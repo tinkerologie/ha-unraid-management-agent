@@ -32,6 +32,7 @@ from custom_components.unraid_management_agent.api.models import (
     NotificationOverview,
     NotificationsResponse,
     SystemInfo,
+    VMGuestInfo,
 )
 from custom_components.unraid_management_agent.collection import (
     TOPIC_SOURCES,
@@ -388,8 +389,27 @@ async def test_ws_set_topics_connection_closed() -> None:
 
     assert client.subscribed_topics is None
     socket.fail_send = False
-    await client._subscribe_on_connect(socket)
+    # The same filter is retried, since the agent never received it
+    await client.set_topics(["system_update"])
     assert socket.sent == [{"subscribe": ["system_update"]}]
+    assert client.subscribed_topics == ["system_update"]
+
+
+async def test_ws_failed_filter_change_reports_unfiltered() -> None:
+    """A failed change on a filtered connection does not report the old filter."""
+    socket = _FakeSocket()
+    client = UnraidWebSocketClient("192.0.2.10", topics=["system_update"])
+    client._websocket = socket
+    await client._subscribe_on_connect(socket)
+
+    async def broken_send(message: str) -> None:
+        msg = "send failed"
+        raise OSError(msg)
+
+    socket.send = broken_send  # type: ignore[method-assign]
+    with pytest.raises(OSError):
+        await client.set_topics(["array_status_update"])
+    assert client.subscribed_topics is None
 
 
 async def test_ws_unfiltered_connection_set_topics() -> None:
@@ -524,6 +544,49 @@ async def test_skipped_poll_detects_unreachable_agent(
     with pytest.raises(UpdateFailed):
         await _poll(coordinator)
     coordinator.client.get_system_info.assert_awaited_once()
+
+
+async def test_vm_guest_kept_between_full_polls(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """With VM devices on, guest data is pushed and not fetched between full polls."""
+    client = MagicMock()
+    client.host = "192.0.2.10"
+    client.port = 8043
+    client.get_system_info = AsyncMock(
+        return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
+    )
+    client.get_array_status = AsyncMock(return_value=mock_array_status())
+    client.get_collectors_status = AsyncMock(return_value=_status())
+    guests = [VMGuestInfo(vm_name="Home Assistant")]
+    client.get_vm_guest = AsyncMock(return_value=guests)
+    coordinator = UnraidDataUpdateCoordinator(
+        hass,
+        entry=_entry(hass, {CONF_ENABLE_VM_DEVICES: True}),
+        client=client,
+        enable_websocket=True,
+    )
+    first = await _poll(coordinator)
+    assert first.vm_guest == guests
+    topics = subscription_topics(first, coordinator.config_entry.options)
+    assert topics is not None
+    assert "vm_guest_update" in topics
+    coordinator._ws_client = _ws(topics)
+
+    freezer.tick(timedelta(seconds=30))
+    data = await _poll(coordinator)
+    client.get_vm_guest.assert_awaited_once()
+    assert data.vm_guest == guests
+
+
+async def test_topic_filter_send_error_does_not_fail_poll(
+    coordinator: UnraidDataUpdateCoordinator,
+) -> None:
+    """An error sending the filter is logged; the poll still succeeds."""
+    coordinator._ws_client = _ws(None)
+    coordinator._ws_client.set_topics.side_effect = OSError("send failed")
+    data = await _poll(coordinator)
+    assert data.system is not None
 
 
 async def test_reconnect_forces_full_poll(

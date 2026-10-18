@@ -122,7 +122,8 @@ class UnraidWebSocketClient:
         self._background_task: asyncio.Task[None] | None = None
         # Topic filter sent after each connect; None receives every topic
         self._topics = list(topics) if topics is not None else None
-        self._topics_sent = False
+        # Filter the agent received on the current connection; None = all
+        self._sent_topics: list[str] | None = None
 
     async def _call_callback(
         self, callback: Callable[..., Any] | None, *args: Any
@@ -167,42 +168,43 @@ class UnraidWebSocketClient:
         """
         Return the topics the current connection is filtered to.
 
-        None while disconnected or while the connection receives every topic.
+        This is the filter the agent received, not a pending one. None while
+        disconnected or while the connection receives every topic.
         """
-        if not self._topics_sent or not self.is_connected:
+        if not self.is_connected:
             return None
-        return self._topics
+        return self._sent_topics
 
     async def set_topics(self, topics: list[str] | None) -> None:
         """
         Set the topic filter and send it to the agent when connected.
 
-        The filter is sent again after each reconnect. None resets the
-        connection to every topic.
+        The filter is sent again after each reconnect, and on the next call
+        if a send fails. None resets the connection to every topic.
         """
-        topics = list(topics) if topics is not None else None
-        if topics == self._topics:
-            return
-        self._topics = topics
-        if self._websocket is None:
-            return
-        if topics is None and not self._topics_sent:
-            # Never filtered: the connection already receives every topic
+        self._topics = list(topics) if topics is not None else None
+        if self._websocket is None or self._topics == self._sent_topics:
             return
         try:
             await self._send_topics(self._websocket)
         except websockets.exceptions.ConnectionClosed:
             # Sent again once the connection is back
-            self._topics_sent = False
+            pass
 
     async def _send_topics(self, websocket: Any) -> None:
-        """Send the subscribe frame for the current topic filter."""
+        """
+        Send the subscribe frame for the current topic filter.
+
+        Until the send completes the connection's filter is unknown, so it
+        is reported as unfiltered (callers then fetch everything).
+        """
+        self._sent_topics = None
         await websocket.send(json.dumps({"subscribe": self._topics}))
-        self._topics_sent = self._topics is not None
+        self._sent_topics = self._topics
 
     async def _subscribe_on_connect(self, websocket: Any) -> None:
         """Send the topic filter, if any, to a new connection."""
-        self._topics_sent = False
+        self._sent_topics = None
         if self._topics is not None:
             await self._send_topics(websocket)
 
@@ -258,7 +260,7 @@ class UnraidWebSocketClient:
             raise ConnectionError(f"Failed to connect to WebSocket: {e}") from e
         finally:
             self._websocket = None
-            self._topics_sent = False
+            self._sent_topics = None
             await self._call_callback(self.on_close)
 
     async def start(self) -> None:
@@ -340,7 +342,7 @@ class UnraidWebSocketClient:
 
             finally:
                 self._websocket = None
-                self._topics_sent = False
+                self._sent_topics = None
 
             # Handle disconnection
             if self._running:

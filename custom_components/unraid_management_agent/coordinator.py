@@ -671,9 +671,14 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         if self._ws_client is None or data.collectors is None:
             # Without collector status the mode is unknown: keep the filter
             return
-        await self._ws_client.set_topics(
-            subscription_topics(data, self.config_entry.options)
-        )
+        try:
+            await self._ws_client.set_topics(
+                subscription_topics(data, self.config_entry.options)
+            )
+        except Exception as err:
+            # The client reports the connection as unfiltered, so polls fetch
+            # everything; the filter is sent again on the next poll
+            _LOGGER.debug("Error sending WebSocket topic filter: %s", err)
 
     async def _async_update_data(self) -> UnraidData:
         """
