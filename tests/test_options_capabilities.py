@@ -29,6 +29,7 @@ from custom_components.unraid_management_agent.api.models import (
 )
 from custom_components.unraid_management_agent.config_flow import (
     _has_controllable_fans,
+    _has_fans,
     _has_hwmon_controllers,
     _service_present,
     _visible_option_keys,
@@ -82,10 +83,7 @@ CPUTIN_KEY = "nct6798_isa_0290_temp2"
 def _minimal_data() -> UnraidData:
     """Return the data of a server with none of the optional capabilities."""
     return UnraidData(
-        system=SystemInfo(
-            fans=[FanInfo(name="nct6798_fan1", rpm=900, source="nct6798-isa-0290")],
-            temperatures=[],
-        ),
+        system=SystemInfo(fans=[], temperatures=[]),
         containers=[],
         vms=[],
         gpu=[],
@@ -407,3 +405,40 @@ def test_nic_option_follows_the_nic_collector(
     """With the option off no cards are fetched, so the nic collector decides."""
     data = UnraidData(network_cards=None, collectors=collectors)
     assert (CONF_ENABLE_NIC_DEVICES in _visible_option_keys(data)) is expected
+
+
+def test_fans_without_control_show_the_fan_option() -> None:
+    """Fan RPM sensors depend on the option, so any reported fan shows it."""
+    rpm_only = UnraidData(
+        system=SystemInfo(
+            fans=[FanInfo(name="nct6798_fan1", rpm=900, source="nct6798-isa-0290")]
+        ),
+        fan_control=FanControlStatus(
+            fans=[FanDevice(id="fan1", name="Fan 1", controllable=False)]
+        ),
+    )
+    assert _has_fans(rpm_only) is True
+    assert CONF_ENABLE_FAN_CONTROL in _visible_option_keys(rpm_only)
+    assert _has_fans(UnraidData(system=SystemInfo(fans=[]))) is False
+    assert _has_fans(UnraidData()) is False
+
+
+@pytest.mark.parametrize("missing", ["runtime_data", "coordinator"])
+async def test_all_options_without_runtime_data(
+    hass: HomeAssistant, loaded_entry: MockConfigEntry, missing: str
+) -> None:
+    """A loaded entry without runtime data or coordinator shows every option."""
+    runtime_data = loaded_entry.runtime_data
+    if missing == "runtime_data":
+        loaded_entry.runtime_data = None
+    else:
+        loaded_entry.runtime_data = MagicMock(coordinator=None)
+    try:
+        result = await hass.config_entries.options.async_init(loaded_entry.entry_id)
+        assert result["type"] is FlowResultType.FORM
+        assert _schema_keys(result) == [
+            *ALL_BOOLEAN_KEYS,
+            CONF_CPU_TEMPERATURE_SOURCE,
+        ]
+    finally:
+        loaded_entry.runtime_data = runtime_data

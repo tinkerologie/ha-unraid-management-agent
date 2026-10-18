@@ -388,6 +388,18 @@ def _has_controllable_fans(data: UnraidData) -> bool:
     return any(fan.id and fan.controllable for fan in fans or [])
 
 
+def _has_fans(data: UnraidData) -> bool:
+    """
+    Return True when the fan control option has anything to act on.
+
+    The option gates the fan RPM sensors (one per reported fan) as well as the
+    fan control entities, so any reported fan counts, not only controllable
+    ones.
+    """
+    system = data.system
+    return bool(system is not None and system.fans) or _has_controllable_fans(data)
+
+
 def _visible_option_keys(data: UnraidData) -> set[str]:
     """Return the boolean options that apply to this server's data."""
     visible = {CONF_READ_ONLY, CONF_ENABLE_WEBSOCKET}
@@ -407,7 +419,7 @@ def _visible_option_keys(data: UnraidData) -> set[str]:
         visible.add(CONF_ENABLE_HWMON_DEVICES)
     if data.zfs_pools:
         visible.add(CONF_ENABLE_ZFS_POOL_DEVICES)
-    if _has_controllable_fans(data):
+    if _has_fans(data):
         visible.add(CONF_ENABLE_FAN_CONTROL)
     return visible
 

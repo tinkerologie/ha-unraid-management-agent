@@ -131,3 +131,25 @@ async def test_selected_channel_without_reading(
     ]
     await _setup(hass, **{CONF_CPU_TEMPERATURE_SOURCE: K10TEMP_KEY})
     assert _cpu_state(hass) == STATE_UNKNOWN
+
+
+@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
+async def test_selected_channel_without_coordinator_data(
+    hass: HomeAssistant, mock_async_unraid_client: MagicMock
+) -> None:
+    """With no coordinator data a picked channel gives no value and is unavailable."""
+    mock_async_unraid_client.get_system_info.return_value.temperatures = [K10TEMP]
+    entry = await _setup(hass, **{CONF_CPU_TEMPERATURE_SOURCE: K10TEMP_KEY})
+    coordinator = entry.runtime_data.coordinator
+    coordinator.data = None
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+    assert _cpu_state(hass) == STATE_UNAVAILABLE
+
+    entity = next(
+        e
+        for e in hass.data["sensor"].entities
+        if getattr(e, "unique_id", None) == f"{ENTRY_ID}_cpu_temperature"
+    )
+    assert entity.native_value is None
+    assert entity.available is False
