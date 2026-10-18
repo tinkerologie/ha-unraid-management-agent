@@ -2487,6 +2487,13 @@ class ParitySchedule(BaseModel):
         validation_alias=AliasChoices("minute", "schedule_minute", "start_minute"),
     )
     day_of_month: CoercedInt = Field(None, description="Day of month for monthly mode")
+    week_of_month: str | None = Field(
+        None,
+        description=(
+            "Week of the month for weekday schedules (W1-W4, or WL for the last"
+            " week); Unraid's dotm week value"
+        ),
+    )
     month: CoercedInt = Field(
         None,
         description="Month (1-12) for yearly mode",

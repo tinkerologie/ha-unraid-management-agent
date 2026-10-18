@@ -5512,3 +5512,228 @@ def test_unassigned_device_size_sensor() -> None:
     assert attrs["device_path"] == "/dev/sdc1"
     assert attrs["filesystem"] == "btrfs"
     assert attrs["mounted"] is True
+
+
+# ---------------------------------------------------------------------------
+# Parity sensors on servers without a parity disk, and first-week schedules
+# ---------------------------------------------------------------------------
+
+_FIRST_FRIDAY_CRON = "0 22 * 1,4,7,10 5"
+
+
+def _next_parity_with_now(schedule, now: datetime) -> datetime | None:
+    from custom_components.unraid_management_agent.sensor import (
+        _get_next_parity_check,
+    )
+
+    data = UnraidData()
+    data.parity_schedule = schedule
+    with patch(
+        "custom_components.unraid_management_agent.sensor.dt_util.now",
+        return_value=now,
+    ):
+        return _get_next_parity_check(data)
+
+
+@pytest.mark.parametrize("mode", ["monthly", "yearly", "custom"])
+def test_next_parity_check_first_week_guard(mode: str) -> None:
+    """Unraid's `[[ $(date +%e) -le 7 ]]` guard is not in check_cron; apply it."""
+    from custom_components.unraid_management_agent.api.models import ParitySchedule
+
+    schedule = ParitySchedule(mode=mode, check_cron=_FIRST_FRIDAY_CRON)
+    # Fri 2026-10-16 is a Friday in October, but not the first one
+    result = _next_parity_with_now(schedule, datetime(2026, 10, 14, 12, tzinfo=UTC))
+    assert result is not None
+    assert (result.year, result.month, result.day, result.hour) == (2027, 1, 1, 22)
+    assert result.weekday() == 4
+
+
+def test_next_parity_check_first_week_guard_same_month() -> None:
+    """When the first matching weekday is still ahead it is returned."""
+    from custom_components.unraid_management_agent.api.models import ParitySchedule
+
+    schedule = ParitySchedule(mode="monthly", check_cron=_FIRST_FRIDAY_CRON)
+    result = _next_parity_with_now(schedule, datetime(2026, 9, 20, 12, tzinfo=UTC))
+    assert result is not None
+    assert (result.month, result.day) == (10, 2)
+
+
+@pytest.mark.parametrize(
+    ("mode", "cron", "extra"),
+    [
+        ("weekly", "0 22 * * 5", {}),
+        ("daily", "0 22 * * *", {}),
+        ("monthly", "0 22 1 * *", {}),
+        ("custom", "0 22 * 1,4,7,10 5", {"cron": "0 22 * 1,4,7,10 5"}),
+        ("manual", "0 22 * * 5", {}),
+    ],
+)
+def test_next_parity_check_no_guard_when_not_implied(
+    mode: str, cron: str, extra: dict
+) -> None:
+    """Only month-based schedules with a weekday and no day-of-month get the guard."""
+    from custom_components.unraid_management_agent.api.models import ParitySchedule
+
+    schedule = ParitySchedule(mode=mode, check_cron=cron, **extra)
+    result = _next_parity_with_now(schedule, datetime(2026, 10, 14, 12, tzinfo=UTC))
+    assert result is not None
+    if mode == "monthly":
+        assert (result.month, result.day) == (11, 1)
+    elif mode == "custom":
+        assert (result.month, result.day) == (10, 16)  # raw user cron, any Friday
+    elif mode != "daily":
+        assert (result.month, result.day) == (10, 16)
+
+
+@pytest.mark.parametrize(
+    ("week", "expected_day"),
+    [
+        ("W1", (2027, 1, 1)),
+        ("W2", (2027, 1, 8)),
+        ("W3", (2026, 10, 16)),
+        ("W4", (2026, 10, 23)),
+        ("WL", (2026, 10, 30)),
+        ("w2", (2027, 1, 8)),
+    ],
+)
+def test_next_parity_check_uses_the_reported_week(
+    week: str, expected_day: tuple[int, int, int]
+) -> None:
+    """The agent's week_of_month picks the week of the weekday schedule."""
+    from custom_components.unraid_management_agent.api.models import ParitySchedule
+    from custom_components.unraid_management_agent.sensor import (
+        _get_next_parity_check_attrs,
+    )
+
+    schedule = ParitySchedule(
+        mode="monthly", check_cron=_FIRST_FRIDAY_CRON, week_of_month=week
+    )
+    result = _next_parity_with_now(schedule, datetime(2026, 10, 14, 12, tzinfo=UTC))
+    assert result is not None
+    assert (result.year, result.month, result.day) == expected_day
+    data = UnraidData()
+    data.parity_schedule = schedule
+    attrs = _get_next_parity_check_attrs(data)
+    assert attrs["schedule_week"] == week.upper()
+    assert attrs["schedule_week_inferred"] is False
+
+
+def test_next_parity_check_week_inferred_without_agent_week() -> None:
+    """An older agent without week_of_month gets the first week, flagged inferred."""
+    from custom_components.unraid_management_agent.api.models import ParitySchedule
+    from custom_components.unraid_management_agent.sensor import (
+        _get_next_parity_check_attrs,
+    )
+
+    data = UnraidData()
+    for week in (None, "", "13"):
+        data.parity_schedule = ParitySchedule(
+            mode="monthly", check_cron=_FIRST_FRIDAY_CRON, week_of_month=week
+        )
+        attrs = _get_next_parity_check_attrs(data)
+        assert attrs["schedule_week"] == "W1"
+        assert attrs["schedule_week_inferred"] is True
+    data.parity_schedule = ParitySchedule(mode="weekly", check_cron="0 22 * * 5")
+    assert "schedule_week" not in _get_next_parity_check_attrs(data)
+
+
+@pytest.mark.parametrize(
+    "cron",
+    ["0 22 * 1,4,7,10", "0 22 * * 5 extra", "0 22 * * *"],
+    ids=["four_fields", "six_fields", "any_weekday"],
+)
+def test_no_week_guard_without_a_five_field_weekday_cron(cron: str) -> None:
+    """Only a five-field cron with a weekday and a wildcard day-of-month is guarded."""
+    from custom_components.unraid_management_agent.api.models import ParitySchedule
+    from custom_components.unraid_management_agent.sensor import (
+        _get_next_parity_check_attrs,
+        _schedule_week,
+    )
+
+    schedule = ParitySchedule(mode="monthly", check_cron=cron, week_of_month="W2")
+    assert _schedule_week(schedule) == (None, False)
+    data = UnraidData()
+    data.parity_schedule = schedule
+    assert "schedule_week" not in _get_next_parity_check_attrs(data)
+
+
+def test_last_week_guard_handles_month_lengths() -> None:
+    """WL is the last seven days of each month, including February."""
+    from custom_components.unraid_management_agent.sensor import _in_schedule_week
+
+    assert _in_schedule_week(datetime(2027, 2, 22, tzinfo=UTC), "WL")
+    assert not _in_schedule_week(datetime(2027, 2, 21, tzinfo=UTC), "WL")
+    assert _in_schedule_week(datetime(2026, 10, 25, tzinfo=UTC), "WL")
+    assert not _in_schedule_week(datetime(2026, 10, 24, tzinfo=UTC), "WL")
+
+
+def test_next_cron_occurrence_guard_unsatisfiable_returns_none() -> None:
+    """A guarded cron that never lands in the first week gives up (bounded loop)."""
+    from custom_components.unraid_management_agent.sensor import (
+        _next_cron_occurrence,
+    )
+
+    now = datetime(2026, 10, 14, 12, tzinfo=UTC)
+    with (
+        patch(
+            "custom_components.unraid_management_agent.sensor.dt_util.now",
+            return_value=now,
+        ),
+        patch(
+            "custom_components.unraid_management_agent.sensor._WEEK_GUARD_MAX_ITERATIONS",
+            1,
+        ),
+    ):
+        # One scan allowed: Fri 2026-10-16 fails the guard and the bound is hit
+        assert _next_cron_occurrence("0 22 * * 5", week="W1") is None
+        assert _next_cron_occurrence("0 22 * * 5") is not None
+
+
+@pytest.mark.parametrize(
+    ("num_data", "num_parity", "expected"),
+    [
+        (0, 0, False),
+        (3, 0, True),
+        (3, 1, True),
+        (3, 2, True),
+        (None, None, True),
+    ],
+)
+def test_parity_sensors_gated_on_array_disks(num_data, num_parity, expected) -> None:
+    """Parity sensors are hidden only on a server with no array disks."""
+    from custom_components.unraid_management_agent.api.models import (
+        ArrayStatus,
+        ParityCheckRecord,
+        ParityHistory,
+        ParitySchedule,
+    )
+    from custom_components.unraid_management_agent.sensor import (
+        ARRAY_SENSOR_DESCRIPTIONS,
+        PARITY_SCHEDULE_SENSOR_DESCRIPTIONS,
+    )
+
+    data = UnraidData()
+    data.array = ArrayStatus(
+        state="Started", num_data_disks=num_data, num_parity_disks=num_parity
+    )
+    data.parity_schedule = ParitySchedule(mode="monthly", check_cron="0 1 1 * *")
+    data.parity_history = ParityHistory(
+        records=[ParityCheckRecord(date="2025-02-01T00:00:00Z")]
+    )
+    descriptions = {
+        d.key: d
+        for d in (*PARITY_SCHEDULE_SENSOR_DESCRIPTIONS, *ARRAY_SENSOR_DESCRIPTIONS)
+    }
+    for key in ("next_parity_check", "last_parity_check", "parity_progress"):
+        assert descriptions[key].supported_fn(data) is expected
+
+
+def test_parity_sensors_supported_without_array_data() -> None:
+    """Missing array data is unknown, not 'no parity' (don't hide on a failed fetch)."""
+    from custom_components.unraid_management_agent.sensor import (
+        ARRAY_SENSOR_DESCRIPTIONS,
+    )
+
+    data = UnraidData()
+    parity = next(d for d in ARRAY_SENSOR_DESCRIPTIONS if d.key == "parity_progress")
+    assert parity.supported_fn(data) is True

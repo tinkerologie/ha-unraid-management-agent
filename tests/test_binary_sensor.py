@@ -1299,3 +1299,30 @@ def test_remote_share_binary_sensor_methods() -> None:
     assert attrs["protocol"] == "smb"
     assert attrs["server"] == "192.168.1.50"
     assert attrs["mount_point"] == "/mnt/remotes/share1"
+
+
+def test_has_parity_schedule_no_parity_disks():
+    """The schedule binary sensor is hidden only on a server with no array disks."""
+    from custom_components.unraid_management_agent.api.models import (
+        ArrayStatus,
+        ParitySchedule,
+    )
+
+    coordinator = MagicMock()
+    coordinator.data = UnraidData()
+    coordinator.data.parity_schedule = ParitySchedule(mode="monthly")
+    coordinator.data.array = ArrayStatus(
+        state="Started", num_data_disks=0, num_parity_disks=0
+    )
+    assert _has_parity_schedule(coordinator) is False
+    # An array without parity can still run read checks on a schedule
+    coordinator.data.array = ArrayStatus(
+        state="Started", num_data_disks=3, num_parity_disks=0
+    )
+    assert _has_parity_schedule(coordinator) is True
+    coordinator.data.array = ArrayStatus(
+        state="Started", num_data_disks=3, num_parity_disks=1
+    )
+    assert _has_parity_schedule(coordinator) is True
+    coordinator.data.array = None
+    assert _has_parity_schedule(coordinator) is True

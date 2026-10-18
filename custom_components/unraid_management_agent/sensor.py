@@ -8,12 +8,13 @@ callbacks, enabling a declarative approach to sensor definition.
 
 from __future__ import annotations
 
+import calendar
 import logging
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, cast
+from typing import Any, Final, cast
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -940,15 +941,79 @@ def _get_plugins_with_updates_attrs(data: UnraidData) -> dict[str, Any]:
 # =============================================================================
 
 
-def _next_cron_occurrence(cron_expr: str) -> datetime | None:
-    """Compute the next occurrence of a cron expression in local time."""
+# Upper bound on cron occurrences scanned when applying a week-of-month guard
+# (a guarded schedule matches at most a few times a year).
+_WEEK_GUARD_MAX_ITERATIONS = 500
+
+# Unraid's week-of-month choices for weekday schedules (dotm W1-W4, WL)
+_SCHEDULE_WEEKS: Final = frozenset({"W1", "W2", "W3", "W4", "WL"})
+
+
+def _in_schedule_week(occurrence: datetime, week: str) -> bool:
+    """
+    Return True when an occurrence falls in the given week of its month.
+
+    W1-W4 are days 1-7, 8-14, 15-21 and 22-28, and WL is the last seven days
+    of the month, matching the ``date +%e`` guards Unraid writes into the cron.
+    """
+    if week == "WL":
+        days_in_month = calendar.monthrange(occurrence.year, occurrence.month)[1]
+        return occurrence.day > days_in_month - 7
+    number = int(week[1])
+    return (number - 1) * 7 < occurrence.day <= number * 7
+
+
+def _next_cron_occurrence(
+    cron_expr: str, *, week: str | None = None
+) -> datetime | None:
+    """
+    Compute the next occurrence of a cron expression in local time.
+
+    With ``week`` only occurrences in that week of the month count, mirroring
+    the ``[[ $(date +%e) ... ]] &&`` guard Unraid adds to weekday schedules.
+    """
     try:
         from cronsim import CronSim
 
-        return next(CronSim(cron_expr, dt_util.now()))
+        occurrences = CronSim(cron_expr, dt_util.now())
+        if week is None:
+            return next(occurrences)
+        for _ in range(_WEEK_GUARD_MAX_ITERATIONS):
+            occurrence = next(occurrences)
+            if _in_schedule_week(occurrence, week):
+                return occurrence
     except Exception:
         _LOGGER.debug("Could not compute next run for cron expression %r", cron_expr)
         return None
+    _LOGGER.debug("No %s occurrence found for cron expression %r", week, cron_expr)
+    return None
+
+
+def _schedule_week(schedule: Any) -> tuple[str | None, bool]:
+    """
+    Return the week-of-month guard of a schedule and whether it was inferred.
+
+    Unraid writes "<week> <weekday> of the month" schedules as
+    ``m h * <months> <dow> [[ $(date +%e) ... ]] && mdcmd check ...`` and the
+    agent's ``check_cron`` carries only the five cron fields. A month-based
+    schedule with a weekday and a wildcard day-of-month can only come from that
+    option. The agent's ``week_of_month`` says which week; without it (older
+    agents) the first week, Unraid's most common choice, is assumed and
+    reported as inferred. Weekly/daily schedules and raw custom crons have no
+    guard.
+    """
+    mode = (schedule.mode or "").lower()
+    if mode not in ("monthly", "yearly", "custom"):
+        return None, False
+    if mode == "custom" and schedule.cron:
+        return None, False
+    fields = (schedule.check_cron or "").split()
+    if not (len(fields) == 5 and fields[2] == "*" and fields[4] != "*"):
+        return None, False
+    week = (getattr(schedule, "week_of_month", None) or "").upper()
+    if week in _SCHEDULE_WEEKS:
+        return week, False
+    return "W1", True
 
 
 def _get_next_parity_check(data: UnraidData) -> datetime | None:
@@ -962,7 +1027,9 @@ def _get_next_parity_check(data: UnraidData) -> datetime | None:
     # (parity-check.cron, exposed by agent >= 2026.06.05); it is exact for
     # every scheduled mode including custom (issue #68).
     if schedule.check_cron:
-        next_check = _next_cron_occurrence(schedule.check_cron)
+        next_check = _next_cron_occurrence(
+            schedule.check_cron, week=_schedule_week(schedule)[0]
+        )
         if next_check is not None:
             return next_check
 
@@ -995,6 +1062,10 @@ def _get_next_parity_check_attrs(data: UnraidData) -> dict[str, Any]:
         attrs["mode"] = schedule.mode
     if schedule.frequency is not None:
         attrs["frequency"] = schedule.frequency
+    week, inferred = _schedule_week(schedule)
+    if week is not None:
+        attrs["schedule_week"] = week
+        attrs["schedule_week_inferred"] = inferred
     if schedule.day is not None:
         attrs["day"] = schedule.day
     if schedule.month is not None:

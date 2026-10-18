@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps the agent's value; the sensor's state and availability change only
   when a channel is picked. Entity IDs and unique IDs are unchanged.
 
+- **Wrong next parity check date for week-of-month schedules**:
+  - The next parity check no longer lands on any matching weekday for Unraid's "<week> <weekday> of the month" schedules (e.g. first Friday of Jan/Apr/Jul/Oct). Unraid's `date +%e` week guard is not part of `check_cron`, so it is re-applied for month-based schedules with a weekday and a wildcard day-of-month: the week the agent reports in `week_of_month` (W1-W4, WL), or the first week on agents that don't report it. The next parity check sensor shows the week in `schedule_week`, and `schedule_week_inferred` is true when it was assumed.
 - **Clean up Docker and VMs group devices when options are disabled**:
   - The **<hostname> Docker** and **<hostname> VMs** group devices are now cleanly removed from the device registry when "Show Docker containers as separate devices" (`enable_container_devices`) or "Show virtual machines as separate devices" (`enable_vm_devices`) is disabled in integration options.
   - All associated entities (Docker CPU, memory, vDisk, container updates, system services for docker/libvirt, and container/VM switches and buttons) are safely reparented under the main server device when the group devices are disabled.
