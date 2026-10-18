@@ -59,6 +59,7 @@ from .api.models import (
     UpdateStatus,
     UPSInfo,
     UserScript,
+    VMGuestInfo,
     VMInfo,
     VMSettings,
     ZFSArcStats,
@@ -148,6 +149,10 @@ class UnraidData:
     # None when network card devices are off, the agent has no /network/cards
     # endpoint, or the fetch failed
     network_cards: NICList | None = None
+    # Data read inside configured VMs through the guest agent (/vm/guest).
+    # None when VM devices are off, the agent has no such endpoint (404), or
+    # the fetch failed; readings inside an entry are None while the VM is off.
+    vm_guest: list[VMGuestInfo] | None = None
     # Alerting engine (agent /alerts/rules and /alerts/status). None when the
     # agent does not provide them (older agents: 404) or the fetch failed.
     alert_rules: list[AlertRule] | None = None
@@ -195,6 +200,35 @@ class UnraidRuntimeData:
 
 
 type UnraidConfigEntry = ConfigEntry[UnraidRuntimeData]
+
+
+def _drop_replaced_vm_guests(
+    guests: list[VMGuestInfo] | None,
+    old_vms: list[Any] | None,
+    new_vms: list[Any],
+) -> list[VMGuestInfo] | None:
+    """
+    Return the guest records without those of VMs replaced under the same name.
+
+    Guest records name their VM but carry no UUID. When a VM list update brings
+    a VM with a known name but a new UUID, the cached record belongs to the old
+    VM, so it is dropped until the agent reports the new VM's guest data.
+    """
+    if not guests:
+        return guests
+    old_ids = {
+        getattr(vm, "name", None): getattr(vm, "id", None) for vm in old_vms or []
+    }
+    replaced = {
+        name
+        for vm in new_vms
+        if (name := getattr(vm, "name", None)) is not None
+        and name in old_ids
+        and old_ids[name] != getattr(vm, "id", None)
+    }
+    if not replaced:
+        return guests
+    return [guest for guest in guests if guest.vm_name not in replaced]
 
 
 def _merge_collector_state(
@@ -549,6 +583,14 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
             "network cards", self.client.get_network_cards, suppress_404=True
         )
 
+    async def _fetch_vm_guest(self) -> list[VMGuestInfo] | None:
+        """Fetch guest agent data, only when VMs are shown as devices."""
+        if not self.is_vm_devices_enabled():
+            return None
+        return await self._fetch(
+            "VM guest data", self.client.get_vm_guest, suppress_404=True
+        )
+
     async def _fetch_parity_history(self) -> ParityHistory | None:
         """
         Return parity history, fetching it at most once per interval.
@@ -654,6 +696,7 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                 ),
                 self._fetch("NUT status", self.client.get_nut_info, suppress_404=True),
                 self._fetch_network_cards(),
+                self._fetch_vm_guest(),
             )
 
             # Unpack results with proper types (gather loses individual type info).
@@ -697,6 +740,7 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
             storage_topology: StorageTopology | None = results[33]
             nut: NUTInfo | None = results[34]
             network_cards: NICList | None = results[35]
+            vm_guest: list[VMGuestInfo] | None = results[36]
 
             # If the core endpoints are all unreachable, treat the whole update
             # as failed instead of returning an empty snapshot. This flips
@@ -829,6 +873,7 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                 else None,
                 storage_topology=storage_topology,
                 network_cards=network_cards,
+                vm_guest=vm_guest,
             )
 
             # Check for issues and create repair flows
@@ -903,7 +948,15 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                 event.data if isinstance(event.data, list) else [event.data]
             )
         elif event.event_type == EventType.VM_LIST_UPDATE:
-            self.data.vms = event.data if isinstance(event.data, list) else [event.data]
+            vms = event.data if isinstance(event.data, list) else [event.data]
+            self.data.vm_guest = _drop_replaced_vm_guests(
+                self.data.vm_guest, self.data.vms, vms
+            )
+            self.data.vms = vms
+        elif event.event_type == EventType.VM_GUEST_UPDATE:
+            self.data.vm_guest = (
+                event.data if isinstance(event.data, list) else [event.data]
+            )
         elif event.event_type == EventType.SHARE_LIST_UPDATE:
             self.data.shares = (
                 event.data if isinstance(event.data, list) else [event.data]
