@@ -390,3 +390,20 @@ def test_fan_without_id_is_not_controllable() -> None:
         fan_control=FanControlStatus(fans=[FanDevice(name="Fan", controllable=True)])
     )
     assert _has_controllable_fans(data) is False
+
+
+@pytest.mark.parametrize(
+    ("collectors", "expected"),
+    [
+        (_collectors(nic=True), True),
+        (_collectors(nic=False), False),
+        (_collectors(docker=True), False),
+        (None, False),
+    ],
+)
+def test_nic_option_follows_the_nic_collector(
+    collectors: CollectorStatus | None, expected: bool
+) -> None:
+    """With the option off no cards are fetched, so the nic collector decides."""
+    data = UnraidData(network_cards=None, collectors=collectors)
+    assert (CONF_ENABLE_NIC_DEVICES in _visible_option_keys(data)) is expected

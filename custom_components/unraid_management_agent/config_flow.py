@@ -397,7 +397,11 @@ def _visible_option_keys(data: UnraidData) -> set[str]:
         visible.add(CONF_ENABLE_VM_DEVICES)
     if data.gpu:
         visible.add(CONF_ENABLE_GPU_DEVICES)
-    if data.network_cards is not None and data.network_cards.cards:
+    # Network cards are only fetched while the option is on, so the agent's
+    # nic collector is the signal that does not depend on the option itself
+    if _collector_enabled(data, "nic") or (
+        data.network_cards is not None and data.network_cards.cards
+    ):
         visible.add(CONF_ENABLE_NIC_DEVICES)
     if _has_hwmon_controllers(data):
         visible.add(CONF_ENABLE_HWMON_DEVICES)
