@@ -849,7 +849,12 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
             # stale entity cleanup is suppressed (the previous behaviour fed an
             # empty-but-"successful" snapshot to cleanup, which then removed
             # every dynamic entity while the server was rebooting; see #83).
-            if system is None and array is None:
+            # A poll that kept system and array from the WebSocket checks the
+            # collector status instead, which every poll fetches.
+            core_missing = system is None and array is None
+            if {"system", "array"} <= self._skip_fields:
+                core_missing = collectors is None
+            if core_missing:
                 if not self._unavailable_logged:
                     _LOGGER.warning(
                         "Unraid server is unreachable (core endpoints returned no data)"
@@ -985,6 +990,12 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
             from . import repairs
 
             await repairs.async_check_and_create_issues(self.hass, self, data)
+
+            # WebSocket events may have updated kept fields while this poll
+            # awaited: return their newest values
+            if self.data is not None:
+                for field in self._skip_fields:
+                    setattr(data, field, getattr(self.data, field))
 
             return data
 

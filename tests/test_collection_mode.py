@@ -13,6 +13,7 @@ import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
@@ -491,6 +492,38 @@ async def test_dynamic_mode_skips_pushed_rest_reads(
     await _poll(coordinator)
     assert client.get_system_info.await_count == 2
     assert client.get_notification_overview.await_count == 2
+
+
+async def test_push_during_poll_is_kept(
+    coordinator: UnraidDataUpdateCoordinator, freezer: FrozenDateTimeFactory
+) -> None:
+    """A WebSocket push that arrives while a skipped poll awaits is not undone."""
+    first = await _poll(coordinator)
+    coordinator._ws_client = _ws(subscription_topics(first, {}))
+    pushed = SystemInfo(hostname="tower", uptime_seconds=2000)
+
+    async def collectors_status() -> CollectorStatus:
+        # The event arrives while the poll waits on REST calls
+        coordinator.data.system = pushed
+        return _status()
+
+    coordinator.client.get_collectors_status.side_effect = collectors_status
+    freezer.tick(timedelta(seconds=30))
+    data = await _poll(coordinator)
+    assert data.system is pushed
+
+
+async def test_skipped_poll_detects_unreachable_agent(
+    coordinator: UnraidDataUpdateCoordinator, freezer: FrozenDateTimeFactory
+) -> None:
+    """With system and array kept, a failed collector status fails the update."""
+    first = await _poll(coordinator)
+    coordinator._ws_client = _ws(subscription_topics(first, {}))
+    coordinator.client.get_collectors_status.side_effect = Exception("down")
+    freezer.tick(timedelta(seconds=30))
+    with pytest.raises(UpdateFailed):
+        await _poll(coordinator)
+    coordinator.client.get_system_info.assert_awaited_once()
 
 
 async def test_reconnect_forces_full_poll(
