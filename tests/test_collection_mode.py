@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Iterator
 from datetime import timedelta
@@ -395,6 +396,38 @@ async def test_ws_set_topics_connection_closed() -> None:
     assert client.subscribed_topics == ["system_update"]
 
 
+async def test_ws_overlapping_filter_changes() -> None:
+    """A change made while a send is in flight is sent next and recorded."""
+    socket = _FakeSocket()
+    client = UnraidWebSocketClient("192.0.2.10")
+    client._websocket = socket
+    release = asyncio.Event()
+    sent_first = asyncio.Event()
+    real_send = socket.send
+
+    async def slow_send(message: str) -> None:
+        if not sent_first.is_set():
+            sent_first.set()
+            await release.wait()
+        await real_send(message)
+
+    socket.send = slow_send  # type: ignore[method-assign]
+    first = asyncio.create_task(client.set_topics(["system_update"]))
+    await sent_first.wait()
+    second = asyncio.create_task(client.set_topics(["array_status_update"]))
+    await asyncio.sleep(0)
+    # Mid-send the filter is unknown
+    assert client.subscribed_topics is None
+    release.set()
+    await asyncio.gather(first, second)
+
+    assert socket.sent == [
+        {"subscribe": ["system_update"]},
+        {"subscribe": ["array_status_update"]},
+    ]
+    assert client.subscribed_topics == ["array_status_update"]
+
+
 async def test_ws_failed_filter_change_reports_unfiltered() -> None:
     """A failed change on a filtered connection does not report the old filter."""
     socket = _FakeSocket()
@@ -587,6 +620,9 @@ async def test_topic_filter_send_error_does_not_fail_poll(
     coordinator._ws_client.set_topics.side_effect = OSError("send failed")
     data = await _poll(coordinator)
     assert data.system is not None
+    coordinator._ws_client.set_topics.assert_awaited_once_with(
+        subscription_topics(data, coordinator.config_entry.options)
+    )
 
 
 async def test_reconnect_forces_full_poll(

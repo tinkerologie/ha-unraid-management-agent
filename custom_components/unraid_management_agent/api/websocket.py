@@ -124,6 +124,7 @@ class UnraidWebSocketClient:
         self._topics = list(topics) if topics is not None else None
         # Filter the agent received on the current connection; None = all
         self._sent_topics: list[str] | None = None
+        self._send_lock = asyncio.Lock()
 
     async def _call_callback(
         self, callback: Callable[..., Any] | None, *args: Any
@@ -183,7 +184,7 @@ class UnraidWebSocketClient:
         if a send fails. None resets the connection to every topic.
         """
         self._topics = list(topics) if topics is not None else None
-        if self._websocket is None or self._topics == self._sent_topics:
+        if self._websocket is None:
             return
         try:
             await self._send_topics(self._websocket)
@@ -193,18 +194,24 @@ class UnraidWebSocketClient:
 
     async def _send_topics(self, websocket: Any) -> None:
         """
-        Send the subscribe frame for the current topic filter.
+        Send the current topic filter unless the agent already has it.
 
-        Until the send completes the connection's filter is unknown, so it
-        is reported as unfiltered (callers then fetch everything).
+        Sends are serialised, and each records the filter its own frame
+        carried. Until a send completes the connection's filter is unknown,
+        so it is reported as unfiltered (callers then fetch everything).
         """
-        self._sent_topics = None
-        await websocket.send(json.dumps({"subscribe": self._topics}))
-        self._sent_topics = self._topics
+        async with self._send_lock:
+            topics = self._topics
+            if topics == self._sent_topics:
+                return
+            self._sent_topics = None
+            await websocket.send(json.dumps({"subscribe": topics}))
+            self._sent_topics = topics
 
     async def _subscribe_on_connect(self, websocket: Any) -> None:
         """Send the topic filter, if any, to a new connection."""
-        self._sent_topics = None
+        async with self._send_lock:
+            self._sent_topics = None
         if self._topics is not None:
             await self._send_topics(websocket)
 
