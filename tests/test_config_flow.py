@@ -13,6 +13,7 @@ from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from custom_components.unraid_management_agent.api import UnraidConnectionError
 from custom_components.unraid_management_agent.const import (
+    CONF_CPU_TEMPERATURE_SOURCE,
     CONF_ENABLE_CONTAINER_DEVICES,
     CONF_ENABLE_CONTAINER_UPDATES,
     CONF_ENABLE_FAN_CONTROL,
@@ -30,6 +31,7 @@ from custom_components.unraid_management_agent.const import (
 )
 
 from .const import MOCK_CONFIG, mock_system_info
+from .test_options_capabilities import _full_data
 
 
 async def test_form_user_success(
@@ -235,6 +237,12 @@ async def test_options_flow(
     ):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
+    hass.config_entries.async_update_entry(
+        mock_config_entry,
+        options={**mock_config_entry.options, CONF_READ_ONLY: True},
+    )
+    # A server with every capability shows every option (issue #231)
+    mock_config_entry.runtime_data.coordinator.data = _full_data()
 
     result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
 
@@ -251,6 +259,7 @@ async def test_options_flow(
         CONF_ENABLE_HWMON_DEVICES,
         CONF_ENABLE_VM_DEVICES,
         CONF_ENABLE_ZFS_POOL_DEVICES,
+        CONF_CPU_TEMPERATURE_SOURCE,
     ]
 
     with (
@@ -274,6 +283,8 @@ async def test_options_flow(
 
     assert result2["type"] == FlowResultType.CREATE_ENTRY
     assert result2["data"][CONF_ENABLE_WEBSOCKET] is False
+    # Options not in the submitted input are kept
+    assert mock_config_entry.options[CONF_READ_ONLY] is True
 
 
 async def test_reconfigure_flow(

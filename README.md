@@ -246,6 +246,11 @@ Click **Configure** on an active integration entry to adjust operational options
 | **Show USB sensor controllers as separate devices** | `false` | Creates a child device for each USB sensor controller the agent identifies (e.g. an Aquacomputer Octo), holding its fan and temperature sensors named by their lm-sensors labels. |
 | **Show virtual machines as separate devices**       | `false` | Creates a child device for each VM under the server's VMs device, keyed by libvirt UUID.                                                                                          |
 | **Show ZFS pools as separate devices**              | `false` | Creates a child device for each ZFS pool holding its sensors, plus drive health roll-ups (hottest drive, worst NVMe wear, media errors, failing drives).                          |
+| **CPU temperature source**                          | `auto`  | Where the CPU temperature sensor gets its value. **Automatic** uses the agent's CPU temperature; pick a hwmon channel (e.g. `k10temp Tctl`) if that shows the wrong chip.         |
+
+The dialog only shows the options that apply to your server. **Read-only mode** and **WebSocket** are always shown. The other options appear only when the integration detects what they are for: Docker or VMs enabled (or containers/VMs present), GPUs, PCI network cards, USB sensor controllers, ZFS pools, controllable fans, or hwmon temperature channels for the CPU temperature source. An option that is already on stays visible so you can turn it off, hidden options keep their saved values, and every option is shown while the server's data is not available (for example before the first connection).
+
+If you pick a CPU temperature channel, the CPU temperature sensor shows that channel's reading and is unavailable while the agent does not report it. With **Automatic** nothing changes.
 
 ---
 

@@ -20,8 +20,8 @@ from custom_components.unraid_management_agent.const import (
     DOMAIN,
 )
 from custom_components.unraid_management_agent.coordinator import UnraidData
-from custom_components.unraid_management_agent.sensor import (
-    _hwmon_temperature_channels,
+from custom_components.unraid_management_agent.hwmon import (
+    hwmon_temperature_channels,
 )
 
 from .const import MOCK_CONFIG, MOCK_OPTIONS
@@ -53,7 +53,7 @@ def _system(readings: list[TemperatureInfo]) -> MagicMock:
 
 
 def _keys(readings: list[TemperatureInfo]) -> set[str]:
-    return {key for key, _, _ in _hwmon_temperature_channels(_system(readings))}
+    return {key for key, _, _ in hwmon_temperature_channels(_system(readings))}
 
 
 def test_temperature_info_feature_and_label() -> None:
@@ -83,7 +83,7 @@ def test_channel_keys_do_not_depend_on_other_chips() -> None:
 def test_display_name_uses_short_chip_only_when_unique() -> None:
     """Names read 'octo Coolant Temp' but keep the bus address for 'nvme'."""
     names = {
-        key: name for key, _, name in _hwmon_temperature_channels(_system(READINGS))
+        key: name for key, _, name in hwmon_temperature_channels(_system(READINGS))
     }
     assert names == {
         "octo_hid_temp1": "octo Coolant Temp",
@@ -105,7 +105,7 @@ def test_readings_without_source_stay_distinct() -> None:
 def test_duplicate_channel_creates_one_sensor() -> None:
     """A channel the agent lists twice yields a single sensor, not a key clash."""
     duplicate = _reading("octo-hid-3-3_Coolant_Temp_temp1_input", 28.1, "octo-hid-3-3")
-    channels = _hwmon_temperature_channels(_system([COOLANT, duplicate]))
+    channels = hwmon_temperature_channels(_system([COOLANT, duplicate]))
     assert [key for key, _, _ in channels] == ["octo_hid_temp1"]
 
 

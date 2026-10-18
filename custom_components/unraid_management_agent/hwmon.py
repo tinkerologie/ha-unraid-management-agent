@@ -20,11 +20,60 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import slugify
 
-from .api.models import FanInfo, TemperatureInfo
+from .api.models import FanInfo, TemperatureInfo, hwmon_temperature_keys
 from .const import DOMAIN
 from .entity import hwmon_controller_identifier
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def hwmon_readings_by_key(system: Any) -> dict[str, TemperatureInfo]:
+    """
+    Map each hwmon temperature channel's entity key to its reading.
+
+    A None system or temperature list gives an empty mapping.
+    """
+    keyed: dict[str, TemperatureInfo] = {}
+    for key, reading in hwmon_temperature_keys(
+        getattr(system, "temperatures", None)
+    ).items():
+        keyed.setdefault(slugify(key), reading)
+    return keyed
+
+
+def hwmon_temperature_channels(
+    system: Any,
+) -> list[tuple[str, TemperatureInfo, str]]:
+    """
+    Return (key, reading, display name) for each hwmon temperature channel.
+
+    The key comes from the chip name and channel (hwmon_temperature_keys), so
+    it stays the same whichever other chips are present and when a USB device
+    reconnects with a new address. The display name uses the short chip name
+    ('octo') unless several chips share it (several 'nvme' drives); it only
+    sets the initial entity ID, so it may differ between setups without
+    affecting identity.
+    """
+    keyed = hwmon_readings_by_key(system)
+
+    def short_chip(reading: TemperatureInfo) -> str:
+        """Return the chip name without its bus address ('k10temp')."""
+        return (reading.source or "").split("-")[0]
+
+    counts: dict[tuple[str, str | None], int] = {}
+    for reading in keyed.values():
+        ident = (short_chip(reading), reading.hwmon_feature)
+        counts[ident] = counts.get(ident, 0) + 1
+
+    channels: list[tuple[str, TemperatureInfo, str]] = []
+    for key, reading in sorted(keyed.items(), key=lambda kv: kv[1].name or ""):
+        chip = reading.source or ""
+        if counts[(short_chip(reading), reading.hwmon_feature)] == 1:
+            chip = short_chip(reading)
+        elif reading.device_id:
+            chip = f"{short_chip(reading)} {reading.device_id}"
+        channels.append((key, reading, f"{chip} {reading.label}".strip()))
+    return channels
 
 
 @callback

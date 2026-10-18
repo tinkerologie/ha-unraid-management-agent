@@ -67,7 +67,8 @@
           "enable_nic_devices": "Show network cards as separate devices",
           "enable_hwmon_devices": "Show USB sensor controllers as separate devices",
           "enable_vm_devices": "Show virtual machines as separate devices",
-          "enable_zfs_pool_devices": "Show ZFS pools as separate devices"
+          "enable_zfs_pool_devices": "Show ZFS pools as separate devices",
+          "cpu_temperature_source": "CPU temperature source"
         },
         "data_description": {
           "enable_container_updates": "Periodically check Docker containers for available image updates. This may slow down polling and use additional network requests. Also creates an update entity for each container, from which its image update can be installed.",
@@ -79,8 +80,16 @@
           "enable_nic_devices": "Give each PCI network card its own device under the server, with its ASIC, PHY, and MAC temperatures, and per port the link speed and the plugged optic's diagnostics (module temperature and voltage, RX and TX power, alarm and warning flags, vendor and part number). Needs an agent that reports network cards. When off, no network card entities are created (existing ones are removed).",
           "enable_hwmon_devices": "Give each USB sensor controller the agent identifies (for example an Aquacomputer Octo) its own device under the server, holding its fan and temperature sensors named by their lm-sensors labels (\"Array Fan1\", \"Coolant Temp\"). Entity IDs are kept. When off, these sensors stay on the server device. A channel labelled as flow in sensors.conf (\"Coolant Flow\") is shown as a flow channel either way; it still reports RPM.",
           "enable_vm_devices": "Give each VM its own device under the server's VMs device, holding its power switch, control buttons, and metric sensors (CPU, memory, network, and disk rates). When off, VM switches and buttons stay on the server device, and no VM sensors are created.",
-          "enable_zfs_pool_devices": "Give each ZFS pool its own device under the server, holding its usage, health, scrub, and error sensors with short names, plus drive health roll-ups: hottest drive temperature, worst NVMe wear, media errors, failing drives, and a drive count with per-drive details. Drive health needs agent 2026.10 or later. When off, pool entities stay on the server device, named after the pool."
+          "enable_zfs_pool_devices": "Give each ZFS pool its own device under the server, holding its usage, health, scrub, and error sensors with short names, plus drive health roll-ups: hottest drive temperature, worst NVMe wear, media errors, failing drives, and a drive count with per-drive details. Drive health needs agent 2026.10 or later. When off, pool entities stay on the server device, named after the pool.",
+          "cpu_temperature_source": "Where the CPU temperature sensor gets its value. \"Automatic\" uses the CPU temperature the agent reports. If that shows the wrong chip on your board (for example a motherboard channel such as nct6798 CPUTIN instead of k10temp Tctl), pick the hwmon channel to use instead. The sensor is unavailable while the picked channel is not reported."
         }
+      }
+    }
+  },
+  "selector": {
+    "cpu_temperature_source": {
+      "options": {
+        "auto": "Automatic (agent CPU temperature)"
       }
     }
   },

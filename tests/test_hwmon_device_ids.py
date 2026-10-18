@@ -24,9 +24,9 @@ from custom_components.unraid_management_agent.const import (
     DOMAIN,
 )
 from custom_components.unraid_management_agent.coordinator import UnraidData
-from custom_components.unraid_management_agent.hwmon import fan_legacy_unique_ids
-from custom_components.unraid_management_agent.sensor import (
-    _hwmon_temperature_channels,
+from custom_components.unraid_management_agent.hwmon import (
+    fan_legacy_unique_ids,
+    hwmon_temperature_channels,
 )
 
 from .const import MOCK_CONFIG, MOCK_OPTIONS
@@ -70,7 +70,7 @@ FAN_B = _fan(f"octo-{SERIAL_B}_fan8", 900, "octo-hid-3-14", SERIAL_B)
 
 
 def _keys(temps: list[TemperatureInfo]) -> set[str]:
-    return {key for key, _, _ in _hwmon_temperature_channels(_system(temps, []))}
+    return {key for key, _, _ in hwmon_temperature_channels(_system(temps, []))}
 
 
 def test_temperature_key_uses_device_id() -> None:
@@ -84,7 +84,7 @@ def test_temperature_key_uses_device_id() -> None:
 
 def test_two_octos_with_device_ids() -> None:
     """Two identical controllers get separate, address-free keys and names."""
-    channels = _hwmon_temperature_channels(_system([OCTO_A, OCTO_B], []))
+    channels = hwmon_temperature_channels(_system([OCTO_A, OCTO_B], []))
     assert {key: name for key, _, name in channels} == {
         "octo_hid_07274_50017_temp1": f"octo {SERIAL_A} Coolant Temp",
         "octo_hid_07274_61234_temp1": f"octo {SERIAL_B} Coolant Temp",

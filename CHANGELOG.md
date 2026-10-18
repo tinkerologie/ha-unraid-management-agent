@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Selectable CPU temperature source** (#195): On some boards the agent's CPU
+  temperature comes from the wrong chip (for example `nct6798 CPUTIN` instead
+  of `k10temp Tctl` on a Ryzen with an ASUS B550). A new **CPU temperature
+  source** option lists the reported hwmon temperature channels with their
+  current readings. With a channel picked, the CPU temperature sensor shows
+  that channel, whether or not its own temperature sensor is enabled, and is
+  unavailable while the agent does not report it. The default, **Automatic**,
+  keeps the agent's value; the sensor's state and availability change only
+  when a channel is picked. Entity IDs and unique IDs are unchanged.
+
 - **Clean up Docker and VMs group devices when options are disabled**:
   - The **<hostname> Docker** and **<hostname> VMs** group devices are now cleanly removed from the device registry when "Show Docker containers as separate devices" (`enable_container_devices`) or "Show virtual machines as separate devices" (`enable_vm_devices`) is disabled in integration options.
   - All associated entities (Docker CPU, memory, vDisk, container updates, system services for docker/libvirt, and container/VM switches and buttons) are safely reparented under the main server device when the group devices are disabled.
@@ -16,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Options dialog shows only what applies to the server** (#231): Read-only
+  mode and WebSocket are always shown. The Docker, VM, GPU, network card, USB
+  sensor controller, ZFS pool and fan control options appear only when the
+  server's data shows the related service or hardware (for Docker and VMs: a
+  known service setting first, then an explicitly enabled collector). An
+  option that is on stays visible so it can be turned off, saving the form
+  keeps the stored values of hidden options, and every option is shown when
+  the server's data is not available.
 - **Start Array and Stop Array buttons disabled by default**: New installs get
   the `array_start` and `array_stop` buttons disabled, so the array cannot be
   started or stopped by an accidental tap on a dashboard. Existing button

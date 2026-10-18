@@ -51,7 +51,6 @@ from .api.models import (
     NUTDeviceStatus,
     TemperatureInfo,
     fan_sensor_keys,
-    hwmon_temperature_keys,
 )
 from .cleanup import async_prune_seen_names
 from .const import (
@@ -71,7 +70,10 @@ from .const import (
     ATTR_SERVER_MODEL,
     ATTR_UPS_MODEL,
     ATTR_UPS_STATUS,
+    CONF_CPU_TEMPERATURE_SOURCE,
     CONF_ENABLE_FAN_CONTROL,
+    CPU_TEMPERATURE_SOURCE_AUTO,
+    DEFAULT_CPU_TEMPERATURE_SOURCE,
     DEFAULT_ENABLE_FAN_CONTROL,
     DOMAIN,
 )
@@ -100,6 +102,8 @@ from .hwmon import (
     fan_model_is_shared,
     hwmon_controller_names,
     hwmon_controller_of,
+    hwmon_readings_by_key,
+    hwmon_temperature_channels,
     temperature_legacy_unique_ids,
 )
 from .nic import (
@@ -1761,6 +1765,51 @@ class UnraidSensorEntity(UnraidBaseEntity, SensorEntity):
         return self.entity_description.available_fn(self.coordinator.data)
 
 
+class UnraidCpuTemperatureSensorEntity(UnraidSensorEntity):
+    """
+    CPU temperature from the agent, or from a hwmon channel the user picked.
+
+    The agent picks the CPU temperature itself, and on some boards it picks a
+    motherboard channel (nct6798 CPUTIN instead of k10temp Tctl, issue #195).
+    The "CPU temperature source" option names a hwmon channel by its stable
+    key; that channel is then read from the latest data, whether or not its
+    own (disabled by default) temperature entity is enabled. A picked channel
+    that is not reported makes the entity unavailable rather than falling back
+    to the value the user rejected.
+    """
+
+    @property
+    def _source(self) -> str:
+        """Return the configured CPU temperature source."""
+        return str(
+            self.coordinator.config_entry.options.get(
+                CONF_CPU_TEMPERATURE_SOURCE, DEFAULT_CPU_TEMPERATURE_SOURCE
+            )
+        )
+
+    def _selected_reading(self) -> TemperatureInfo | None:
+        """Return the picked channel's reading from the latest data."""
+        data = self.coordinator.data
+        system = data.system if data else None
+        return hwmon_readings_by_key(system).get(self._source)
+
+    @property
+    def native_value(self) -> Any:
+        """Return the agent's value, or the picked channel's temperature."""
+        if self._source == CPU_TEMPERATURE_SOURCE_AUTO:
+            return super().native_value
+        reading = self._selected_reading()
+        value = reading.value_celsius if reading else None
+        return round(float(value), 1) if value is not None else None
+
+    @property
+    def available(self) -> bool:
+        """Return False when the picked channel is missing from the data."""
+        if self._source == CPU_TEMPERATURE_SOURCE_AUTO:
+            return super().available
+        return super().available and self._selected_reading() is not None
+
+
 class UnraidUptimeSensorEntity(UnraidSensorEntity):
     """
     Uptime sensor that stabilizes the derived boot timestamp.
@@ -1871,50 +1920,6 @@ class UnraidSystemStatusSensor(UnraidBaseEntity, SensorEntity):
 # =============================================================================
 
 
-def _hwmon_readings_by_key(system: Any) -> dict[str, TemperatureInfo]:
-    """Map each hwmon temperature channel's entity key to its reading."""
-    keyed: dict[str, TemperatureInfo] = {}
-    for key, reading in hwmon_temperature_keys(
-        getattr(system, "temperatures", None)
-    ).items():
-        keyed.setdefault(ha_slugify(key), reading)
-    return keyed
-
-
-def _hwmon_temperature_channels(
-    system: Any,
-) -> list[tuple[str, TemperatureInfo, str]]:
-    """
-    Return (key, reading, display name) for each hwmon temperature channel.
-
-    The key comes from the chip name and channel (hwmon_temperature_keys), so
-    it stays the same whichever other chips are present and when a USB device
-    reconnects with a new address. The display name uses the short chip name
-    ('octo') unless several chips share it (several 'nvme' drives); it only
-    sets the initial entity ID, so it may differ between setups without
-    affecting identity.
-    """
-    keyed = _hwmon_readings_by_key(system)
-
-    def short_chip(reading: TemperatureInfo) -> str:
-        return (reading.source or "").split("-")[0]
-
-    counts: dict[tuple[str, str | None], int] = {}
-    for reading in keyed.values():
-        ident = (short_chip(reading), reading.hwmon_feature)
-        counts[ident] = counts.get(ident, 0) + 1
-
-    channels: list[tuple[str, TemperatureInfo, str]] = []
-    for key, reading in sorted(keyed.items(), key=lambda kv: kv[1].name or ""):
-        chip = reading.source or ""
-        if counts[(short_chip(reading), reading.hwmon_feature)] == 1:
-            chip = short_chip(reading)
-        elif reading.device_id:
-            chip = f"{short_chip(reading)} {reading.device_id}"
-        channels.append((key, reading, f"{chip} {reading.label}".strip()))
-    return channels
-
-
 def _hwmon_controller_device(
     coordinator: UnraidDataUpdateCoordinator, item: Any
 ) -> DeviceInfo | ChildDeviceInfo | None:
@@ -1978,7 +1983,7 @@ class UnraidHwmonTemperatureSensor(UnraidBaseEntity, SensorEntity):
         """Return this channel's reading from the latest data, if present."""
         data = self.coordinator.data
         system = data.system if data else None
-        return _hwmon_readings_by_key(system).get(self._key)
+        return hwmon_readings_by_key(system).get(self._key)
 
     @property
     def available(self) -> bool:
@@ -4870,6 +4875,10 @@ async def async_setup_entry(
         if description.supported_fn(data):
             if description.key == "uptime":
                 entities.append(UnraidUptimeSensorEntity(coordinator, description))
+            elif description.key == "cpu_temperature":
+                entities.append(
+                    UnraidCpuTemperatureSensorEntity(coordinator, description)
+                )
             else:
                 entities.append(UnraidSensorEntity(coordinator, description))
 
@@ -5331,7 +5340,7 @@ async def async_setup_entry(
         )
         new_entities: list[SensorEntity] = []
         prefix = f"{entry.entry_id}_temperature_"
-        channels = _hwmon_temperature_channels(current_data.system)
+        channels = hwmon_temperature_channels(current_data.system)
         readings = [reading for _, reading, _ in channels]
         for key, reading, display_name in channels:
             if key not in seen_temperatures:

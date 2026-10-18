@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigEntry,
+    ConfigEntryState,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlowWithReload,
@@ -18,6 +19,10 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -26,6 +31,7 @@ from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .api import UnraidAuthenticationError, UnraidClient, UnraidConnectionError
 from .const import (
+    CONF_CPU_TEMPERATURE_SOURCE,
     CONF_ENABLE_CONTAINER_DEVICES,
     CONF_ENABLE_CONTAINER_UPDATES,
     CONF_ENABLE_FAN_CONTROL,
@@ -36,6 +42,8 @@ from .const import (
     CONF_ENABLE_WEBSOCKET,
     CONF_ENABLE_ZFS_POOL_DEVICES,
     CONF_READ_ONLY,
+    CPU_TEMPERATURE_SOURCE_AUTO,
+    DEFAULT_CPU_TEMPERATURE_SOURCE,
     DEFAULT_ENABLE_CONTAINER_DEVICES,
     DEFAULT_ENABLE_CONTAINER_UPDATES,
     DEFAULT_ENABLE_FAN_CONTROL,
@@ -53,6 +61,10 @@ from .const import (
     ERROR_TIMEOUT,
     ERROR_UNKNOWN,
 )
+from .hwmon import hwmon_controller_of, hwmon_temperature_channels
+
+if TYPE_CHECKING:
+    from .coordinator import UnraidData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -306,83 +318,172 @@ class UnraidConfigFlow(ConfigFlow, domain=DOMAIN):
         return UnraidOptionsFlowHandler()
 
 
+# Options in the order the form shows them, with their defaults. The read-only
+# and WebSocket options apply to every server; the others are shown only when
+# the server has what they are for (see _visible_option_keys).
+_BOOLEAN_OPTIONS: tuple[tuple[str, bool], ...] = (
+    (CONF_ENABLE_CONTAINER_UPDATES, DEFAULT_ENABLE_CONTAINER_UPDATES),
+    (CONF_ENABLE_FAN_CONTROL, DEFAULT_ENABLE_FAN_CONTROL),
+    (CONF_READ_ONLY, DEFAULT_READ_ONLY),
+    (CONF_ENABLE_WEBSOCKET, DEFAULT_ENABLE_WEBSOCKET),
+    (CONF_ENABLE_CONTAINER_DEVICES, DEFAULT_ENABLE_CONTAINER_DEVICES),
+    (CONF_ENABLE_GPU_DEVICES, DEFAULT_ENABLE_GPU_DEVICES),
+    (CONF_ENABLE_NIC_DEVICES, DEFAULT_ENABLE_NIC_DEVICES),
+    (CONF_ENABLE_HWMON_DEVICES, DEFAULT_ENABLE_HWMON_DEVICES),
+    (CONF_ENABLE_VM_DEVICES, DEFAULT_ENABLE_VM_DEVICES),
+    (CONF_ENABLE_ZFS_POOL_DEVICES, DEFAULT_ENABLE_ZFS_POOL_DEVICES),
+)
+
+
+def _entry_data(entry: ConfigEntry) -> UnraidData | None:
+    """
+    Return the entry's latest coordinator data, or None if there is none.
+
+    Only a loaded entry has runtime data; before the first successful refresh
+    (or after unload) the form falls back to showing every option.
+    """
+    if entry.state is not ConfigEntryState.LOADED:
+        return None
+    runtime_data = getattr(entry, "runtime_data", None)
+    coordinator = getattr(runtime_data, "coordinator", None)
+    return getattr(coordinator, "data", None)
+
+
+def _collector_enabled(data: UnraidData, name: str) -> bool:
+    """Return True only when the agent lists the collector as enabled."""
+    collectors = data.collectors
+    collector = collectors.get_collector_by_name(name) if collectors else None
+    return collector is not None and collector.enabled is True
+
+
+def _service_present(
+    items: list[Any] | None, settings: Any, collector: str, data: UnraidData
+) -> bool:
+    """
+    Return True when the server shows a Docker or VM service.
+
+    Existing containers/VMs count first. Otherwise a known service setting
+    decides; only without one does an explicitly enabled collector count.
+    Unknown is not enabled here, unlike the coordinator's permissive helpers.
+    """
+    if items:
+        return True
+    if settings is not None and getattr(settings, "enabled", None) is not None:
+        return settings.enabled is True
+    return _collector_enabled(data, collector)
+
+
+def _has_hwmon_controllers(data: UnraidData) -> bool:
+    """Return True when a fan or temperature is on a USB sensor controller."""
+    system = data.system
+    if system is None:
+        return False
+    items = [*(system.fans or []), *(system.temperatures or [])]
+    return any(hwmon_controller_of(item) is not None for item in items)
+
+
+def _has_controllable_fans(data: UnraidData) -> bool:
+    """Return True when a fan can be controlled (the rule number.py uses)."""
+    fans = data.fan_control.fans if data.fan_control else None
+    return any(fan.id and fan.controllable for fan in fans or [])
+
+
+def _visible_option_keys(data: UnraidData) -> set[str]:
+    """Return the boolean options that apply to this server's data."""
+    visible = {CONF_READ_ONLY, CONF_ENABLE_WEBSOCKET}
+    if _service_present(data.containers, data.docker_settings, "docker", data):
+        visible |= {CONF_ENABLE_CONTAINER_DEVICES, CONF_ENABLE_CONTAINER_UPDATES}
+    if _service_present(data.vms, data.vm_settings, "vm", data):
+        visible.add(CONF_ENABLE_VM_DEVICES)
+    if data.gpu:
+        visible.add(CONF_ENABLE_GPU_DEVICES)
+    if data.network_cards is not None and data.network_cards.cards:
+        visible.add(CONF_ENABLE_NIC_DEVICES)
+    if _has_hwmon_controllers(data):
+        visible.add(CONF_ENABLE_HWMON_DEVICES)
+    if data.zfs_pools:
+        visible.add(CONF_ENABLE_ZFS_POOL_DEVICES)
+    if _has_controllable_fans(data):
+        visible.add(CONF_ENABLE_FAN_CONTROL)
+    return visible
+
+
+# Options shown together: a group stays visible while any of its keys is on
+_OPTION_GROUPS: tuple[frozenset[str], ...] = (
+    frozenset({CONF_ENABLE_CONTAINER_DEVICES, CONF_ENABLE_CONTAINER_UPDATES}),
+)
+
+
+def _cpu_temperature_choices(
+    data: UnraidData | None, current: str
+) -> list[SelectOptionDict]:
+    """
+    Return the CPU temperature source choices: automatic, then each channel.
+
+    A channel is offered by its stable key and labelled with its name and
+    current reading. A stored choice the agent no longer reports is kept, so
+    the form never silently changes the user's selection.
+    """
+    choices = [SelectOptionDict(value=CPU_TEMPERATURE_SOURCE_AUTO, label="Automatic")]
+    system = data.system if data else None
+    for key, reading, name in hwmon_temperature_channels(system):
+        value = reading.value_celsius
+        label = name if value is None else f"{name} ({value:.1f} °C)"
+        choices.append(SelectOptionDict(value=key, label=label))
+    if current not in {choice["value"] for choice in choices}:
+        choices.append(
+            SelectOptionDict(value=current, label=f"{current} (not currently reported)")
+        )
+    return choices
+
+
 class UnraidOptionsFlowHandler(OptionsFlowWithReload):
     """Handle options flow for Unraid Management Agent."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+        """
+        Manage the options.
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_ENABLE_CONTAINER_UPDATES,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_CONTAINER_UPDATES,
-                            DEFAULT_ENABLE_CONTAINER_UPDATES,
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_ENABLE_FAN_CONTROL,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_FAN_CONTROL, DEFAULT_ENABLE_FAN_CONTROL
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_READ_ONLY,
-                        default=self.config_entry.options.get(
-                            CONF_READ_ONLY, DEFAULT_READ_ONLY
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_ENABLE_WEBSOCKET,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_WEBSOCKET, DEFAULT_ENABLE_WEBSOCKET
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_ENABLE_CONTAINER_DEVICES,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_CONTAINER_DEVICES,
-                            DEFAULT_ENABLE_CONTAINER_DEVICES,
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_ENABLE_GPU_DEVICES,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_GPU_DEVICES, DEFAULT_ENABLE_GPU_DEVICES
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_ENABLE_NIC_DEVICES,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_NIC_DEVICES, DEFAULT_ENABLE_NIC_DEVICES
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_ENABLE_HWMON_DEVICES,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_HWMON_DEVICES, DEFAULT_ENABLE_HWMON_DEVICES
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_ENABLE_VM_DEVICES,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_VM_DEVICES, DEFAULT_ENABLE_VM_DEVICES
-                        ),
-                    ): cv.boolean,
-                    vol.Optional(
-                        CONF_ENABLE_ZFS_POOL_DEVICES,
-                        default=self.config_entry.options.get(
-                            CONF_ENABLE_ZFS_POOL_DEVICES,
-                            DEFAULT_ENABLE_ZFS_POOL_DEVICES,
-                        ),
-                    ): cv.boolean,
-                }
-            ),
+        Only the options that apply to the server are shown; hidden options
+        keep their stored values when the form is saved.
+        """
+        options = self.config_entry.options
+        if user_input is not None:
+            return self.async_create_entry(title="", data={**options, **user_input})
+
+        data = _entry_data(self.config_entry)
+        visible = (
+            {key for key, _ in _BOOLEAN_OPTIONS}
+            if data is None
+            else _visible_option_keys(data)
         )
+        # An option that is on stays visible so it can be turned off
+        visible |= {key for key, _ in _BOOLEAN_OPTIONS if options.get(key) is True}
+        for group in _OPTION_GROUPS:
+            if visible & group:
+                visible |= group
+
+        schema: dict[Any, Any] = {
+            vol.Optional(key, default=options.get(key, default)): cv.boolean
+            for key, default in _BOOLEAN_OPTIONS
+            if key in visible
+        }
+
+        cpu_source = options.get(
+            CONF_CPU_TEMPERATURE_SOURCE, DEFAULT_CPU_TEMPERATURE_SOURCE
+        )
+        cpu_choices = _cpu_temperature_choices(data, cpu_source)
+        if data is None or len(cpu_choices) > 1:
+            schema[vol.Optional(CONF_CPU_TEMPERATURE_SOURCE, default=cpu_source)] = (
+                SelectSelector(
+                    SelectSelectorConfig(
+                        options=cpu_choices,
+                        mode=SelectSelectorMode.DROPDOWN,
+                        translation_key=CONF_CPU_TEMPERATURE_SOURCE,
+                    )
+                )
+            )
+
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))
