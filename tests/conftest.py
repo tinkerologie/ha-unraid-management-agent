@@ -150,6 +150,7 @@ def mock_websocket_client() -> Generator[MagicMock]:
         ws_client.start = AsyncMock()
         ws_client.stop = AsyncMock()
         ws_client.is_connected = False
+        ws_client.subscribed_topics = None
         yield ws_client
 
 

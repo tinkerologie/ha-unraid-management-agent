@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Agent Dynamic collection mode support** (#233, needs agent v2026.10.01, tinkerologie/unraid-management-agent#280): the integration detects the agent's collection mode from `GET /collectors/status`. In Dynamic mode:
+  - the WebSocket sends a `{"subscribe": [...]}` topic filter after each connect, with only the topics the integration's entities use, so the agent can slow down collectors nothing else reads. The filter follows collector enable/disable changes and the VM devices option;
+  - while the WebSocket is connected, REST polling skips the data the subscribed topics push and reads everything every 10 minutes and after each reconnect.
+  - Manual mode and older agents keep the unfiltered WebSocket and the full 30-second poll.
+  - The System Status sensor gains a `collection_mode` attribute. Diagnostics show the mode, the topics in use, and each collector's `effective_interval_seconds` and `reason`. The collector models parse the new `mode`, `effective_interval_seconds`, `reason`, `event_driven` and `publish_count` fields.
 - **VM guest agent sensors** (needs an agent with the `vm_guest_agent` feature, tinkerologie/unraid-management-agent#272, and "Show virtual machines as separate devices"): data the agent reads from inside configured VMs through the QEMU guest agent is shown on each VM's device, from `GET /vm/guest` and the `vm_guest_update` WebSocket event:
   - per GPU: temperature, utilization, memory used (total as an attribute), power, fan speed and clock;
   - per disk: temperature and wear; per filesystem: used percent (bytes as attributes);
@@ -16,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The sensors stay available with an unknown state while the VM is off or a reading is null, and only become unavailable when the agent cannot be reached. Entity IDs are named after the VM and the item (`sensor.<server>_vms_<vm>_gpu_0_temperature`, `..._disk_<model>_wear`, `..._filesystem_c_used`, `..._<sensor name>`); unique IDs use the GPU index, disk serial number, mount point and sensor name. Older agents answer 404 and get no guest entities.
 
 ### Fixed
+
+- **Collector interval API call**: `UnraidClient.update_collector_interval` sent `PUT` with `interval_seconds`, which the agent does not accept. It now sends `PATCH /collectors/{name}/interval` with `interval`, and a 409 (the agent manages intervals in Dynamic mode) raises `UnraidDynamicCollectionModeError`, a subclass of `UnraidConflictError`.
 
 - **Selectable CPU temperature source** (#195): On some boards the agent's CPU
   temperature comes from the wrong chip (for example `nct6798 CPUTIN` instead

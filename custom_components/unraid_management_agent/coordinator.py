@@ -7,7 +7,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -68,6 +68,8 @@ from .api.models import (
     ZFSSnapshot,
 )
 from .api.websocket import UnraidWebSocketClient
+from .collection import collection_mode as agent_collection_mode
+from .collection import pushed_fields, subscription_topics
 from .const import (
     CONF_ENABLE_CONTAINER_DEVICES,
     CONF_ENABLE_CONTAINER_UPDATES,
@@ -102,6 +104,11 @@ _RECONNECT_REFRESH_DEBOUNCE = timedelta(seconds=10)
 # agent re-reads parity-checks.log from the boot device on every request, so
 # it is fetched on this slower cadence instead of on every poll.
 _PARITY_HISTORY_INTERVAL = timedelta(minutes=15)
+
+# In the agent's Dynamic collection mode, data pushed over the subscribed
+# WebSocket topics is fetched over REST only on this cadence: a safety net
+# for missed events. A REST read also counts as demand for its collector.
+_DYNAMIC_FULL_POLL_INTERVAL = timedelta(minutes=10)
 
 
 @dataclass
@@ -308,6 +315,10 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         # Last successfully fetched parity history and when it was fetched
         self._parity_history: ParityHistory | None = None
         self._parity_history_fetched_at: datetime | None = None
+        # Fields the current poll keeps instead of fetching (Dynamic mode),
+        # and when the last poll that fetched everything ran
+        self._skip_fields: frozenset[str] = frozenset()
+        self._last_full_poll: datetime | None = None
 
         super().__init__(
             hass,
@@ -332,6 +343,16 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
     def websocket_connected(self) -> bool:
         """Return True if websocket is connected."""
         return self._ws_client is not None and self._ws_client.is_connected
+
+    @property
+    def collection_mode(self) -> str | None:
+        """Return the agent's collection mode: "dynamic", "manual" or None (older agent)."""
+        return agent_collection_mode(self.data.collectors if self.data else None)
+
+    @property
+    def websocket_topics(self) -> list[str] | None:
+        """Return the WebSocket topic filter in use; None means every topic."""
+        return self._ws_client.subscribed_topics if self._ws_client else None
 
     @property
     def last_successful_update(self) -> datetime | None:
@@ -558,8 +579,20 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         coro_fn: Callable[[], Coroutine[Any, Any, T]],
         *,
         suppress_404: bool = False,
+        pushed: str | None = None,
+        keep_pushed: bool = True,
     ) -> T | None:
-        """Fetch data from a single API endpoint, returning *None* on failure."""
+        """
+        Fetch data from a single API endpoint, returning *None* on failure.
+
+        *pushed* names the UnraidData field a WebSocket topic keeps up to
+        date. When this poll skips that field, the current value is returned
+        instead of fetching (or None with ``keep_pushed=False``).
+        """
+        if pushed is not None and pushed in self._skip_fields:
+            if not keep_pushed or self.data is None:
+                return None
+            return cast("T | None", getattr(self.data, pushed))
         try:
             return await coro_fn()
         except UnraidAuthenticationError:
@@ -588,7 +621,10 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         if not self.is_vm_devices_enabled():
             return None
         return await self._fetch(
-            "VM guest data", self.client.get_vm_guest, suppress_404=True
+            "VM guest data",
+            self.client.get_vm_guest,
+            suppress_404=True,
+            pushed="vm_guest",
         )
 
     async def _fetch_parity_history(self) -> ParityHistory | None:
@@ -612,6 +648,33 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                 self._parity_history_fetched_at = now
         return self._parity_history
 
+    def _pushed_fields_to_skip(self) -> frozenset[str]:
+        """
+        Return the fields this poll keeps instead of fetching.
+
+        Only in Dynamic mode with a filtered WebSocket connection: its topics
+        push these fields. Every _DYNAMIC_FULL_POLL_INTERVAL, and after each
+        reconnect, the poll fetches everything.
+        """
+        topics = self.websocket_topics
+        if self.data is None or not topics:
+            return frozenset()
+        if (
+            self._last_full_poll is None
+            or dt_util.utcnow() - self._last_full_poll >= _DYNAMIC_FULL_POLL_INTERVAL
+        ):
+            return frozenset()
+        return pushed_fields(topics)
+
+    async def _async_sync_topics(self, data: UnraidData) -> None:
+        """Send the WebSocket topic filter for the agent's collection mode."""
+        if self._ws_client is None or data.collectors is None:
+            # Without collector status the mode is unknown: keep the filter
+            return
+        await self._ws_client.set_topics(
+            subscription_topics(data, self.config_entry.options)
+        )
+
     async def _async_update_data(self) -> UnraidData:
         """
         Fetch data from API endpoint.
@@ -625,33 +688,66 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
 
         ZFS datasets and snapshots are not polled because no entity uses them
         (the snapshot list can be large), and parity history is fetched on a
-        slower cadence (see _fetch_parity_history).
+        slower cadence (see _fetch_parity_history). In the agent's Dynamic
+        collection mode, data the subscribed WebSocket topics push is kept
+        between full polls (see _pushed_fields_to_skip).
         """
+        self._skip_fields = self._pushed_fields_to_skip()
         try:
             # Fetch all data concurrently - each method returns typed Pydantic models
-            # Fetch all data concurrently - each method returns typed Pydantic models
             results: list[Any] = await asyncio.gather(
-                self._fetch("system info", self.client.get_system_info),
-                self._fetch("array status", self.client.get_array_status),
-                self._fetch("disks", self.client.list_disks),
-                self._fetch("containers", self.client.list_containers),
-                self._fetch("VMs", self.client.list_vms),
-                self._fetch("UPS status", self.client.get_ups_info),
-                self._fetch("GPU metrics", self.client.list_gpus, suppress_404=True),
-                self._fetch("network interfaces", self.client.list_network_interfaces),
-                self._fetch("shares", self.client.list_shares),
-                self._fetch("notifications", self.client.list_notifications),
                 self._fetch(
-                    "notification overview", self.client.get_notification_overview
+                    "system info", self.client.get_system_info, pushed="system"
+                ),
+                self._fetch(
+                    "array status", self.client.get_array_status, pushed="array"
+                ),
+                self._fetch("disks", self.client.list_disks, pushed="disks"),
+                self._fetch(
+                    "containers", self.client.list_containers, pushed="containers"
+                ),
+                self._fetch("VMs", self.client.list_vms, pushed="vms"),
+                self._fetch("UPS status", self.client.get_ups_info, pushed="ups"),
+                self._fetch(
+                    "GPU metrics",
+                    self.client.list_gpus,
+                    suppress_404=True,
+                    pushed="gpu",
+                ),
+                self._fetch(
+                    "network interfaces",
+                    self.client.list_network_interfaces,
+                    pushed="network",
+                ),
+                self._fetch("shares", self.client.list_shares, pushed="shares"),
+                self._fetch(
+                    "notifications",
+                    self.client.list_notifications,
+                    pushed="notifications",
+                ),
+                # notifications_update carries the overview with the list
+                self._fetch(
+                    "notification overview",
+                    self.client.get_notification_overview,
+                    pushed="notifications",
+                    keep_pushed=False,
                 ),
                 self._fetch("user scripts", self.client.list_user_scripts),
-                self._fetch("ZFS pools", self.client.list_zfs_pools),
                 self._fetch(
-                    "ZFS ARC stats", self.client.get_zfs_arc_stats, suppress_404=True
+                    "ZFS pools", self.client.list_zfs_pools, pushed="zfs_pools"
+                ),
+                self._fetch(
+                    "ZFS ARC stats",
+                    self.client.get_zfs_arc_stats,
+                    suppress_404=True,
+                    pushed="zfs_arc",
                 ),
                 self._fetch("collectors status", self.client.get_collectors_status),
                 self._fetch(
-                    "fan control status", self.client.get_fan_status, suppress_404=True
+                    "fan control status",
+                    self.client.get_fan_status,
+                    suppress_404=True,
+                    pushed="fan_control",
                 ),
                 self._fetch("disk settings", self.client.get_disk_settings),
                 self._fetch("mover settings", self.client.get_mover_settings),
@@ -694,7 +790,12 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                     self.client.get_storage_topology,
                     suppress_404=True,
                 ),
-                self._fetch("NUT status", self.client.get_nut_info, suppress_404=True),
+                self._fetch(
+                    "NUT status",
+                    self.client.get_nut_info,
+                    suppress_404=True,
+                    pushed="nut",
+                ),
                 self._fetch_network_cards(),
                 self._fetch_vm_guest(),
             )
@@ -876,6 +977,10 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                 vm_guest=vm_guest,
             )
 
+            if not self._skip_fields:
+                self._last_full_poll = dt_util.utcnow()
+            await self._async_sync_topics(data)
+
             # Check for issues and create repair flows
             from . import repairs
 
@@ -1048,6 +1153,8 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         the next poll cycle. Debounced to avoid hammering the API during rapid
         connect/disconnect cycles.
         """
+        # Events may have been missed while disconnected: fetch everything
+        self._last_full_poll = None
         if self._websocket_disconnect_logged:
             _LOGGER.info("WebSocket reconnected")
             self._websocket_disconnect_logged = False
@@ -1109,6 +1216,7 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                 reconnect_delays=[1, 2, 5, 10, 30],
                 max_retries=10,
                 api_token=self.client.api_token,
+                topics=subscription_topics(self.data, self.config_entry.options),
             )
 
             # Start the WebSocket client as a background task

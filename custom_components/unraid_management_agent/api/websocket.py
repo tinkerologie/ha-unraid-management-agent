@@ -90,6 +90,7 @@ class UnraidWebSocketClient:
         max_retries: int = 10,
         *,
         api_token: str | None = None,
+        topics: list[str] | None = None,
     ):
         self.host = host
         self._headers: dict[str, str] = (
@@ -119,6 +120,9 @@ class UnraidWebSocketClient:
         self._running = False
         self._retry_count = 0
         self._background_task: asyncio.Task[None] | None = None
+        # Topic filter sent after each connect; None receives every topic
+        self._topics = list(topics) if topics is not None else None
+        self._topics_sent = False
 
     async def _call_callback(
         self, callback: Callable[..., Any] | None, *args: Any
@@ -158,6 +162,50 @@ class UnraidWebSocketClient:
             else:
                 callback(*call_args)
 
+    @property
+    def subscribed_topics(self) -> list[str] | None:
+        """
+        Return the topics the current connection is filtered to.
+
+        None while disconnected or while the connection receives every topic.
+        """
+        if not self._topics_sent or not self.is_connected:
+            return None
+        return self._topics
+
+    async def set_topics(self, topics: list[str] | None) -> None:
+        """
+        Set the topic filter and send it to the agent when connected.
+
+        The filter is sent again after each reconnect. None resets the
+        connection to every topic.
+        """
+        topics = list(topics) if topics is not None else None
+        if topics == self._topics:
+            return
+        self._topics = topics
+        if self._websocket is None:
+            return
+        if topics is None and not self._topics_sent:
+            # Never filtered: the connection already receives every topic
+            return
+        try:
+            await self._send_topics(self._websocket)
+        except websockets.exceptions.ConnectionClosed:
+            # Sent again once the connection is back
+            self._topics_sent = False
+
+    async def _send_topics(self, websocket: Any) -> None:
+        """Send the subscribe frame for the current topic filter."""
+        await websocket.send(json.dumps({"subscribe": self._topics}))
+        self._topics_sent = self._topics is not None
+
+    async def _subscribe_on_connect(self, websocket: Any) -> None:
+        """Send the topic filter, if any, to a new connection."""
+        self._topics_sent = False
+        if self._topics is not None:
+            await self._send_topics(websocket)
+
     def _get_reconnect_delay(self) -> int:
         """Get the delay for the current retry attempt."""
         if self._retry_count < len(self.reconnect_delays):
@@ -185,6 +233,7 @@ class UnraidWebSocketClient:
             ) as websocket:
                 self._websocket = websocket
                 self._reset_retry_count()
+                await self._subscribe_on_connect(websocket)
 
                 # Call on_connect callback
                 await self._call_callback(self.on_connect)
@@ -209,6 +258,7 @@ class UnraidWebSocketClient:
             raise ConnectionError(f"Failed to connect to WebSocket: {e}") from e
         finally:
             self._websocket = None
+            self._topics_sent = False
             await self._call_callback(self.on_close)
 
     async def start(self) -> None:
@@ -253,6 +303,7 @@ class UnraidWebSocketClient:
                     additional_headers=self._headers,
                 ) as websocket:
                     self._websocket = websocket
+                    await self._subscribe_on_connect(websocket)
 
                     # Call on_connect callback
                     await self._call_callback(self.on_connect)
@@ -289,6 +340,7 @@ class UnraidWebSocketClient:
 
             finally:
                 self._websocket = None
+                self._topics_sent = False
 
             # Handle disconnection
             if self._running:

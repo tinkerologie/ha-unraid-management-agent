@@ -12,6 +12,7 @@ from .exceptions import (
     UnraidAuthenticationError,
     UnraidConflictError,
     UnraidConnectionError,
+    UnraidDynamicCollectionModeError,
     UnraidNotFoundError,
     UnraidRateLimitError,
     UnraidTimeoutError,
@@ -1940,12 +1941,24 @@ class UnraidClient:
         Returns:
             Updated collector information
 
+        Raises:
+            UnraidDynamicCollectionModeError: If the agent is in Dynamic
+                collection mode, where it manages collector intervals itself
+
         """
-        data = await self._request(
-            "PUT",
-            f"/collectors/{name}/interval",
-            data={"interval_seconds": interval_seconds},
-        )
+        try:
+            data = await self._request(
+                "PATCH",
+                f"/collectors/{name}/interval",
+                data={"interval": interval_seconds},
+            )
+        except UnraidConflictError as err:
+            raise UnraidDynamicCollectionModeError(
+                f"The {name} collector's interval is managed by the agent "
+                "in Dynamic collection mode",
+                error_code=err.error_code,
+                status_code=409,
+            ) from err
         return CollectorInfo.model_validate(data)
 
     # Docker extended endpoints (Issue #39)

@@ -2402,6 +2402,22 @@ class CollectorDetails(BaseModel):
         None, description="True if collector cannot be disabled"
     )
     error_count: int | None = Field(None, description="Error count")
+    # Collection mode fields (agent v2026.10.01+, #280); None on older agents
+    mode: str | None = Field(None, description="Collection mode: dynamic or manual")
+    effective_interval_seconds: int | None = Field(
+        None,
+        description="Interval the collector runs at right now (0 while stopped)",
+    )
+    reason: str | None = Field(
+        None,
+        description="Why it runs at that interval: event, active, idle, floor or manual",
+    )
+    event_driven: bool | None = Field(
+        None, description="True when change events trigger the collector"
+    )
+    publish_count: int | None = Field(
+        None, description="Updates published since the agent started"
+    )
 
     model_config = ConfigDict(frozen=True, extra="allow")
 
@@ -2429,6 +2445,10 @@ class CollectorStatus(BaseModel):
     disabled_count: int | None = Field(None, description="Disabled collectors")
     collectors: list[CollectorDetails] | None = Field(
         None, description="Collector details"
+    )
+    mode: str | None = Field(
+        None,
+        description="Collection mode: dynamic or manual (None on agents before #280)",
     )
     timestamp: str | None = Field(None, description="Data collection timestamp")
 

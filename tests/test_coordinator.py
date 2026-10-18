@@ -595,6 +595,7 @@ class TestCoordinatorWebSocketManagement:
             reconnect_delays=[1, 2, 5, 10, 30],
             max_retries=10,
             api_token=coordinator.client.api_token,
+            topics=None,
         )
         assert coordinator._ws_client is mock_ws
         assert coordinator._ws_task is not None

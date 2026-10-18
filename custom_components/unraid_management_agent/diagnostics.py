@@ -71,6 +71,22 @@ def _serialize_data(data: Any) -> Any:
     return data
 
 
+def _collector_cadence(data: Any) -> list[dict[str, Any]]:
+    """Return each collector's current cadence and why it runs at it."""
+    status = getattr(data, "collectors", None)
+    return [
+        {
+            "name": collector.name,
+            "enabled": collector.enabled,
+            "mode": collector.mode,
+            "interval_seconds": collector.interval_seconds,
+            "effective_interval_seconds": collector.effective_interval_seconds,
+            "reason": collector.reason,
+        }
+        for collector in (status.collectors if status else None) or []
+    ]
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: UnraidConfigEntry
 ) -> dict[str, Any]:
@@ -101,6 +117,11 @@ async def async_get_config_entry_diagnostics(
             "consecutive_failed_updates": coordinator.consecutive_failed_updates,
             "websocket_connected": coordinator.websocket_connected,
             "in_reboot_grace_period": coordinator.in_reboot_grace_period,
+            # Agent collection mode (#280): None on agents without it. The
+            # topic filter is None while the WebSocket receives every topic.
+            "collection_mode": coordinator.collection_mode,
+            "websocket_topics": coordinator.websocket_topics,
         },
+        "collectors": _collector_cadence(coordinator.data),
         "coordinator_data": async_redact_data(coordinator_data, TO_REDACT),
     }

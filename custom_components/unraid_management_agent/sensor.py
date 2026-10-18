@@ -1966,6 +1966,9 @@ class UnraidSystemStatusSensor(UnraidBaseEntity, SensorEntity):
         attrs: dict[str, Any] = {
             "websocket_connected": self.coordinator.websocket_connected,
         }
+        # Agent collection mode (dynamic or manual); absent on older agents
+        if (collection_mode := self.coordinator.collection_mode) is not None:
+            attrs["collection_mode"] = collection_mode
 
         if self.coordinator.pending_system_action is not None:
             attrs["pending_action"] = self.coordinator.pending_system_action

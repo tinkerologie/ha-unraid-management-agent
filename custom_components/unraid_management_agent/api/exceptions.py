@@ -41,6 +41,10 @@ class UnraidConflictError(UnraidAPIError):
     """Exception raised when there's a resource conflict (409)."""
 
 
+class UnraidDynamicCollectionModeError(UnraidConflictError):
+    """Exception raised when the agent manages collector intervals (409, Dynamic mode)."""
+
+
 class UnraidRateLimitError(UnraidAPIError):
     """Exception raised when rate limited by the API (429)."""
 

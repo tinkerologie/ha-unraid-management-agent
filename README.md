@@ -252,6 +252,15 @@ The dialog only shows the options that apply to your server. **Read-only mode** 
 
 If you pick a CPU temperature channel, the CPU temperature sensor shows that channel's reading and is unavailable while the agent does not report it. With **Automatic** nothing changes.
 
+### Agent collection mode
+
+Agents from v2026.10.01 have a **collection mode** setting. In **Dynamic** mode the agent runs each collector at its active rate only while something uses its data, and slows it down otherwise. The integration detects the mode from the agent; there is no option for it.
+
+- **Dynamic**: the WebSocket subscribes only to the data the integration uses (system, array, disks, shares, notifications, and Docker, VMs, UPS, NUT, GPU, network, ZFS and fans when their collectors are enabled; VM guest data only with "Show virtual machines as separate devices"). While the WebSocket is connected, the 30-second poll skips the data these topics push and reads it in full every 10 minutes and after each reconnect, as a safety net for missed events. With the WebSocket off or disconnected, the full 30-second poll is used.
+- **Manual**, or an agent without collection modes: nothing changes. The WebSocket receives every event and the full poll runs every 30 seconds.
+
+The **System Status** sensor shows the mode in its `collection_mode` attribute. Diagnostics list the mode, the WebSocket topics in use, and each collector's `effective_interval_seconds` and `reason` (`event`, `active`, `idle`, `floor` or `manual`).
+
 ---
 
 ## Home Assistant Services
