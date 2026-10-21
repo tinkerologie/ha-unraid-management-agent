@@ -1,11 +1,14 @@
 # Unraid Management Agent Home Assistant Integration
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
-[![GitHub Release](https://img.shields.io/github/release/tinkerologie/ha-unraid-management-agent.svg)](https://github.com/tinkerologie/ha-unraid-management-agent/releases)
-[![codecov](https://codecov.io/gh/tinkerologie/ha-unraid-management-agent/branch/main/graph/badge.svg)](https://codecov.io/gh/tinkerologie/ha-unraid-management-agent)
-[![Community Forum](https://img.shields.io/badge/Community-Forum-blue)](https://community.home-assistant.io/t/unraid-integration)
-[![License](https://img.shields.io/github/license/tinkerologie/ha-unraid-management-agent.svg)](https://github.com/tinkerologie/ha-unraid-management-agent/blob/main/LICENSE)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/tinkerologie/ha-unraid-management-agent)
+<!-- BADGES:START -->
+
+[![Marketplace and HACS](https://img.shields.io/badge/Marketplace%20%7C%20HACS-Default-orange.svg)](https://www.hacs.xyz/docs/marketplace/)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/tinkerologie/ha-unraid-management-agent)](https://github.com/tinkerologie/ha-unraid-management-agent/commits/main)
+[![GitHub Release](https://img.shields.io/github/v/release/tinkerologie/ha-unraid-management-agent)](https://github.com/tinkerologie/ha-unraid-management-agent/releases)
+[![codecov](https://codecov.io/gh/tinkerologie/ha-unraid-management-agent/graph/badge.svg)](https://codecov.io/gh/tinkerologie/ha-unraid-management-agent)
+[![License](https://img.shields.io/github/license/tinkerologie/ha-unraid-management-agent)](./LICENSE)
+
+<!-- BADGES:END -->
 
 This custom integration connects Home Assistant to the [Unraid Management Agent](https://github.com/tinkerologie/unraid-management-agent) (UMA) running on your Unraid server. It delivers comprehensive monitoring, interactive controls, dynamic entity discovery, real-time WebSocket telemetry, and a bundled suite of custom Lovelace dashboard cards.
 
