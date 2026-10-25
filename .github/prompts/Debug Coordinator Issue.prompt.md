@@ -1,6 +1,13 @@
 ---
 agent: "agent"
-tools: ["search/codebase", "search", "problems", "runCommands", "runCommands/terminalLastCommand"]
+tools:
+  [
+    "search/codebase",
+    "search",
+    "problems",
+    "runCommands",
+    "runCommands/terminalLastCommand",
+  ]
 description: "Diagnose and fix data update coordinator problems like stale data or unavailable entities"
 ---
 

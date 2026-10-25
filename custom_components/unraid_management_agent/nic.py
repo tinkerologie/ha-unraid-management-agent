@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.components.binary_sensor import BinarySensorEntityDescription
 from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
@@ -250,7 +250,7 @@ def _thresholds(module: NICModule, name: str) -> dict[str, Any] | None:
 
 
 def _rx_attrs(ctx: NICContext) -> dict[str, Any]:
-    module = cast("NICModule", ctx.module)
+    module = ctx.module
     return {
         "lanes": [
             {"lane": lane.lane, "mw": lane.rx_power_mw, "dbm": lane.rx_power_dbm}
@@ -262,7 +262,7 @@ def _rx_attrs(ctx: NICContext) -> dict[str, Any]:
 
 
 def _tx_attrs(ctx: NICContext) -> dict[str, Any]:
-    module = cast("NICModule", ctx.module)
+    module = ctx.module
     return {
         "lanes": [
             {
@@ -292,7 +292,7 @@ def _module_problem(ctx: NICContext) -> bool | None:
 
 
 def _module_problem_attrs(ctx: NICContext) -> dict[str, Any]:
-    module = cast("NICModule", ctx.module)
+    module = ctx.module
     return {
         "alarms": list(module.alarms),
         "warnings": list(module.warnings),
@@ -302,7 +302,7 @@ def _module_problem_attrs(ctx: NICContext) -> dict[str, Any]:
 
 
 def _module_identity_attrs(ctx: NICContext) -> dict[str, Any]:
-    module = cast("NICModule", ctx.module)
+    module = ctx.module
     return {
         "identifier": module.identifier,
         "standard": module.standard,
@@ -315,7 +315,7 @@ def _module_identity_attrs(ctx: NICContext) -> dict[str, Any]:
 
 
 def _port_attrs(ctx: NICContext) -> dict[str, Any]:
-    port = cast("NICPort", ctx.port)
+    port = ctx.port
     return {
         "interface": port.interface,
         "pci_address": port.pci_address,
@@ -547,7 +547,7 @@ def nic_sensor_specs(cards: NICList) -> list[NICEntitySpec]:
     for card in cards.cards:
         name = card_name(card)
         multi_port = len(card.ports) > 1
-        ports_by_function = {}
+        ports_by_function: dict[str, NICPort] = {}
         for port in card.ports:
             ports_by_function.setdefault(port.pci_address, port)
 

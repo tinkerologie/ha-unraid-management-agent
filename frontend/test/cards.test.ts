@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import "../src/index";
 import { UnraidServerCard } from "../src/server-card";
 import { UnraidStorageCard, formatDiskName } from "../src/storage-card";
@@ -24,7 +24,7 @@ import {
 import type { HomeAssistant } from "../src/ha-types";
 
 function createMockHass(): HomeAssistant {
-  return {
+  const hass: HomeAssistant = {
     states: {
       "sensor.cube_cpu_usage": {
         entity_id: "sensor.cube_cpu_usage",
@@ -380,27 +380,42 @@ function createMockHass(): HomeAssistant {
     entities: {},
     callService: async () => Promise.resolve(),
   };
+  hass.entities = Object.fromEntries(Object.keys(hass.states).map((entity_id) => [entity_id, {
+    entity_id, device_id: "dev_1", platform: "unraid_management_agent",
+  }]));
+  return hass;
+}
+
+// Existing rendering cases add telemetry after creating the fixture. Supply the
+// registry evidence that a real Agent entity has, without replacing explicit
+// ownership/device relationships in each case.
+function withMockRegistry(hass: HomeAssistant): HomeAssistant {
+  hass.entities ??= {};
+  for (const entity_id of Object.keys(hass.states)) {
+    hass.entities[entity_id] ??= { entity_id, device_id: "dev_1", platform: "unraid_management_agent" };
+  }
+  return hass;
 }
 
 describe("Unraid Custom Cards", () => {
   it("registers all cards in window.customCards", () => {
     expect(window.customCards).toBeDefined();
     const tags = window.customCards?.map((c) => c.type);
-    expect(tags).toContain("unraid-server-card");
-    expect(tags).toContain("unraid-storage-card");
-    expect(tags).toContain("unraid-shares-card");
-    expect(tags).toContain("unraid-docker-card");
-    expect(tags).toContain("unraid-ups-card");
-    expect(tags).toContain("unraid-vm-card");
-    expect(tags).toContain("unraid-network-card");
-    expect(tags).toContain("unraid-zfs-card");
-    expect(tags).toContain("unraid-fans-card");
-    expect(tags).toContain("unraid-gpu-card");
-    expect(tags).toContain("unraid-notifications-card");
-    expect(tags).toContain("unraid-maintenance-card");
-    expect(tags).toContain("unraid-remote-shares-card");
-    expect(tags).toContain("unraid-unassigned-devices-card");
-    expect(tags).toContain("unraid-dashboard-card");
+    expect(tags).toContain("unraid-management-agent-server-card");
+    expect(tags).toContain("unraid-management-agent-storage-card");
+    expect(tags).toContain("unraid-management-agent-shares-card");
+    expect(tags).toContain("unraid-management-agent-docker-card");
+    expect(tags).toContain("unraid-management-agent-ups-card");
+    expect(tags).toContain("unraid-management-agent-vm-card");
+    expect(tags).toContain("unraid-management-agent-network-card");
+    expect(tags).toContain("unraid-management-agent-zfs-card");
+    expect(tags).toContain("unraid-management-agent-fans-card");
+    expect(tags).toContain("unraid-management-agent-gpu-card");
+    expect(tags).toContain("unraid-management-agent-notifications-card");
+    expect(tags).toContain("unraid-management-agent-maintenance-card");
+    expect(tags).toContain("unraid-management-agent-remote-shares-card");
+    expect(tags).toContain("unraid-management-agent-unassigned-devices-card");
+    expect(tags).toContain("unraid-management-agent-dashboard-card");
   });
 
   it("formats disk and share names cleanly", () => {
@@ -416,7 +431,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidServerCard with mock hass data and formats numeric uptime", async () => {
     const card = new UnraidServerCard();
-    card.setConfig({ type: "custom:unraid-server-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-server-card" });
     const hass = createMockHass();
     hass.states["sensor.cube_uptime"] = {
       entity_id: "sensor.cube_uptime",
@@ -425,12 +440,12 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
     expect(card.getCardSize()).toBe(4);
-    expect(card.getGridOptions().columns).toBe(6);
+    expect(card.getGridOptions()).toEqual({ columns: 12, min_columns: 6 });
     expect(card.shadowRoot?.innerHTML).toContain("CUBE");
     expect(card.shadowRoot?.innerHTML).toContain("CPU Load");
     expect(card.shadowRoot?.innerHTML).toContain("15%");
@@ -443,7 +458,7 @@ describe("Unraid Custom Cards", () => {
 
   it("dispatches hass-more-info event when clicking server rings and supports navigation", async () => {
     const card = new UnraidServerCard();
-    card.setConfig({ type: "custom:unraid-server-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-server-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -475,7 +490,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidStorageCard with clean disk names and Healthy badge", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -493,7 +508,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidStorageCard with Parity Valid when progress is 100 and check is not running", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
     const mockHass = createMockHass();
     mockHass.states["sensor.cube_parity_progress"] = {
       entity_id: "sensor.cube_parity_progress",
@@ -509,7 +524,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = mockHass;
+    card.hass = withMockRegistry(mockHass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -523,7 +538,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidStorageCard with Parity Check Needed when validity sensor is on", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
     const mockHass = createMockHass();
     mockHass.states["binary_sensor.cube_parity_valid"] = {
       entity_id: "binary_sensor.cube_parity_valid",
@@ -539,7 +554,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = mockHass;
+    card.hass = withMockRegistry(mockHass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -551,7 +566,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidStorageCard with check in progress at 0% and Cancel button", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
     const mockHass = createMockHass();
     mockHass.states["binary_sensor.cube_parity_check_running"] = {
       entity_id: "binary_sensor.cube_parity_check_running",
@@ -574,7 +589,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = mockHass;
+    card.hass = withMockRegistry(mockHass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -585,7 +600,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidStorageCard with Parity Check Paused", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
     const mockHass = createMockHass();
     mockHass.states["binary_sensor.cube_parity_check_running"] = {
       entity_id: "binary_sensor.cube_parity_check_running",
@@ -601,7 +616,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = mockHass;
+    card.hass = withMockRegistry(mockHass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -611,7 +626,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidStorageCard with Parity Status Unknown when validity is unknown or unavailable", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
     const mockHass = createMockHass();
     mockHass.states["binary_sensor.cube_parity_valid"] = {
       entity_id: "binary_sensor.cube_parity_valid",
@@ -621,7 +636,7 @@ describe("Unraid Custom Cards", () => {
       last_updated: "",
     };
     delete mockHass.states["binary_sensor.cube_parity_status"];
-    card.hass = mockHass;
+    card.hass = withMockRegistry(mockHass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -633,7 +648,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidStorageCard using legacy sensor fallback when dedicated entities are absent", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
     const mockHass = createMockHass();
     delete mockHass.states["binary_sensor.cube_parity_valid"];
     delete mockHass.states["binary_sensor.cube_parity_check_running"];
@@ -646,7 +661,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = mockHass;
+    card.hass = withMockRegistry(mockHass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -668,7 +683,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = { ...mockHass };
+    card.hass = withMockRegistry({ ...mockHass });
     await card.updateComplete;
 
     expect(card.shadowRoot?.innerHTML).toContain("Parity Check In Progress (65%)");
@@ -677,7 +692,7 @@ describe("Unraid Custom Cards", () => {
 
   it("does not render unknown last check date text", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
     const mockHass = createMockHass();
     mockHass.states["sensor.cube_last_parity_check_date"] = {
       entity_id: "sensor.cube_last_parity_check_date",
@@ -686,7 +701,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = mockHass;
+    card.hass = withMockRegistry(mockHass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -697,7 +712,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidSharesCard and handles protection states", async () => {
     const card = new UnraidSharesCard();
-    card.setConfig({ type: "custom:unraid-shares-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-shares-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -713,7 +728,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidDockerCard and container list excluding autostart switches", async () => {
     const card = new UnraidDockerCard();
-    card.setConfig({ type: "custom:unraid-docker-card", view_mode: "list" });
+    card.setConfig({ type: "custom:unraid-management-agent-docker-card", view_mode: "list" });
     const hass = createMockHass();
     hass.states["switch.cube_docker_container_autostart_plex"] = {
       entity_id: "switch.cube_docker_container_autostart_plex",
@@ -722,7 +737,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -748,7 +763,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidUpsCard with battery, load, and properly formatted runtime", async () => {
     const card = new UnraidUpsCard();
-    card.setConfig({ type: "custom:unraid-ups-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-ups-card" });
     const hass = createMockHass();
     hass.states["sensor.cube_ups_runtime"] = {
       entity_id: "sensor.cube_ups_runtime",
@@ -757,7 +772,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -770,7 +785,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidVmCard with virtual machines", async () => {
     const card = new UnraidVmCard();
-    card.setConfig({ type: "custom:unraid-vm-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-vm-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -782,7 +797,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidVmCard with VMs on child devices of the VMs device", async () => {
     const card = new UnraidVmCard();
-    card.setConfig({ type: "custom:unraid-vm-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-vm-card" });
     const hass = createMockHass();
     hass.devices = {
       ...hass.devices,
@@ -855,7 +870,7 @@ describe("Unraid Custom Cards", () => {
         translation_key: "vm_power",
       };
     }
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -870,7 +885,7 @@ describe("Unraid Custom Cards", () => {
 
   it("finds Container Updates Available on the Docker device", async () => {
     const card = new UnraidMaintenanceCard();
-    card.setConfig({ type: "custom:unraid-maintenance-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-maintenance-card" });
     const hass = createMockHass();
     hass.devices = {
       ...hass.devices,
@@ -895,7 +910,7 @@ describe("Unraid Custom Cards", () => {
       platform: "unraid_management_agent",
       translation_key: "container_updates_available",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
     const found = (
@@ -909,7 +924,7 @@ describe("Unraid Custom Cards", () => {
 
   it("prefers an entity on the server device over one on the Docker device", async () => {
     const card = new UnraidMaintenanceCard();
-    card.setConfig({ type: "custom:unraid-maintenance-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-maintenance-card" });
     const hass = createMockHass();
     hass.devices = {
       ...hass.devices,
@@ -940,7 +955,7 @@ describe("Unraid Custom Cards", () => {
         translation_key: "container_updates_available",
       };
     }
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
     const found = (
@@ -954,25 +969,26 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidDashboardCard with tabs", async () => {
     const card = new UnraidDashboardCard();
-    card.setConfig({ type: "custom:unraid-dashboard-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-dashboard-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
 
-    expect(card.shadowRoot?.innerHTML).toContain("Unified Unraid Control Center");
+    expect(card.shadowRoot?.innerHTML).toContain("Unraid Management Agent");
     expect(card.shadowRoot?.innerHTML).toContain("Shares");
     document.body.removeChild(card);
   });
 
   it("renders UnraidServerCardEditor and updates config", async () => {
     const editor = new UnraidServerCardEditor();
-    editor.setConfig({ type: "custom:unraid-server-card", title: "My Tower" });
+    editor.setConfig({ type: "custom:unraid-management-agent-server-card", title: "My Tower" });
     editor.hass = createMockHass();
     document.body.appendChild(editor);
     await editor.updateComplete;
 
-    expect(editor.shadowRoot?.innerHTML).toContain("Unraid Server");
-    expect(editor.shadowRoot?.innerHTML).toContain("Custom Title");
+    const form = editor.shadowRoot?.querySelector("ha-form") as any;
+    expect(form.computeLabel({ name: "server" })).toBe("Unraid Management Agent server");
+    expect(form.schema.find((field: any) => field.name === "title").selector).toEqual({ text: {} });
     document.body.removeChild(editor);
   });
 
@@ -996,17 +1012,18 @@ describe("Unraid Custom Cards", () => {
       ...hass.devices,
     };
     const editor = new UnraidServerCardEditor();
-    editor.setConfig({ type: "custom:unraid-server-card" });
+    editor.setConfig({ type: "custom:unraid-management-agent-server-card" });
     editor.hass = hass;
     document.body.appendChild(editor);
     await editor.updateComplete;
-    const options = Array.from(editor.shadowRoot?.querySelectorAll("option") ?? []);
-    expect(options.map((o) => o.value)).toEqual(["dev_1"]);
+    const form = editor.shadowRoot?.querySelector("ha-form") as any;
+    const options = form.schema[0].selector.select.options;
+    expect(options.map((o: any) => o.value)).toEqual(["", "dev_1"]);
     document.body.removeChild(editor);
 
     const card = new UnraidServerCard();
-    card.setConfig({ type: "custom:unraid-server-card" });
-    card.hass = hass;
+    card.setConfig({ type: "custom:unraid-management-agent-server-card" });
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
     expect(card.shadowRoot?.innerHTML).toContain("CUBE");
@@ -1016,19 +1033,20 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidSharesCardEditor", async () => {
     const editor = new UnraidSharesCardEditor();
-    editor.setConfig({ type: "custom:unraid-shares-card", title: "My Shares" });
+    editor.setConfig({ type: "custom:unraid-management-agent-shares-card", title: "My Shares" });
     editor.hass = createMockHass();
     document.body.appendChild(editor);
     await editor.updateComplete;
 
-    expect(editor.shadowRoot?.innerHTML).toContain("Unraid Server");
-    expect(editor.shadowRoot?.innerHTML).toContain("Custom Title");
+    const form = editor.shadowRoot?.querySelector("ha-form") as any;
+    expect(form.computeLabel({ name: "server" })).toBe("Unraid Management Agent server");
+    expect(form.schema.find((field: any) => field.name === "title").selector).toEqual({ text: {} });
     document.body.removeChild(editor);
   });
 
   it("renders UnraidServerCard with ISO timestamp uptime", async () => {
     const card = new UnraidServerCard();
-    card.setConfig({ type: "custom:unraid-server-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-server-card" });
     const hass = createMockHass();
     const threeHoursAgo = new Date(Date.now() - 3 * 3600 * 1000 - 15 * 60 * 1000).toISOString();
     hass.states["sensor.cube_up_since"] = {
@@ -1038,7 +1056,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1048,7 +1066,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidNetworkCard with interface list and traffic metrics", async () => {
     const card = new UnraidNetworkCard();
-    card.setConfig({ type: "custom:unraid-network-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-network-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -1065,7 +1083,7 @@ describe("Unraid Custom Cards", () => {
 
   it("handles shares with missing color attribute and clamps usage percentage", async () => {
     const card = new UnraidSharesCard();
-    card.setConfig({ type: "custom:unraid-shares-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-shares-card" });
     const hass = createMockHass();
     // Add a share with missing color and >100% usage
     hass.states["sensor.cube_share_unprotected_usage"] = {
@@ -1080,7 +1098,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1093,7 +1111,7 @@ describe("Unraid Custom Cards", () => {
 
   it("ignores network card child-device entities in UnraidNetworkCard", async () => {
     const card = new UnraidNetworkCard();
-    card.setConfig({ type: "custom:unraid-network-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-network-card" });
     const hass = createMockHass();
     hass.devices!["nic_1"] = {
       id: "nic_1",
@@ -1126,7 +1144,7 @@ describe("Unraid Custom Cards", () => {
       device_id: "dev_1",
       platform: "unraid_management_agent",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1142,7 +1160,7 @@ describe("Unraid Custom Cards", () => {
 
   it("filters placeholder IP states from connected count and formats small data rates", async () => {
     const card = new UnraidNetworkCard();
-    card.setConfig({ type: "custom:unraid-network-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-network-card" });
     const hass = createMockHass();
     // Add an unavailable interface
     hass.states["sensor.cube_network_eth1_ip_address"] = {
@@ -1166,7 +1184,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1194,19 +1212,20 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidNetworkCardEditor", async () => {
     const editor = new UnraidNetworkCardEditor();
-    editor.setConfig({ type: "custom:unraid-network-card", title: "My Network" });
+    editor.setConfig({ type: "custom:unraid-management-agent-network-card", title: "My Network" });
     editor.hass = createMockHass();
     document.body.appendChild(editor);
     await editor.updateComplete;
 
-    expect(editor.shadowRoot?.innerHTML).toContain("Unraid Server");
-    expect(editor.shadowRoot?.innerHTML).toContain("Custom Title");
+    const form = editor.shadowRoot?.querySelector("ha-form") as any;
+    expect(form.computeLabel({ name: "server" })).toBe("Unraid Management Agent server");
+    expect(form.schema.find((field: any) => field.name === "title").selector).toEqual({ text: {} });
     document.body.removeChild(editor);
   });
 
   it("renders UnraidZfsCard with pools and ARC hit ratio", async () => {
     const card = new UnraidZfsCard();
-    card.setConfig({ type: "custom:unraid-zfs-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-zfs-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -1221,7 +1240,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidZfsCard pools shown as separate devices", async () => {
     const card = new UnraidZfsCard();
-    card.setConfig({ type: "custom:unraid-zfs-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-zfs-card" });
     const hass = createMockHass();
     hass.devices = {
       ...hass.devices,
@@ -1277,7 +1296,7 @@ describe("Unraid Custom Cards", () => {
     add("sensor.elsewhere_usage", "other_server_pool", "zfs_pool_device_usage", "99", {
       pool_name: "elsewhere",
     });
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1292,7 +1311,7 @@ describe("Unraid Custom Cards", () => {
 
   it("keeps corrupted-file counts per pool on the server device", async () => {
     const card = new UnraidZfsCard();
-    card.setConfig({ type: "custom:unraid-zfs-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-zfs-card" });
     const hass = createMockHass();
     const add = (entityId: string, translationKey: string | undefined, state: string, attributes: Record<string, unknown> = {}) => {
       hass.states[entityId] = { entity_id: entityId, state, attributes, last_changed: "", last_updated: "" };
@@ -1307,7 +1326,7 @@ describe("Unraid Custom Cards", () => {
     add("sensor.cube_zfs_flash_usage", "zfs_pool_usage", "10", { pool_name: "flash" });
     add("sensor.cube_zfs_tank_corrupted_files", undefined, "3");
     add("sensor.cube_zfs_flash_corrupted_files", undefined, "0");
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     const pools = (
       card as unknown as { getPools(): { name: string; corruptedFiles?: number }[] }
     ).getPools();
@@ -1317,7 +1336,7 @@ describe("Unraid Custom Cards", () => {
 
   it("matches pools by pool_name after pool devices are turned off", async () => {
     const card = new UnraidZfsCard();
-    card.setConfig({ type: "custom:unraid-zfs-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-zfs-card" });
     const hass = createMockHass();
     const add = (entityId: string, translationKey: string | undefined, state: string, attributes: Record<string, unknown>) => {
       hass.states[entityId] = { entity_id: entityId, state, attributes, last_changed: "", last_updated: "" };
@@ -1332,7 +1351,7 @@ describe("Unraid Custom Cards", () => {
     add("sensor.cube_zfs_pool_flash_usage", "zfs_pool_usage", "35", { pool_name: "flash" });
     add("sensor.cube_zfs_pool_flash_health", "zfs_pool_health", "DEGRADED", { pool_name: "flash" });
     add("sensor.cube_zfs_pool_flash_corrupted_files", undefined, "4", { pool_name: "flash" });
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     const pools = (
       card as unknown as {
         getPools(): { name: string; health: string; corruptedFiles?: number }[];
@@ -1347,7 +1366,7 @@ describe("Unraid Custom Cards", () => {
 
   it("does not pick a child device as the server", async () => {
     const card = new UnraidZfsCard();
-    card.setConfig({ type: "custom:unraid-zfs-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-zfs-card" });
     const hass = createMockHass();
     hass.devices = {
       pool_flash: {
@@ -1358,7 +1377,7 @@ describe("Unraid Custom Cards", () => {
       },
       ...hass.devices,
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     const active = (
       card as unknown as { getActiveDevice(): { id: string } | undefined }
     ).getActiveDevice();
@@ -1367,7 +1386,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidFansCard with cooling fan telemetry", async () => {
     const card = new UnraidFansCard();
-    card.setConfig({ type: "custom:unraid-fans-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-fans-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -1380,7 +1399,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidFansCard fans of a USB controller device", async () => {
     const card = new UnraidFansCard();
-    card.setConfig({ type: "custom:unraid-fans-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-fans-card" });
     const hass = createMockHass();
     hass.devices = {
       ...hass.devices,
@@ -1413,7 +1432,7 @@ describe("Unraid Custom Cards", () => {
     };
     add("sensor.cube_fan_octo_fan8", "octo", "Octo (fan controller) Coolant Flow (rpm)", "742");
     add("sensor.other_fan_octo_fan1", "other_octo", "Other server fan", "999");
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1426,7 +1445,7 @@ describe("Unraid Custom Cards", () => {
 
   it("lists number-only fan controls of a USB controller device, not of another server", async () => {
     const card = new UnraidFansCard();
-    card.setConfig({ type: "custom:unraid-fans-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-fans-card" });
     const hass = createMockHass();
     for (const id of Object.keys(hass.states)) {
       if (id.startsWith("sensor.") && id.includes("fan")) delete hass.states[id];
@@ -1462,7 +1481,7 @@ describe("Unraid Custom Cards", () => {
     };
     add("number.cube_fan_octo_fan2", "octo", "Octo child fan", 1234);
     add("number.other_fan_octo_fan1", "other_octo", "Unrelated fan", 4321);
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1474,7 +1493,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidGpuCard with GPU loads and temperatures", async () => {
     const card = new UnraidGpuCard();
-    card.setConfig({ type: "custom:unraid-gpu-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-gpu-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -1487,7 +1506,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidGpuCard with named GPU slug entities like Intel UHD Graphics", async () => {
     const card = new UnraidGpuCard();
-    card.setConfig({ type: "custom:unraid-gpu-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-gpu-card" });
     const hass = createMockHass();
     // Add named GPU slug entities
     hass.states["sensor.cube_gpu_intel_uhd_graphics_630_utilization"] = {
@@ -1528,7 +1547,7 @@ describe("Unraid Custom Cards", () => {
       last_changed: "",
       last_updated: "",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1543,7 +1562,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidGpuCard with GPU sensors on GPU devices (GPUs as separate devices)", async () => {
     const card = new UnraidGpuCard();
-    card.setConfig({ type: "custom:unraid-gpu-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-gpu-card" });
     const hass = createMockHass();
     // Each GPU's sensors live on a "GPU · <name>" child device of the server.
     // A 4090 took index 0 from the 3070: the index-0 sensors kept their 3070
@@ -1613,7 +1632,7 @@ describe("Unraid Custom Cards", () => {
       device_id: "dev_1",
       platform: "unraid_management_agent",
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1637,7 +1656,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidGpuCard with GPU sensors on the server device (option off)", async () => {
     const card = new UnraidGpuCard();
-    card.setConfig({ type: "custom:unraid-gpu-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-gpu-card" });
     const hass = createMockHass();
     const sensors: Array<[string, string, string, Record<string, unknown>]> = [
       ["sensor.cube_gpu_nvidia_geforce_rtx_3070_utilization", "12", "gpu_utilization", { gpu_name: "NVIDIA GeForce RTX 3070", gpu_driver_version: "615.78.08" }],
@@ -1663,7 +1682,7 @@ describe("Unraid Custom Cards", () => {
         translation_key: translationKey,
       };
     }
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1679,7 +1698,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidGpuCard with suffixed sensors on the server device after an index shift", async () => {
     const card = new UnraidGpuCard();
-    card.setConfig({ type: "custom:unraid-gpu-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-gpu-card" });
     const hass = createMockHass();
     // A 4090 took index 0: the index-0 sensors kept their 3070 entity IDs, and
     // the 3070's index-1 sensors got "_2" suffixed entity IDs
@@ -1704,7 +1723,7 @@ describe("Unraid Custom Cards", () => {
         platform: "unraid_management_agent",
       };
     }
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
 
@@ -1720,7 +1739,7 @@ describe("Unraid Custom Cards", () => {
 
   it("never offers or picks a child device as the Unraid server", async () => {
     const card = new UnraidGpuCard();
-    card.setConfig({ type: "custom:unraid-gpu-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-gpu-card" });
     const hass = createMockHass();
     // Child devices can be listed before their server device
     hass.devices = {
@@ -1732,7 +1751,7 @@ describe("Unraid Custom Cards", () => {
       },
       ...hass.devices,
     };
-    card.hass = hass;
+    card.hass = withMockRegistry(hass);
     document.body.appendChild(card);
     await card.updateComplete;
     expect(card.shadowRoot?.innerHTML).toContain("CUBE");
@@ -1740,18 +1759,19 @@ describe("Unraid Custom Cards", () => {
 
     const editor = new UnraidGpuCardEditor();
     editor.hass = hass;
-    editor.setConfig({ type: "custom:unraid-gpu-card" });
+    editor.setConfig({ type: "custom:unraid-management-agent-gpu-card" });
     document.body.appendChild(editor);
     await editor.updateComplete;
-    const editorHtml = editor.shadowRoot?.innerHTML ?? "";
-    expect(editorHtml).toContain("CUBE");
-    expect(editorHtml).not.toContain("RTX 3070");
+    const form = editor.shadowRoot?.querySelector("ha-form") as any;
+    expect(form.schema[0].selector.select.options.map((option: any) => option.label)).toEqual([
+      "Automatically select an Agent server", "CUBE",
+    ]);
     document.body.removeChild(editor);
   });
 
   it("renders UnraidNotificationsCard with unread counts", async () => {
     const card = new UnraidNotificationsCard();
-    card.setConfig({ type: "custom:unraid-notifications-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-notifications-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -1764,7 +1784,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidMaintenanceCard with flash and parity telemetry", async () => {
     const card = new UnraidMaintenanceCard();
-    card.setConfig({ type: "custom:unraid-maintenance-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-maintenance-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -1777,7 +1797,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidRemoteSharesCard with remote share usage and mount status", async () => {
     const card = new UnraidRemoteSharesCard();
-    card.setConfig({ type: "custom:unraid-remote-shares-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-remote-shares-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -1790,7 +1810,7 @@ describe("Unraid Custom Cards", () => {
 
   it("renders UnraidUnassignedDevicesCard with external disks", async () => {
     const card = new UnraidUnassignedDevicesCard();
-    card.setConfig({ type: "custom:unraid-unassigned-devices-card" });
+    card.setConfig({ type: "custom:unraid-management-agent-unassigned-devices-card" });
     card.hass = createMockHass();
     document.body.appendChild(card);
     await card.updateComplete;
@@ -1800,4 +1820,125 @@ describe("Unraid Custom Cards", () => {
     expect(card.shadowRoot?.innerHTML).toContain("MOUNTED");
     document.body.removeChild(card);
   });
+});
+
+
+describe("Unraid Management Agent isolation", () => {
+  it("registers 15 branded cards and editors without claiming generic Unraid tags", () => {
+    expect(window.customCards).toHaveLength(15);
+    for (const card of window.customCards ?? []) {
+      expect(card.type).toMatch(/^unraid-management-agent-/);
+      expect(card.name).toMatch(/^Unraid Management Agent /);
+      expect(card.preview).toBe(false);
+      expect(customElements.get(`${card.type}-editor`)).toBeDefined();
+      expect(customElements.get(card.type.replace("unraid-management-agent-", "unraid-"))).toBeUndefined();
+    }
+  });
+
+  it("ignores same-name Unraid servers, foreign entities on Agent devices, and unknown ownership", () => {
+    const hass = createMockHass();
+    hass.devices!.foreign = { id: "foreign", name: "CUBE", identifiers: [["unraid", "other"]] };
+    const ids = ["switch.cube_container_foreign", "switch.cube_container_spoof", "switch.cube_container_unknown"];
+    for (const entity_id of ids) {
+      hass.states[entity_id] = { entity_id, state: "on", attributes: { friendly_name: "Foreign container" }, last_changed: "", last_updated: "" };
+    }
+    hass.entities![ids[0]!] = { entity_id: ids[0]!, platform: "unraid", device_id: "foreign", translation_key: "docker_container" };
+    hass.entities![ids[1]!] = { entity_id: ids[1]!, platform: "unraid", device_id: "dev_1", translation_key: "docker_container" };
+    const card = new UnraidDockerCard() as any;
+    card.setConfig({ type: "custom:unraid-management-agent-docker-card" });
+    card.hass = hass;
+    expect(card.getUnraidDevices().map((d: any) => d.id)).toEqual(["dev_1"]);
+    expect(card.getContainers().map((c: any) => c.name)).not.toContain("Foreign container");
+    expect(card.findEntity(ids[0])).toBeUndefined();
+    expect(card.findEntity(/container_foreign/)).toBeUndefined();
+    expect(card.getEntity("container_foreign", "switch")).toBeUndefined();
+    expect(card.getEntities("docker_container").map((s: any) => s.entity_id)).not.toEqual(expect.arrayContaining(ids));
+  });
+
+  it("fails closed for missing/partial registries and an explicitly missing server", () => {
+    const card = new UnraidDockerCard() as any;
+    const hass = createMockHass();
+    card.setConfig({ type: "custom:unraid-management-agent-docker-card" });
+    card.hass = { ...hass, entities: undefined };
+    expect(card.getContainers()).toEqual([]);
+    card.hass = { ...hass, entities: {} };
+    expect(card.getContainers()).toEqual([]);
+    card.hass = hass;
+    card.setConfig({ type: "custom:unraid-management-agent-docker-card", server: "missing" });
+    expect(card.getActiveDevice()).toBeUndefined();
+    expect(card.getContainers()).toEqual([]);
+    expect(UnraidDockerCard.getStubConfig(hass)).toEqual({ server: "dev_1" });
+  });
+
+  it("walks shuffled descendants recursively and leaves foreign or cyclic trees out", () => {
+    const hass = createMockHass();
+    const device = (id: string, parent: string, foreign = false) => ({ id, name: id, identifiers: [[foreign ? "unraid" : "unraid_management_agent", id]] as [string,string][], parent_device_id: parent });
+    hass.devices = {
+      deep: device("deep", "nested"), nested: device("nested", "docker"),
+      docker: { ...device("docker", "dev_1"), via_device_id: "dev_1", parent_device_id: undefined },
+      foreign: device("foreign", "dev_1", true),
+      cycle_a: device("cycle_a", "cycle_b"), cycle_b: device("cycle_b", "cycle_a"),
+      ...hass.devices,
+    };
+    const card = new UnraidDockerCard() as any;
+    card.setConfig({ type: "custom:unraid-management-agent-docker-card" }); card.hass = hass;
+    expect([...card.getServerDeviceIds("dev_1")].sort()).toEqual(["deep", "dev_1", "docker", "nested"]);
+  });
+
+  it("does not dispatch stale or foreign controls and uses explicit container actions", async () => {
+    const hass = createMockHass(); hass.callService = vi.fn(async () => undefined);
+    const card = new UnraidDockerCard() as any;
+    card.setConfig({ type: "custom:unraid-management-agent-docker-card" }); card.hass = hass;
+    await card.toggleEntity("switch.foreign_container"); await card.pressButton("button.foreign_restart");
+    expect(hass.callService).not.toHaveBeenCalled();
+    const own = Object.keys(hass.states).find((id) => id.startsWith("switch.") && id.includes("container"))!;
+    await card.runContainerAction(own, "start");
+    expect(hass.callService).toHaveBeenCalledExactlyOnceWith("switch", "turn_on", { entity_id: own });
+    card.handleToggle(own, true, "Own container");
+    expect(hass.callService).toHaveBeenCalledTimes(1);
+    expect(card._pendingAction.action).toBe("stop");
+  });
+
+  it("offers only Agent roots in native editor controls and round-trips existing settings", async () => {
+    const hass = createMockHass();
+    hass.devices!.foreign = { id: "foreign", name: "Other Unraid", identifiers: [["unraid", "other"]] };
+    const editor = new UnraidServerCardEditor(); editor.hass = hass;
+    editor.setConfig({ type: "custom:unraid-management-agent-server-card", server: "CUBE", title: "Old", hide_header: true });
+    document.body.append(editor); await editor.updateComplete;
+    const form = editor.shadowRoot!.querySelector("ha-form") as any;
+    expect(form.data.server).toBe("dev_1");
+    expect(form.schema[0].selector.select.options.map((v: any) => v.value)).toEqual(["", "dev_1"]);
+    const changed = vi.fn(); editor.addEventListener("config-changed", changed);
+    form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { server: "dev_1", title: "" } }, bubbles: true, composed: true }));
+    expect(changed.mock.calls[0]![0].detail.config).toEqual({ type: "custom:unraid-management-agent-server-card", server: "dev_1", hide_header: true });
+    editor.remove();
+  });
+
+  it("does not add unsupported defaults when a native form emits all of its data", async () => {
+    const editor = new UnraidSharesCardEditor(); editor.hass = createMockHass();
+    editor.setConfig({ type: "custom:unraid-management-agent-shares-card" });
+    document.body.append(editor); await editor.updateComplete;
+    const form = editor.shadowRoot!.querySelector("ha-form") as any;
+    expect(form.data).not.toHaveProperty("view_mode");
+    expect(form.data).not.toHaveProperty("show_system_info");
+    const changed = vi.fn(); editor.addEventListener("config-changed", changed);
+    form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, title: "Shares" } }, bubbles: true, composed: true }));
+    expect(changed.mock.calls[0]![0].detail.config).toEqual({ type: "custom:unraid-management-agent-shares-card", title: "Shares" });
+    editor.remove();
+  });
+
+
+  it("keeps distinctive container names visible without renaming entities", () => {
+    const hass = createMockHass();
+    const entity = Object.values(hass.states).find((state) => state.entity_id.startsWith("switch.") && state.entity_id.includes("container"))!;
+    entity.attributes.friendly_name = "CUBE Container ci-runner-1";
+    const card = new UnraidDockerCard() as any;
+    card.setConfig({ type: "custom:unraid-management-agent-docker-card" }); card.hass = hass;
+    const container = card.getContainers().find((c: any) => c.switchEntityId === entity.entity_id);
+    expect(container.name).toBe("ci-runner-1");
+    expect(entity.attributes.friendly_name).toBe("CUBE Container ci-runner-1");
+    entity.attributes.friendly_name = "CUBE custom name";
+    expect(card.getContainers().find((c: any) => c.switchEntityId === entity.entity_id).name).toBe("CUBE custom name");
+  });
+
 });

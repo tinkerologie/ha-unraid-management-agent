@@ -22,7 +22,10 @@ describe("Live Server Cube Cards Verification", () => {
   let mockHass: any;
 
   beforeAll(() => {
-    liveData = liveDataJson as unknown as { device: any; states: Record<string, any> };
+    liveData = structuredClone(liveDataJson) as unknown as { device: any; states: Record<string, any> };
+    // The recorded telemetry is reused with explicit Agent ownership.
+    liveData.device.id = liveData.device.device_id;
+    liveData.device.identifiers = [["unraid_management_agent", "fixture-agent"]];
 
     mockHass = {
       states: liveData.states,
@@ -48,7 +51,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidGpuCard renders live GPU telemetry", async () => {
     const card = new UnraidGpuCard();
-    card.setConfig({ type: "custom:unraid-gpu-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-gpu-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -66,7 +69,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidServerCard renders live server metrics", async () => {
     const card = new UnraidServerCard();
-    card.setConfig({ type: "custom:unraid-server-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-server-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -80,7 +83,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidStorageCard renders live array and disk data", async () => {
     const card = new UnraidStorageCard();
-    card.setConfig({ type: "custom:unraid-storage-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -93,7 +96,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidSharesCard renders live shares", async () => {
     const card = new UnraidSharesCard();
-    card.setConfig({ type: "custom:unraid-shares-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-shares-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -107,7 +110,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidDockerCard renders live docker containers", async () => {
     const card = new UnraidDockerCard();
-    card.setConfig({ type: "custom:unraid-docker-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-docker-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -121,7 +124,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidUpsCard renders live UPS telemetry", async () => {
     const card = new UnraidUpsCard();
-    card.setConfig({ type: "custom:unraid-ups-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-ups-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -134,7 +137,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidVmCard renders live VMs", async () => {
     const card = new UnraidVmCard();
-    card.setConfig({ type: "custom:unraid-vm-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-vm-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -146,7 +149,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidNetworkCard renders live network interfaces", async () => {
     const card = new UnraidNetworkCard();
-    card.setConfig({ type: "custom:unraid-network-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-network-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -158,7 +161,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidFansCard renders live cooling telemetry", async () => {
     const card = new UnraidFansCard();
-    card.setConfig({ type: "custom:unraid-fans-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-fans-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -170,7 +173,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidNotificationsCard renders live notification center", async () => {
     const card = new UnraidNotificationsCard();
-    card.setConfig({ type: "custom:unraid-notifications-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-notifications-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -182,7 +185,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidMaintenanceCard renders live maintenance operations", async () => {
     const card = new UnraidMaintenanceCard();
-    card.setConfig({ type: "custom:unraid-maintenance-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-maintenance-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -194,7 +197,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidDashboardCard renders tabs with live data", async () => {
     const card = new UnraidDashboardCard();
-    card.setConfig({ type: "custom:unraid-dashboard-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-dashboard-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -209,7 +212,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidZfsCard renders correctly", async () => {
     const card = new UnraidZfsCard();
-    card.setConfig({ type: "custom:unraid-zfs-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-zfs-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -221,7 +224,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidRemoteSharesCard renders correctly", async () => {
     const card = new UnraidRemoteSharesCard();
-    card.setConfig({ type: "custom:unraid-remote-shares-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-remote-shares-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;
@@ -233,7 +236,7 @@ describe("Live Server Cube Cards Verification", () => {
 
   it("verifies UnraidUnassignedDevicesCard renders correctly", async () => {
     const card = new UnraidUnassignedDevicesCard();
-    card.setConfig({ type: "custom:unraid-unassigned-devices-card", server: "Cube" });
+    card.setConfig({ type: "custom:unraid-management-agent-unassigned-devices-card", server: "Cube" });
     card.hass = mockHass;
     document.body.appendChild(card);
     await card.updateComplete;

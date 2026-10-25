@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from typing import Any, Final, cast
 
 from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -1168,7 +1168,9 @@ class UnraidStorageBinarySensor(UnraidStorageEntity, BinarySensorEntity):
     ) -> None:
         """Initialize the binary sensor."""
         super().__init__(coordinator, spec)
-        self.entity_description = spec.description
+        self.entity_description = cast(
+            "UnraidStorageBinarySensorEntityDescription", spec.description
+        )
 
     @property
     def is_on(self) -> bool | None:

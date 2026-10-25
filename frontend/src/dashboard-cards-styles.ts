@@ -6,18 +6,15 @@ export const dashboardCardStyles = [
   css`
     :host {
       display: block;
-      height: 100%;
       box-sizing: border-box;
     }
 
     ha-card {
-      height: 100%;
       box-sizing: border-box;
-      padding: 16px;
+      padding: var(--ha-space-4, 16px);
       display: flex;
       flex-direction: column;
       gap: 14px;
-      overflow: hidden;
       background: var(--unraid-card-bg);
       border: 1px solid var(--unraid-border);
       border-radius: var(--unraid-radius);
@@ -403,6 +400,11 @@ export const dashboardCardStyles = [
       background: color-mix(in srgb, var(--unraid-text) 12%, transparent);
     }
 
+    .btn-danger {
+      color: var(--error-color, #db4437);
+      border-color: var(--error-color, #db4437);
+    }
+
     .btn-primary {
       background: var(--unraid-accent);
       color: white;
@@ -427,10 +429,49 @@ export const dashboardCardStyles = [
       color: var(--unraid-text);
     }
 
+    .btn, .btn-icon, .tab-btn {
+      min-height: 44px;
+      min-width: 44px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    button:focus-visible, [tabindex="0"]:focus-visible {
+      outline: 2px solid var(--primary-color, #03a9f4);
+      outline-offset: 2px;
+    }
+
+    dialog {
+      max-width: min(420px, calc(100vw - 64px));
+      border: 1px solid var(--unraid-border);
+      border-radius: var(--unraid-radius);
+      padding: var(--ha-space-6, 24px);
+      color: var(--unraid-text);
+      background: var(--unraid-card-bg);
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+    dialog h2 { margin-block-start: 0; font-size: 1.25rem; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: var(--ha-space-2, 8px); }
+
+    .btn:disabled, .btn-icon:disabled { cursor: default; opacity: 0.5; }
+
+    @media (max-width: 450px) {
+      .list-row, .row-left, .row-right { flex-wrap: wrap; }
+      .row-left { min-width: 0; }
+      .row-right { margin-inline-start: auto; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+
     /* Docker Containers Grid View (like Unraid GUI) */
     .container-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
       gap: 8px;
     }
 
@@ -442,7 +483,6 @@ export const dashboardCardStyles = [
       border-radius: 8px;
       background: color-mix(in srgb, var(--unraid-text) 4%, transparent);
       border: 1px solid var(--unraid-border);
-      cursor: pointer;
       gap: 6px;
       transition: all 0.2s ease;
     }
@@ -459,6 +499,17 @@ export const dashboardCardStyles = [
       white-space: nowrap;
       min-width: 0;
     }
+
+    .tile-name.btn {
+      min-width: 44px;
+      background: transparent;
+      border: none;
+      padding-inline: 0;
+      justify-content: flex-start;
+      text-align: start;
+      font-size: var(--ha-font-size-s, 14px);
+    }
+
 
     .status-dot {
       width: 8px;

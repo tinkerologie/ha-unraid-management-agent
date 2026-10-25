@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Resolve backend type-check errors by using `RepairsFlowResult`, narrowing storage entity description types, cleaning up NIC annotations, and importing the binary sensor device class from its defining module.
+
+- Give all dashboard cards and editors distinct `unraid-management-agent-*` element types and **Unraid Management Agent** picker names to prevent collisions with the separate Unraid integration (#240). Existing Agent dashboards must update their `custom:unraid-*` card types; ambiguous legacy aliases are no longer registered.
+- Restrict dashboard entity discovery to the selected Agent server and its own child devices, including fallback lookups. Unknown registry ownership and an invalid server selection no longer fall through to another integration or server. Entities from other integrations manually assigned to an Agent device are now excluded as well.
+
+### Changed
+
+- Exclude generated frontend bundles from the prose spelling check; minifier identifiers are validated through the frontend build and tests.
+
+- Use compact descriptive picker entries, native Home Assistant form controls in card editors, automatic content height in Sections, theme-aware colors, accessible keyboard navigation, focus indicators, touch targets and reduced-motion support.
+
 ## [2026.10.0] — 2026-10-19
 
 ### Added

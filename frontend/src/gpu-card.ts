@@ -52,7 +52,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
       ? this.slugifyDeviceName(device.name)
       : undefined;
 
-    for (const [entityId, stateObj] of Object.entries(this.hass.states)) {
+    for (const [entityId, stateObj] of Object.entries(this.agentStates)) {
       if (!entityId.startsWith("sensor.")) continue;
 
       const ent = this.hass.entities?.[entityId];

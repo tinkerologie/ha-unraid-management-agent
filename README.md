@@ -35,7 +35,7 @@ The integration automatically registers a complete suite of custom Lovelace card
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          custom:unraid-dashboard-card                       │
+│                custom:unraid-management-agent-dashboard-card                 │
 │  [ Server ] [ Storage ] [ Docker ] [ VMs ] [ UPS ] [ Network ] [ ZFS ] ...  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  All-in-one unified dashboard card with tabbed navigation across subsystems │
@@ -44,23 +44,23 @@ The integration automatically registers a complete suite of custom Lovelace card
 
 ### Available Custom Cards
 
-| Card Tag                                | Description                      | Key Features                                                                                              |
-| :-------------------------------------- | :------------------------------- | :-------------------------------------------------------------------------------------------------------- |
-| `custom:unraid-dashboard-card`          | **Unified Multi-Tab Dashboard**  | Full-featured dashboard embedding all modules with intuitive sub-navigation tabs.                         |
-| `custom:unraid-server-card`             | **Server Telemetry & Health**    | CPU, RAM, uptime, system load, motherboard info, array status, and navigation rings.                      |
-| `custom:unraid-storage-card`            | **Array & Storage Manager**      | Array state, parity status & operations, cache pools, drive temperatures, and health.                     |
-| `custom:unraid-docker-card`             | **Docker Containers**            | Container list or grid, autostart badges, running switches, CPU/memory telemetry, and update status.      |
-| `custom:unraid-vm-card`                 | **Virtual Machines**             | VM list, power state, start/stop/pause controls, vCPUs, memory allocation, and transfer rates.            |
-| `custom:unraid-ups-card`                | **UPS Power Monitoring**         | Battery percentage, load %, estimated runtime duration, input/output voltage, and power draw.             |
-| `custom:unraid-gpu-card`                | **GPU Telemetry**                | Multi-GPU support (NVIDIA, Intel, AMD), utilization rings, VRAM usage, clocks, driver version, and temps. |
-| `custom:unraid-network-card`            | **Network Interfaces**           | Interface status, IPv4/IPv6 addresses, link speeds, MTU, and real-time RX/TX throughput.                  |
-| `custom:unraid-shares-card`             | **User Shares**                  | User share capacity usage, free space, and parity protection status badges.                               |
-| `custom:unraid-remote-shares-card`      | **Remote Shares**                | Mounted remote SMB/NFS shares, mount/unmount switches, and usage metrics.                                 |
-| `custom:unraid-unassigned-devices-card` | **Unassigned Devices**           | External USB/SATA drives, file systems, mount switches, and partition details.                            |
-| `custom:unraid-zfs-card`                | **ZFS Pools & Datasets**         | Pool status, ARC hit ratio gauges, scrub status, error counts, and dataset capacity.                      |
-| `custom:unraid-fans-card`               | **Fan & Thermal Control**        | PWM fan speeds (RPM), duty cycle percentages, and fan control number sliders.                             |
-| `custom:unraid-notifications-card`      | **System Notifications**         | System notifications breakdown across alerts, warnings, and informational notices.                        |
-| `custom:unraid-maintenance-card`        | **Maintenance & Parity History** | Boot flash drive health, parity check schedule, history, duration, and sync errors.                       |
+| Card Tag                                                 | Description                      | Key Features                                                                                              |
+| :------------------------------------------------------- | :------------------------------- | :-------------------------------------------------------------------------------------------------------- |
+| `custom:unraid-management-agent-dashboard-card`          | **Unified Multi-Tab Dashboard**  | Full-featured dashboard embedding all modules with intuitive sub-navigation tabs.                         |
+| `custom:unraid-management-agent-server-card`             | **Server Telemetry & Health**    | CPU, RAM, uptime, system load, motherboard info, array status, and navigation rings.                      |
+| `custom:unraid-management-agent-storage-card`            | **Array & Storage Manager**      | Array state, parity status & operations, cache pools, drive temperatures, and health.                     |
+| `custom:unraid-management-agent-docker-card`             | **Docker Containers**            | Container list or grid, autostart badges, running switches, CPU/memory telemetry, and update status.      |
+| `custom:unraid-management-agent-vm-card`                 | **Virtual Machines**             | VM list, power state, start/stop/pause controls, vCPUs, memory allocation, and transfer rates.            |
+| `custom:unraid-management-agent-ups-card`                | **UPS Power Monitoring**         | Battery percentage, load %, estimated runtime duration, input/output voltage, and power draw.             |
+| `custom:unraid-management-agent-gpu-card`                | **GPU Telemetry**                | Multi-GPU support (NVIDIA, Intel, AMD), utilization rings, VRAM usage, clocks, driver version, and temps. |
+| `custom:unraid-management-agent-network-card`            | **Network Interfaces**           | Interface status, IPv4/IPv6 addresses, link speeds, MTU, and real-time RX/TX throughput.                  |
+| `custom:unraid-management-agent-shares-card`             | **User Shares**                  | User share capacity usage, free space, and parity protection status badges.                               |
+| `custom:unraid-management-agent-remote-shares-card`      | **Remote Shares**                | Mounted remote SMB/NFS shares, mount/unmount switches, and usage metrics.                                 |
+| `custom:unraid-management-agent-unassigned-devices-card` | **Unassigned Devices**           | External USB/SATA drives, file systems, mount switches, and partition details.                            |
+| `custom:unraid-management-agent-zfs-card`                | **ZFS Pools & Datasets**         | Pool status, ARC hit ratio gauges, scrub status, error counts, and dataset capacity.                      |
+| `custom:unraid-management-agent-fans-card`               | **Fan & Thermal Control**        | PWM fan speeds (RPM), duty cycle percentages, and fan control number sliders.                             |
+| `custom:unraid-management-agent-notifications-card`      | **System Notifications**         | System notifications breakdown across alerts, warnings, and informational notices.                        |
+| `custom:unraid-management-agent-maintenance-card`        | **Maintenance & Parity History** | Boot flash drive health, parity check schedule, history, duration, and sync errors.                       |
 
 ### Dashboard Configuration Examples
 
@@ -68,14 +68,18 @@ The integration automatically registers a complete suite of custom Lovelace card
 
 Simply add the unified dashboard card to any Lovelace view. It automatically discovers your Unraid server:
 
+Cards appear in Home Assistant's picker as **Unraid Management Agent**. Card and editor elements use the `unraid-management-agent-*` namespace and discover only this integration's devices and entities, so the separate Unraid integration can be installed alongside it.
+
+**Migrating existing dashboards:** Back up each Agent dashboard in its raw configuration editor, then change its card types from `custom:unraid-<module>-card` to `custom:unraid-management-agent-<module>-card`. For example, Docker uses `custom:unraid-management-agent-docker-card`. Change only cards intended for the Agent; the separate Unraid integration keeps its own types. Reload the browser after updating the resource. The new bundle deliberately does not register ambiguous legacy aliases.
+
 ```yaml
-type: custom:unraid-dashboard-card
+type: custom:unraid-management-agent-dashboard-card
 ```
 
 To bind to a specific server or customize the header:
 
 ```yaml
-type: custom:unraid-dashboard-card
+type: custom:unraid-management-agent-dashboard-card
 server: tower # Name or device ID of your Unraid server (optional)
 title: Main Unraid Server
 ```
@@ -86,22 +90,22 @@ You can mix and match individual cards across your custom dashboards:
 
 ```yaml
 # Server telemetry overview
-type: custom:unraid-server-card
+type: custom:unraid-management-agent-server-card
 show_system_info: true
 show_motherboard: true
 
 # Docker container monitoring in grid view
-type: custom:unraid-docker-card
+type: custom:unraid-management-agent-docker-card
 view_mode: grid # "grid" or "list"
 
 # Storage array and disk health
-type: custom:unraid-storage-card
+type: custom:unraid-management-agent-storage-card
 
 # Power & UPS status
-type: custom:unraid-ups-card
+type: custom:unraid-management-agent-ups-card
 
 # Multi-GPU metrics
-type: custom:unraid-gpu-card
+type: custom:unraid-management-agent-gpu-card
 ```
 
 ---

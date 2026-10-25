@@ -358,7 +358,7 @@
           dev_1: {
             id: "dev_1",
             name: "Cube",
-            identifiers: [["unraid", "uuid-1234"]],
+            identifiers: [["unraid_management_agent", "uuid-1234"]],
             model: "Custom Server",
             sw_version: "7.3.2",
           },
@@ -367,30 +367,36 @@
         callService: async () => Promise.resolve(),
       };
 
+      mockHass.states["button.cube_container_restart_plex"] = {
+        entity_id: "button.cube_container_restart_plex", state: "unknown", attributes: {},
+      };
+      for (const entity_id of Object.keys(mockHass.states)) {
+        mockHass.entities[entity_id] = { entity_id, device_id: "dev_1", platform: "unraid_management_agent" };
+      }
       window.mockHass = mockHass;
 
       const container = document.getElementById("container");
       const cardTags = [
-        "unraid-server-card",
-        "unraid-storage-card",
-        "unraid-shares-card",
-        "unraid-docker-card",
-        "unraid-ups-card",
-        "unraid-vm-card",
-        "unraid-network-card",
-        "unraid-zfs-card",
-        "unraid-fans-card",
-        "unraid-gpu-card",
-        "unraid-notifications-card",
-        "unraid-maintenance-card",
-        "unraid-remote-shares-card",
-        "unraid-unassigned-devices-card",
-        "unraid-dashboard-card",
+        "unraid-management-agent-server-card",
+        "unraid-management-agent-storage-card",
+        "unraid-management-agent-shares-card",
+        "unraid-management-agent-docker-card",
+        "unraid-management-agent-ups-card",
+        "unraid-management-agent-vm-card",
+        "unraid-management-agent-network-card",
+        "unraid-management-agent-zfs-card",
+        "unraid-management-agent-fans-card",
+        "unraid-management-agent-gpu-card",
+        "unraid-management-agent-notifications-card",
+        "unraid-management-agent-maintenance-card",
+        "unraid-management-agent-remote-shares-card",
+        "unraid-management-agent-unassigned-devices-card",
+        "unraid-management-agent-dashboard-card",
       ];
 
       for (const tag of cardTags) {
         const el = document.createElement(tag);
-        el.id = tag.replace("unraid-", "");
+        el.id = tag.replace("unraid-management-agent-", "");
         el.setConfig({ type: `custom:${tag}` });
         el.hass = mockHass;
         container.appendChild(el);
