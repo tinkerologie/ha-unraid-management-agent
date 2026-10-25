@@ -16,41 +16,89 @@
         "type": "raidz2",
         "state": "ONLINE",
         "devices": [
-          {"name": "nvme5n1p1", "state": "ONLINE"},
-          {"name": "nvme4n1p1", "state": "ONLINE"},
-          {"name": "nvme9n1p1", "state": "ONLINE"},
-          {"name": "nvme8n1p1", "state": "ONLINE"}
+          { "name": "nvme5n1p1", "state": "ONLINE" },
+          { "name": "nvme4n1p1", "state": "ONLINE" },
+          { "name": "nvme9n1p1", "state": "ONLINE" },
+          { "name": "nvme8n1p1", "state": "ONLINE" }
         ]
       }
     ],
     "drives": [
       {
-        "name": "nvme5n1p1", "disk": "nvme5n1", "vdev": "raidz2-0", "state": "ONLINE",
-        "health": {"model": "WD_BLACK SN850X 4000GB", "protocol": "NVMe", "media_type": "nvme",
-                   "smart_passed": true, "temperature_celsius": 41, "percentage_used": 3,
-                   "available_spare_percent": 100, "critical_warning": 0, "media_errors": 0,
-                   "power_on_hours": 8760, "collected_at": "2026-10-11T12:00:00Z"}
+        "name": "nvme5n1p1",
+        "disk": "nvme5n1",
+        "vdev": "raidz2-0",
+        "state": "ONLINE",
+        "health": {
+          "model": "WD_BLACK SN850X 4000GB",
+          "protocol": "NVMe",
+          "media_type": "nvme",
+          "smart_passed": true,
+          "temperature_celsius": 41,
+          "percentage_used": 3,
+          "available_spare_percent": 100,
+          "critical_warning": 0,
+          "media_errors": 0,
+          "power_on_hours": 8760,
+          "collected_at": "2026-10-11T12:00:00Z"
+        }
       },
       {
-        "name": "nvme4n1p1", "disk": "nvme4n1", "vdev": "raidz2-0", "state": "ONLINE",
-        "health": {"model": "WD_BLACK SN850X 4000GB", "protocol": "NVMe", "media_type": "nvme",
-                   "smart_passed": true, "temperature_celsius": 47, "percentage_used": 12,
-                   "available_spare_percent": 100, "critical_warning": 0, "media_errors": 0,
-                   "power_on_hours": 9120, "collected_at": "2026-10-11T12:00:00Z"}
+        "name": "nvme4n1p1",
+        "disk": "nvme4n1",
+        "vdev": "raidz2-0",
+        "state": "ONLINE",
+        "health": {
+          "model": "WD_BLACK SN850X 4000GB",
+          "protocol": "NVMe",
+          "media_type": "nvme",
+          "smart_passed": true,
+          "temperature_celsius": 47,
+          "percentage_used": 12,
+          "available_spare_percent": 100,
+          "critical_warning": 0,
+          "media_errors": 0,
+          "power_on_hours": 9120,
+          "collected_at": "2026-10-11T12:00:00Z"
+        }
       },
       {
-        "name": "nvme9n1p1", "disk": "nvme9n1", "vdev": "raidz2-0", "state": "ONLINE",
-        "health": {"model": "Corsair MP600 PRO NH", "protocol": "NVMe", "media_type": "nvme",
-                   "smart_passed": true, "temperature_celsius": 39, "percentage_used": 5,
-                   "available_spare_percent": 100, "critical_warning": 0, "media_errors": 0,
-                   "power_on_hours": 6012, "collected_at": "2026-10-11T12:00:00Z"}
+        "name": "nvme9n1p1",
+        "disk": "nvme9n1",
+        "vdev": "raidz2-0",
+        "state": "ONLINE",
+        "health": {
+          "model": "Corsair MP600 PRO NH",
+          "protocol": "NVMe",
+          "media_type": "nvme",
+          "smart_passed": true,
+          "temperature_celsius": 39,
+          "percentage_used": 5,
+          "available_spare_percent": 100,
+          "critical_warning": 0,
+          "media_errors": 0,
+          "power_on_hours": 6012,
+          "collected_at": "2026-10-11T12:00:00Z"
+        }
       },
       {
-        "name": "nvme8n1p1", "disk": "nvme8n1", "vdev": "raidz2-0", "state": "ONLINE",
-        "health": {"model": "Corsair MP600 PRO NH", "protocol": "NVMe", "media_type": "nvme",
-                   "smart_passed": true, "temperature_celsius": 44, "percentage_used": 7,
-                   "available_spare_percent": 100, "critical_warning": 0, "media_errors": 0,
-                   "power_on_hours": 6015, "collected_at": "2026-10-11T12:00:00Z"}
+        "name": "nvme8n1p1",
+        "disk": "nvme8n1",
+        "vdev": "raidz2-0",
+        "state": "ONLINE",
+        "health": {
+          "model": "Corsair MP600 PRO NH",
+          "protocol": "NVMe",
+          "media_type": "nvme",
+          "smart_passed": true,
+          "temperature_celsius": 44,
+          "percentage_used": 7,
+          "available_spare_percent": 100,
+          "critical_warning": 0,
+          "media_errors": 0,
+          "power_on_hours": 6015,
+          "collected_at": "2026-10-11T12:00:00Z"
+        }
       }
     ],
     "scan_status": "scrub completed",
@@ -73,33 +121,64 @@
         "type": "raidz2",
         "state": "DEGRADED",
         "devices": [
-          {"name": "sdy1", "state": "ONLINE"},
-          {"name": "sdz1", "state": "ONLINE"},
-          {"name": "sdaa1", "state": "FAULTED"},
-          {"name": "9876543210123456789", "state": "UNAVAIL"}
+          { "name": "sdy1", "state": "ONLINE" },
+          { "name": "sdz1", "state": "ONLINE" },
+          { "name": "sdaa1", "state": "FAULTED" },
+          { "name": "9876543210123456789", "state": "UNAVAIL" }
         ]
       }
     ],
     "drives": [
       {
-        "name": "sdy1", "disk": "sdy", "vdev": "raidz2-0", "state": "ONLINE",
-        "health": {"model": "SEAGATE ST24000NM007H", "protocol": "SCSI", "media_type": "hdd",
-                   "smart_passed": true, "temperature_celsius": 37, "media_errors": 0,
-                   "power_on_hours": 14219, "collected_at": "2026-10-11T12:00:00Z"}
+        "name": "sdy1",
+        "disk": "sdy",
+        "vdev": "raidz2-0",
+        "state": "ONLINE",
+        "health": {
+          "model": "SEAGATE ST24000NM007H",
+          "protocol": "SCSI",
+          "media_type": "hdd",
+          "smart_passed": true,
+          "temperature_celsius": 37,
+          "media_errors": 0,
+          "power_on_hours": 14219,
+          "collected_at": "2026-10-11T12:00:00Z"
+        }
       },
       {
-        "name": "sdz1", "disk": "sdz", "vdev": "raidz2-0", "state": "ONLINE",
-        "health": {"model": "SEAGATE ST24000NM007H", "protocol": "SCSI", "media_type": "hdd",
-                   "standby": true, "smart_passed": true, "temperature_celsius": 52, "media_errors": 0,
-                   "power_on_hours": 14100, "collected_at": "2026-10-11T11:00:00Z"}
+        "name": "sdz1",
+        "disk": "sdz",
+        "vdev": "raidz2-0",
+        "state": "ONLINE",
+        "health": {
+          "model": "SEAGATE ST24000NM007H",
+          "protocol": "SCSI",
+          "media_type": "hdd",
+          "standby": true,
+          "smart_passed": true,
+          "temperature_celsius": 52,
+          "media_errors": 0,
+          "power_on_hours": 14100,
+          "collected_at": "2026-10-11T11:00:00Z"
+        }
       },
       {
-        "name": "sdaa1", "disk": "sdaa", "vdev": "raidz2-0", "state": "FAULTED",
-        "health": {"model": "SEAGATE ST24000NM007H", "protocol": "SCSI", "media_type": "hdd",
-                   "smart_passed": false, "temperature_celsius": 40, "media_errors": 3,
-                   "power_on_hours": 14301, "collected_at": "2026-10-11T12:00:00Z"}
+        "name": "sdaa1",
+        "disk": "sdaa",
+        "vdev": "raidz2-0",
+        "state": "FAULTED",
+        "health": {
+          "model": "SEAGATE ST24000NM007H",
+          "protocol": "SCSI",
+          "media_type": "hdd",
+          "smart_passed": false,
+          "temperature_celsius": 40,
+          "media_errors": 3,
+          "power_on_hours": 14301,
+          "collected_at": "2026-10-11T12:00:00Z"
+        }
       },
-      {"name": "9876543210123456789", "vdev": "raidz2-0", "state": "UNAVAIL"}
+      { "name": "9876543210123456789", "vdev": "raidz2-0", "state": "UNAVAIL" }
     ],
     "scan_status": "resilver in progress",
     "scan_state": "scanning"
@@ -118,25 +197,49 @@
         "type": "mirror",
         "state": "ONLINE",
         "devices": [
-          {"name": "nvme2n1p3", "state": "ONLINE"},
-          {"name": "nvme6n1p3", "state": "ONLINE"}
+          { "name": "nvme2n1p3", "state": "ONLINE" },
+          { "name": "nvme6n1p3", "state": "ONLINE" }
         ]
       }
     ],
     "drives": [
       {
-        "name": "nvme2n1p3", "disk": "nvme2n1", "vdev": "mirror-0", "state": "ONLINE",
-        "health": {"model": "MKNSSDPE2TB-D8", "protocol": "NVMe", "media_type": "nvme",
-                   "smart_passed": true, "temperature_celsius": 35, "percentage_used": 89,
-                   "available_spare_percent": 100, "critical_warning": 0, "media_errors": 0,
-                   "power_on_hours": 31520, "collected_at": "2026-10-11T12:00:00Z"}
+        "name": "nvme2n1p3",
+        "disk": "nvme2n1",
+        "vdev": "mirror-0",
+        "state": "ONLINE",
+        "health": {
+          "model": "MKNSSDPE2TB-D8",
+          "protocol": "NVMe",
+          "media_type": "nvme",
+          "smart_passed": true,
+          "temperature_celsius": 35,
+          "percentage_used": 89,
+          "available_spare_percent": 100,
+          "critical_warning": 0,
+          "media_errors": 0,
+          "power_on_hours": 31520,
+          "collected_at": "2026-10-11T12:00:00Z"
+        }
       },
       {
-        "name": "nvme6n1p3", "disk": "nvme6n1", "vdev": "mirror-0", "state": "ONLINE",
-        "health": {"model": "Samsung SSD 970 EVO Plus 2TB", "protocol": "NVMe", "media_type": "nvme",
-                   "smart_passed": true, "temperature_celsius": 38, "percentage_used": 21,
-                   "available_spare_percent": 8, "critical_warning": 1, "media_errors": 0,
-                   "power_on_hours": 22000, "collected_at": "2026-10-11T12:00:00Z"}
+        "name": "nvme6n1p3",
+        "disk": "nvme6n1",
+        "vdev": "mirror-0",
+        "state": "ONLINE",
+        "health": {
+          "model": "Samsung SSD 970 EVO Plus 2TB",
+          "protocol": "NVMe",
+          "media_type": "nvme",
+          "smart_passed": true,
+          "temperature_celsius": 38,
+          "percentage_used": 21,
+          "available_spare_percent": 8,
+          "critical_warning": 1,
+          "media_errors": 0,
+          "power_on_hours": 22000,
+          "collected_at": "2026-10-11T12:00:00Z"
+        }
       }
     ],
     "scan_status": "scrub completed",

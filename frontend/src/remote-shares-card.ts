@@ -35,7 +35,7 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
     const device = this.getActiveDevice();
     const deviceId = device?.id;
 
-    for (const [entityId, stateObj] of Object.entries(this.hass.states)) {
+    for (const [entityId, stateObj] of Object.entries(this.agentStates)) {
       if (deviceId && this.hass.entities) {
         const ent = this.hass.entities[entityId];
         if (ent && ent.device_id && ent.device_id !== deviceId) continue;

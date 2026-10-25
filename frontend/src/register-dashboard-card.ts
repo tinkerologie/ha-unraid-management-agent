@@ -31,9 +31,9 @@ export function registerDashboardCard(
   if (!window.customCards.some((card) => card.type === registration.tag)) {
     window.customCards.push({
       type: registration.tag,
-      name: registration.name,
+      name: registration.name.replace(/^Unraid /, "Unraid Management Agent "),
       description: registration.description,
-      preview: true,
+      preview: false,
       documentationURL: "https://github.com/tinkerologie/ha-unraid-management-agent",
     });
   }

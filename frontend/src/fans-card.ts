@@ -35,7 +35,7 @@ export class UnraidFansCard extends BaseUnraidCard {
 
     // Map control numbers
     const controlMap = new Map<string, string>();
-    for (const [entityId, stateObj] of Object.entries(this.hass.states)) {
+    for (const [entityId, stateObj] of Object.entries(this.agentStates)) {
       if (entityId.startsWith("number.") && (entityId.includes("_fan_") || entityId.includes("fan_control"))) {
         if (deviceId && this.hass.entities) {
           const ent = this.hass.entities[entityId];
@@ -53,7 +53,7 @@ export class UnraidFansCard extends BaseUnraidCard {
       }
     }
 
-    for (const [entityId, stateObj] of Object.entries(this.hass.states)) {
+    for (const [entityId, stateObj] of Object.entries(this.agentStates)) {
       if (!entityId.startsWith("sensor.")) continue;
 
       // Check device ID or naming
@@ -107,7 +107,7 @@ export class UnraidFansCard extends BaseUnraidCard {
 
     // Fallback: If no sensor.* RPM entities exist, check for number.* fan controls (e.g. UMA fan speed controls)
     if (list.length === 0) {
-      for (const [entityId, stateObj] of Object.entries(this.hass.states)) {
+      for (const [entityId, stateObj] of Object.entries(this.agentStates)) {
         if (!entityId.startsWith("number.")) continue;
         if (deviceId && this.hass.entities) {
           const ent = this.hass.entities[entityId];

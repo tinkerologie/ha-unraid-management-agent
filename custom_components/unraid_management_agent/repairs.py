@@ -5,9 +5,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.repairs import RepairsFlow
+from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
@@ -53,7 +52,7 @@ class ConnectionIssueRepairFlow(RepairsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Handle the initial step."""
         if user_input is not None:
             # Mark issue as resolved
@@ -88,7 +87,7 @@ class DiskHealthRepairFlow(RepairsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Handle the initial step."""
         if user_input is not None:
             # Mark issue as resolved
@@ -124,7 +123,7 @@ class ArrayIssueRepairFlow(RepairsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Handle the initial step."""
         if user_input is not None:
             # Mark issue as resolved
@@ -160,7 +159,7 @@ class ParityCheckRepairFlow(RepairsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         """Handle the initial step."""
         if user_input is not None:
             # Mark issue as resolved

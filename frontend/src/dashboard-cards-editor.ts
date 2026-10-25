@@ -1,6 +1,13 @@
-import { LitElement, css, html, type TemplateResult } from "lit";
+import { LitElement, css, html, nothing, type TemplateResult } from "lit";
 import { type CardConfig } from "./config";
 import { fireEvent, type HomeAssistant } from "./ha-types";
+
+const labels: Record<string, string> = {
+  server: "Unraid Management Agent server",
+  title: "Custom title",
+  view_mode: "Default view",
+  show_system_info: "Show system details",
+};
 
 export class UnraidCardEditor extends LitElement {
   static override properties = {
@@ -15,158 +22,86 @@ export class UnraidCardEditor extends LitElement {
     .card-config {
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      padding: 8px 0;
-      color: var(--primary-text-color, #fff);
-      font-size: 0.9rem;
-    }
-    .form-row {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    label {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--secondary-text-color, #aaa);
-    }
-    input[type="text"],
-    select {
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.15));
-      background: var(--card-background-color, #1e1e24);
-      color: var(--primary-text-color, #fff);
-      font-size: 0.85rem;
-    }
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-    }
-    .checkbox-row input {
-      width: 16px;
-      height: 16px;
-      accent-color: var(--primary-color, #f25f22);
+      gap: var(--ha-space-4, 16px);
+      padding-block: var(--ha-space-2, 8px);
+      color: var(--primary-text-color);
     }
   `;
+
+  private readonly _computeLabel = (schema: { name: string }): string =>
+    labels[schema.name] ?? schema.name;
+
+  private readonly _computeHelper = (schema: { name: string }): string | undefined =>
+    schema.name === "server"
+      ? "Only servers provided by Unraid Management Agent are listed."
+      : undefined;
 
   setConfig(config: CardConfig): void {
     this._config = { ...config };
   }
 
-  private _valueChanged(key: string, value: unknown): void {
+  private _valueChanged(event: CustomEvent<{ value: Record<string, unknown> }>): void {
+    event.stopPropagation();
     if (!this._config) return;
-    this._config = { ...this._config, [key]: value };
-    fireEvent(this, "config-changed", { config: this._config });
+    const config = { ...this._config, ...event.detail.value };
+    for (const key of ["server", "title"] as const) {
+      if (config[key] === "") delete config[key];
+    }
+    this._config = config;
+    fireEvent(this, "config-changed", { config });
   }
 
   protected override render(): TemplateResult {
-    if (!this._config) return html``;
-
-    const devices = this.hass?.devices
-      ? Object.values(this.hass.devices).filter(
-          (d) =>
-            // Not child devices (GPUs, storage), nor the Docker and VMs devices
-            // or their child devices (containers, VMs)
-            !d.via_device_id &&
-            !d.parent_device_id &&
-            d.identifiers?.some(
-              ([domain]) => domain === "unraid_management_agent" || domain === "unraid"
-            )
-        )
-      : [];
-
+    if (!this._config || !this.hass) return html``;
+    const devices = Object.values(this.hass.devices ?? {}).filter(
+      (device) =>
+        !device.via_device_id && !device.parent_device_id &&
+        device.identifiers?.some(([domain]) => domain === "unraid_management_agent")
+    );
+    const selected = this._config.server ? devices.find(
+      (device) => device.id === this._config?.server ||
+        device.name?.toLowerCase() === this._config?.server?.toLowerCase() ||
+        device.name_by_user?.toLowerCase() === this._config?.server?.toLowerCase()
+    ) : undefined;
+    const server = selected?.id ?? this._config.server ?? "";
+    const options = [
+      { value: "", label: "Automatically select an Agent server" },
+      ...devices.map((device) => ({
+        value: device.id, label: device.name_by_user || device.name || device.id,
+      })),
+    ];
+    if (server && !selected) {
+      options.push({ value: server, label: `Unavailable Agent server: ${server}` });
+    }
+    const schema = [
+      { name: "server", selector: { select: { options, mode: "dropdown" } } },
+      { name: "title", selector: { text: {} } },
+      ...(this._config.type.includes("docker")
+        ? [{ name: "view_mode", selector: { select: { options: [
+          { value: "grid", label: "Grid" }, { value: "list", label: "List" },
+        ], mode: "dropdown" } } }]
+        : []),
+      ...(this._config.type.includes("server") || this._config.type.includes("dashboard")
+        ? [{ name: "show_system_info", selector: { boolean: {} } }]
+        : []),
+    ];
     return html`
       <div class="card-config">
-        <div class="form-row">
-          <label for="server">Unraid Server</label>
-          ${devices.length > 0
-            ? html`
-                <select
-                  id="server"
-                  @change=${(e: Event) =>
-                    this._valueChanged(
-                      "server",
-                      (e.target as HTMLSelectElement).value
-                    )}
-                >
-                  ${(() => {
-                    const currentServer =
-                      this._config.server || devices[0]?.id || "";
-                    return devices.map(
-                      (d) => html`
-                        <option
-                          value=${d.id}
-                          ?selected=${d.id === currentServer}
-                        >
-                          ${d.name_by_user || d.name || d.id}
-                        </option>
-                      `
-                    );
-                  })()}
-                </select>
-              `
-            : html`
-                <input
-                  type="text"
-                  id="server"
-                  placeholder="Auto-detecting server..."
-                  .value=${this._config.server || ""}
-                  @input=${(e: Event) =>
-                    this._valueChanged(
-                      "server",
-                      (e.target as HTMLInputElement).value
-                    )}
-                />
-              `}
-        </div>
-        <div class="form-row">
-          <label for="title">Custom Title (optional)</label>
-          <input
-            type="text"
-            id="title"
-            placeholder="Leave empty for default"
-            .value=${this._config.title || ""}
-            @input=${(e: Event) =>
-              this._valueChanged(
-                "title",
-                (e.target as HTMLInputElement).value
-              )}
-          />
-        </div>
-        ${this._config.type?.includes("docker")
-          ? html`
-              <div class="form-row">
-                <label for="view_mode">Default View Mode</label>
-                <select
-                  id="view_mode"
-                  .value=${this._config.view_mode || "grid"}
-                  @change=${(e: Event) =>
-                    this._valueChanged(
-                      "view_mode",
-                      (e.target as HTMLSelectElement).value
-                    )}
-                >
-                  <option value="grid">Grid View (Icons & Status)</option>
-                  <option value="list">List View (Detailed Table)</option>
-                </select>
-              </div>
-            `
-          : ""}
-        <label class="checkbox-row">
-          <input
-            type="checkbox"
-            .checked=${this._config.show_system_info !== false}
-            @change=${(e: Event) =>
-              this._valueChanged(
-                "show_system_info",
-                (e.target as HTMLInputElement).checked
-              )}
-          />
-          <span>Show System Details</span>
-        </label>
+        ${devices.length === 0
+          ? html`<ha-alert alert-type="info">No Unraid Management Agent server is available. Set up the integration to display its data.</ha-alert>`
+          : nothing}
+        <ha-form
+          .hass=${this.hass}
+          .schema=${schema}
+          .data=${{ ...this._config, server, title: this._config.title ?? "",
+            ...(schema.some((field) => field.name === "view_mode")
+              ? { view_mode: this._config.view_mode ?? "grid" } : {}),
+            ...(schema.some((field) => field.name === "show_system_info")
+              ? { show_system_info: this._config.show_system_info !== false } : {}) }}
+          .computeLabel=${this._computeLabel}
+          .computeHelper=${this._computeHelper}
+          @value-changed=${this._valueChanged}
+        ></ha-form>
       </div>
     `;
   }

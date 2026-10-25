@@ -3053,7 +3053,7 @@ class UnraidZFSPoolCorruptedFilesSensor(UnraidZFSPoolSensorBase):
         if not zfs_pool_devices_enabled(coordinator):
             # Named after the pool on the server device, as before the option.
             self._attr_translation_key = None
-            self._attr_translation_placeholders = {}
+            self._attr_translation_placeholders: dict[str, str] = {}
             self._attr_name = f"{pool_name} Corrupted Files"
 
     @property
@@ -4909,7 +4909,9 @@ class UnraidStorageSensor(UnraidStorageEntity, SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, spec)
-        self.entity_description = spec.description
+        self.entity_description = cast(
+            "UnraidStorageSensorEntityDescription", spec.description
+        )
 
     @property
     def native_value(self) -> Any:

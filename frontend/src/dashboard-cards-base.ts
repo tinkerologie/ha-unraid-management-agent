@@ -49,6 +49,16 @@ export abstract class BaseUnraidCard extends LitElement {
     return document.createElement(this.editorTag);
   }
 
+  static getStubConfig(hass?: HomeAssistant): Record<string, unknown> {
+    const server = Object.values(hass?.devices ?? {}).find(
+      (device) =>
+        !device.via_device_id &&
+        !device.parent_device_id &&
+        device.identifiers?.some(([domain]) => domain === "unraid_management_agent")
+    );
+    return server ? { server: server.id } : {};
+  }
+
   static override properties = {
     hass: { attribute: false },
     config: { attribute: false },
@@ -56,6 +66,9 @@ export abstract class BaseUnraidCard extends LitElement {
 
   declare hass?: HomeAssistant;
   declare config: CardConfig;
+  private _agentStates?: Record<string, HassEntity>;
+  private _agentStatesHass?: HomeAssistant;
+  private _agentStatesConfig?: CardConfig;
 
   constructor() {
     super();
@@ -73,6 +86,7 @@ export abstract class BaseUnraidCard extends LitElement {
 
   override willUpdate(changedProperties: PropertyValues<this>): void {
     super.willUpdate(changedProperties);
+    this._agentStates = undefined;
     if (changedProperties.has("config")) {
       if (this.config.embedded) {
         this.setAttribute("embedded", "");
@@ -99,7 +113,7 @@ export abstract class BaseUnraidCard extends LitElement {
   }
 
   getGridOptions() {
-    return { columns: 6, rows: 4, min_columns: 3, min_rows: 3 };
+    return { columns: 12, min_columns: 6 };
   }
 
   /** Get all Unraid server devices registered in Home Assistant */
@@ -120,7 +134,7 @@ export abstract class BaseUnraidCard extends LitElement {
   protected isUnraidDevice(device: DeviceRegistryEntry): boolean {
     return (
       device.identifiers?.some(
-        ([domain]) => domain === "unraid_management_agent" || domain === "unraid"
+        ([domain]) => domain === "unraid_management_agent"
       ) ?? false
     );
   }
@@ -140,7 +154,31 @@ export abstract class BaseUnraidCard extends LitElement {
       );
       if (match) return match;
     }
-    return devices[0];
+    return this.config.server ? undefined : devices[0];
+  }
+
+  /** Only expose entities owned by the selected Agent server and its devices. */
+  protected get agentStates(): Record<string, HassEntity> {
+    if (
+      this._agentStates && this._agentStatesHass === this.hass &&
+      this._agentStatesConfig === this.config
+    ) return this._agentStates;
+    const server = this.getActiveDevice();
+    if (!server || !this.hass?.entities) return {};
+    const deviceIds = this.getServerDeviceIds(server.id);
+    this._agentStatesHass = this.hass;
+    this._agentStatesConfig = this.config;
+    this._agentStates = Object.fromEntries(
+      Object.entries(this.hass.states).filter(([entityId]) => {
+        const entry = this.hass?.entities?.[entityId];
+        return (
+          entry?.platform === "unraid_management_agent" &&
+          !!entry.device_id &&
+          deviceIds.has(entry.device_id)
+        );
+      })
+    );
+    return this._agentStates;
   }
 
   /**
@@ -154,12 +192,18 @@ export abstract class BaseUnraidCard extends LitElement {
     const devices = Object.values(this.hass?.devices ?? {}).filter((device) =>
       this.isUnraidDevice(device)
     );
-    for (const device of devices) {
-      if (device.via_device_id === serverId) ids.add(device.id);
-    }
-    for (const device of devices) {
-      if (device.parent_device_id && ids.has(device.parent_device_id)) {
-        ids.add(device.id);
+    let added = true;
+    while (added) {
+      added = false;
+      for (const device of devices) {
+        if (
+          !ids.has(device.id) &&
+          ((device.via_device_id && ids.has(device.via_device_id)) ||
+            (device.parent_device_id && ids.has(device.parent_device_id)))
+        ) {
+          ids.add(device.id);
+          added = true;
+        }
       }
     }
     return ids;
@@ -195,7 +239,7 @@ export abstract class BaseUnraidCard extends LitElement {
             ent.translation_key === translationKey &&
             (!domain || ent.entity_id.startsWith(`${domain}.`))
           ) {
-            const stateObj = this.hass.states[ent.entity_id];
+            const stateObj = this.agentStates[ent.entity_id];
             if (stateObj) return stateObj;
           }
         }
@@ -203,15 +247,14 @@ export abstract class BaseUnraidCard extends LitElement {
     }
 
     // Fallback: search states by naming patterns
-    const states = Object.values(this.hass.states);
+    const states = Object.values(this.agentStates);
     return states.find((s) => {
       if (domain && !s.entity_id.startsWith(`${domain}.`)) return false;
       if (this.hass?.entities) {
         const reg = this.hass.entities[s.entity_id];
         if (
           reg &&
-          reg.platform !== "unraid_management_agent" &&
-          reg.platform !== "unraid"
+          reg.platform !== "unraid_management_agent"
         )
           return false;
       }
@@ -264,7 +307,7 @@ export abstract class BaseUnraidCard extends LitElement {
       }
     >();
 
-    for (const [entityId, stateObj] of Object.entries(this.hass.states)) {
+    for (const [entityId, stateObj] of Object.entries(this.agentStates)) {
       if (cleanName && !entityId.includes(cleanName)) continue;
       // Interface entities live on the server device itself. Entities of its
       // child devices (e.g. a "Network card (41:00)" NIC device) can also
@@ -326,7 +369,7 @@ export abstract class BaseUnraidCard extends LitElement {
       ? this.slugifyDeviceName(device.name)
       : undefined;
 
-    return Object.values(this.hass.states).find((s) => {
+    return Object.values(this.agentStates).find((s) => {
       if (!s.entity_id.startsWith("sensor.")) return false;
       if (cleanName && !s.entity_id.includes(cleanName)) return false;
       return (
@@ -379,7 +422,7 @@ export abstract class BaseUnraidCard extends LitElement {
           keyMatch &&
           (!domain || ent.entity_id.startsWith(`${domain}.`))
         ) {
-          const stateObj = this.hass.states[ent.entity_id];
+          const stateObj = this.agentStates[ent.entity_id];
           if (stateObj) matches.push(stateObj);
         }
       }
@@ -396,8 +439,7 @@ export abstract class BaseUnraidCard extends LitElement {
         const reg = this.hass.entities[s.entity_id];
         if (
           reg &&
-          reg.platform !== "unraid_management_agent" &&
-          reg.platform !== "unraid"
+          reg.platform !== "unraid_management_agent"
         )
           return false;
       }
@@ -519,7 +561,7 @@ export abstract class BaseUnraidCard extends LitElement {
       );
     };
 
-    const states = Object.values(this.hass.states);
+    const states = Object.values(this.agentStates);
     const domainStates = domain
       ? states.filter((s) => s.entity_id.startsWith(`${domain}.`))
       : states;
@@ -539,23 +581,23 @@ export abstract class BaseUnraidCard extends LitElement {
   protected findEntity(pattern: RegExp | string): HassEntity | undefined {
     if (!this.hass?.states) return undefined;
     if (typeof pattern === "string") {
-      return this.hass.states[pattern];
+      return this.agentStates[pattern];
     }
-    return Object.values(this.hass.states).find((s) =>
+    return Object.values(this.agentStates).find((s) =>
       pattern.test(s.entity_id)
     );
   }
 
   /** Toggle switch service call */
   protected async toggleEntity(entityId: string): Promise<void> {
-    if (!this.hass) return;
+    if (!this.hass || !this.agentStates[entityId]) return;
     const domain = entityId.split(".")[0] || "homeassistant";
     await this.hass.callService(domain, "toggle", { entity_id: entityId });
   }
 
   /** Press button service call */
   protected async pressButton(entityId: string): Promise<void> {
-    if (!this.hass) return;
+    if (!this.hass || !this.agentStates[entityId]) return;
     await this.hass.callService("button", "press", { entity_id: entityId });
   }
 

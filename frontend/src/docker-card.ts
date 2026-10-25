@@ -59,13 +59,23 @@ export class UnraidDockerCard extends BaseUnraidCard {
     ...BaseUnraidCard.properties,
     _filter: { state: true },
     _viewMode: { state: true },
+    _pendingAction: { state: true },
+    _busy: { state: true },
+    _error: { state: true },
   };
 
   declare _filter: "all" | "running" | "stopped" | "updates";
   declare _viewMode: "grid" | "list";
 
+  declare private _pendingAction?: { entityId: string; name: string; action: "stop" | "restart" };
+  declare private _busy: boolean;
+  declare private _error: string;
+
   constructor() {
     super();
+    this._pendingAction = undefined;
+    this._busy = false;
+    this._error = "";
     this._filter = "all";
     this._viewMode = "grid";
   }
@@ -82,13 +92,74 @@ export class UnraidDockerCard extends BaseUnraidCard {
     }
   }
 
+  override updated(): void {
+    const dialog = this.renderRoot.querySelector<HTMLDialogElement>("dialog");
+    if (this._pendingAction && dialog && !dialog.open) dialog.showModal();
+    else if (!this._pendingAction && dialog?.open) dialog.close();
+  }
+
   private handleToggle(entityId: string, isRunning: boolean, name: string): void {
-    if (isRunning) {
-      if (!confirm(`Are you sure you want to stop container "${name}"?`)) {
-        return;
-      }
+    this._error = "";
+    if (isRunning) this._pendingAction = { entityId, name, action: "stop" };
+    else void this.runContainerAction(entityId, "start");
+  }
+
+  private requestRestart(entityId: string, name: string): void {
+    this._error = "";
+    this._pendingAction = { entityId, name, action: "restart" };
+  }
+
+  private async runContainerAction(entityId: string, action: "start" | "stop" | "restart"): Promise<void> {
+    if (!this.hass || this._busy) return;
+    // Recheck ownership when a confirmation is accepted after a state update.
+    if (!this.agentStates[entityId]) {
+      this._pendingAction = undefined;
+      this._error = "This container is no longer available from Unraid Management Agent.";
+      return;
     }
-    this.toggleEntity(entityId);
+    this._busy = true;
+    this._error = "";
+    try {
+      await this.hass.callService(
+        action === "restart" ? "button" : "switch",
+        action === "restart" ? "press" : action === "start" ? "turn_on" : "turn_off",
+        { entity_id: entityId }
+      );
+      this._pendingAction = undefined;
+    } catch {
+      this._error = "The container action failed. Check the server connection and try again.";
+    } finally {
+      this._busy = false;
+    }
+  }
+
+  private renderConfirmation(): TemplateResult {
+    const title = `${this._pendingAction?.action === "restart" ? "Restart" : "Stop"} container?`;
+    const content = html`
+      <p>${this._pendingAction?.name} will be ${this._pendingAction?.action === "restart" ? "restarted" : "stopped"}. Its services will be interrupted.</p>
+      ${this._error ? html`<p role="alert">${this._error}</p>` : nothing}
+    `;
+    const actions = html`
+      <div class="dialog-actions" slot="footer">
+        <button class="btn" autofocus ?disabled=${this._busy} @click=${() => { this._pendingAction = undefined; }}>Cancel</button>
+        <button class="btn btn-danger" ?disabled=${this._busy} @click=${() => {
+          const action = this._pendingAction;
+          if (action) void this.runContainerAction(action.entityId, action.action);
+        }}>${this._busy ? "Working…" : this._pendingAction?.action === "restart" ? "Restart" : "Stop"}</button>
+      </div>
+    `;
+    // Prefer Home Assistant's current dialog; the native fallback also works
+    // before HA's lazy-loaded dialog component has been registered.
+    if (customElements.get("ha-dialog")) {
+      return html`<ha-dialog type="alert" width="small" .open=${!!this._pendingAction}
+        .headerTitle=${title} .preventScrimClose=${this._busy}
+        @closed=${() => { this._pendingAction = undefined; }}>${content}${actions}</ha-dialog>`;
+    }
+    return html`<dialog aria-labelledby="container-action-title"
+      @cancel=${(event: Event) => { if (this._busy) event.preventDefault(); else this._pendingAction = undefined; }}
+      @close=${() => { this._pendingAction = undefined; }}>
+      <h2 id="container-action-title">${title}</h2>${content}${actions}
+    </dialog>`;
   }
 
   private getContainers(): ContainerItem[] {
@@ -103,10 +174,23 @@ export class UnraidDockerCard extends BaseUnraidCard {
     const updates = this.getEntities("docker_container_update", "update");
 
     const list: ContainerItem[] = [];
+    const server = this.getActiveDevice();
+    const serverNames = [server?.name_by_user, server?.name].filter(
+      (name): name is string => !!name
+    );
 
     for (const sw of switches) {
       const slug = extractEntityContainerSlug(sw.entity_id);
-      const cleanName = (sw.attributes.friendly_name as string) || slug;
+      let cleanName = (sw.attributes.friendly_name as string) || slug;
+      // Keep the distinctive container name visible in narrow tiles. Registry
+      // names and service targets remain unchanged.
+      for (const name of serverNames) {
+        if (!cleanName.toLowerCase().startsWith(`${name.toLowerCase()} `)) continue;
+        const remainder = cleanName.slice(name.length).trimStart();
+        const shortName = remainder.replace(/^(?:docker )?container\s+/i, "");
+        if (shortName && shortName !== remainder) cleanName = shortName;
+        break;
+      }
       const isRunning = sw.state === "on";
 
       const restart = restarts.find(
@@ -185,26 +269,29 @@ export class UnraidDockerCard extends BaseUnraidCard {
       <ha-card>
         ${this.renderHeader(
           this.config.title || "Docker Containers",
-          `${runningCount} running • ${stoppedCount} stopped`,
+          `Unraid Management Agent · ${runningCount} running • ${stoppedCount} stopped`,
           mdiDocker,
           badge
         )}
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
-          <div style="display: flex; gap: 4px; overflow-x: auto;">
+          <div role="group" aria-label="Container status" style="display: flex; gap: 4px; overflow-x: auto;">
             <button
               class="tab-btn ${this._filter === "all" ? "active" : ""}"
+              aria-pressed=${this._filter === "all"}
               @click=${() => (this._filter = "all")}
             >
               All (${containers.length})
             </button>
             <button
               class="tab-btn ${this._filter === "running" ? "active" : ""}"
+              aria-pressed=${this._filter === "running"}
               @click=${() => (this._filter = "running")}
             >
               Running (${runningCount})
             </button>
             <button
               class="tab-btn ${this._filter === "stopped" ? "active" : ""}"
+              aria-pressed=${this._filter === "stopped"}
               @click=${() => (this._filter = "stopped")}
             >
               Stopped (${stoppedCount})
@@ -214,7 +301,8 @@ export class UnraidDockerCard extends BaseUnraidCard {
                   <button
                     class="tab-btn ${this._filter === "updates" ? "active" : ""}"
                     style="color: var(--unraid-warning);"
-                    @click=${() => (this._filter = "updates")}
+                    aria-pressed=${this._filter === "updates"}
+              @click=${() => (this._filter = "updates")}
                   >
                     Updates (${updateCount})
                   </button>
@@ -237,6 +325,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
             <button
               class="btn-icon"
               title="Toggle View Mode"
+              aria-label=${this._viewMode === "grid" ? "Switch to list view" : "Switch to grid view"}
               @click=${() =>
                 (this._viewMode = this._viewMode === "grid" ? "list" : "grid")}
             >
@@ -244,6 +333,8 @@ export class UnraidDockerCard extends BaseUnraidCard {
             </button>
           </div>
         </div>
+        ${this._error ? html`<ha-alert alert-type="error" role="alert">${this._error}</ha-alert>` : nothing}
+        ${this.renderConfirmation()}
         ${this._viewMode === "grid"
           ? html`
               <div class="container-grid">
@@ -251,11 +342,12 @@ export class UnraidDockerCard extends BaseUnraidCard {
                   (c) => html`
                     <div
                       class="container-tile"
-                      @click=${() => this.openMoreInfo(c.switchEntityId)}
+                      role="group" aria-label=${c.name}
                     >
                       <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
                         <span class="status-dot ${c.isRunning ? "online" : "offline"}"></span>
-                        <span class="tile-name" title="${c.name}">${c.name}</span>
+                        <button class="tile-name btn" title=${c.name} aria-label=${`Show details for ${c.name}`}
+                          @click=${() => this.openMoreInfo(c.switchEntityId)}>${c.name}</button>
                       </div>
                       <div style="display: flex; align-items: center; gap: 4px;">
                         ${c.hasUpdate
@@ -266,10 +358,10 @@ export class UnraidDockerCard extends BaseUnraidCard {
                               <button
                                 class="btn-icon"
                                 style="padding: 2px;"
-                                title="Restart ${c.name}"
+                                title="Restart ${c.name}" aria-label=${`Restart ${c.name}`} ?disabled=${this._busy}
                                 @click=${(e: Event) => {
                                   e.stopPropagation();
-                                  this.pressButton(c.restartEntityId!);
+                                  this.requestRestart(c.restartEntityId!, c.name);
                                 }}
                               >
                                 ${iconTemplate(mdiRestart, 14)}
@@ -280,6 +372,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
                           class="btn-icon"
                           style="padding: 2px; color: ${c.isRunning ? "var(--unraid-online)" : "var(--unraid-subtext)"};"
                           title="${c.isRunning ? "Stop" : "Start"} ${c.name}"
+                          aria-label=${`${c.isRunning ? "Stop" : "Start"} ${c.name}`} ?disabled=${this._busy}
                           @click=${(e: Event) => {
                             e.stopPropagation();
                             this.handleToggle(c.switchEntityId, c.isRunning, c.name);
@@ -321,7 +414,8 @@ export class UnraidDockerCard extends BaseUnraidCard {
                               <button
                                 class="btn"
                                 style="padding: 3px 8px;"
-                                @click=${() => this.pressButton(c.restartEntityId!)}
+                                aria-label=${`Restart ${c.name}`} ?disabled=${this._busy}
+                                @click=${() => this.requestRestart(c.restartEntityId!, c.name)}
                               >
                                 ${iconTemplate(mdiRestart, 13)}
                                 <span>Restart</span>
@@ -331,6 +425,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
                         <button
                           class="btn ${c.isRunning ? "btn" : "btn-primary"}"
                           style="padding: 3px 8px;"
+                          aria-label=${`${c.isRunning ? "Stop" : "Start"} ${c.name}`} ?disabled=${this._busy}
                           @click=${() => this.handleToggle(c.switchEntityId, c.isRunning, c.name)}
                         >
                           ${iconTemplate(mdiPower, 13)}

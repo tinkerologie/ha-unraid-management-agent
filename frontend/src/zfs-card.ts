@@ -77,7 +77,7 @@ export class UnraidZfsCard extends BaseUnraidCard {
         ent.device_id !== server.id &&
         this.isServerOrChildDevice(ent.device_id, server.id)
       ) {
-        const stateObj = this.hass.states[ent.entity_id];
+        const stateObj = this.agentStates[ent.entity_id];
         if (stateObj) found.push(stateObj);
       }
     }
@@ -113,7 +113,7 @@ export class UnraidZfsCard extends BaseUnraidCard {
 
     // Also search all states for zfs pools if not registered with translation_key
     if (this.hass?.states) {
-      for (const [entityId, stateObj] of Object.entries(this.hass.states)) {
+      for (const [entityId, stateObj] of Object.entries(this.agentStates)) {
         if (deviceId && this.hass.entities) {
           const ent = this.hass.entities[entityId];
           if (ent && ent.device_id && ent.device_id !== deviceId) continue;
