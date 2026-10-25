@@ -3,7 +3,7 @@ import { css } from "lit";
 export const themeTokens = css`
   :host {
     --unraid-primary: var(--primary-color, #f25f22);
-    --unraid-accent: var(--primary-color, #03a9f4);
+    --unraid-accent: var(--primary-color, #f25f22);
     --unraid-online: var(--success-color, #2ecc71);
     --unraid-warning: var(--warning-color, #f39c12);
     --unraid-error: var(--error-color, #e74c3c);

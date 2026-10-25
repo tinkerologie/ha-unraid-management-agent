@@ -199,4 +199,12 @@ test.describe("Unraid Lovelace Dashboard Cards Browser Tests", () => {
     await expect(dialog).not.toBeVisible();
   });
 
+
+  test("respects reduced-motion preferences for card controls", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const card = page.locator("#docker-card");
+    await expect(card.getByRole("button", { name: "Switch to list view" })).toHaveCSS("transition-duration", "0s");
+    await expect(card.getByRole("button", { name: "All (1)", exact: true })).toHaveCSS("transition-duration", "0s");
+  });
+
 });
