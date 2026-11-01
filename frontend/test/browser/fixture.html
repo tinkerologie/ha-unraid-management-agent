@@ -394,10 +394,30 @@
         "unraid-management-agent-dashboard-card",
       ];
 
+      // Local stress fixtures preserve IDs and ownership while varying display text.
+      const params = new URLSearchParams(location.search);
+      if (params.has("width")) {
+        container.style.width = `${Number(params.get("width"))}px`;
+        container.style.maxWidth = container.style.width;
+      }
+      container.dir = params.get("dir") || "ltr";
+      const longName = "VeryLongServerContainerVirtualMachineGraphicsCardName".repeat(4);
+      if (params.has("longNames")) {
+        mockHass.devices.dev_1.name_by_user = longName;
+        for (const state of Object.values(mockHass.states)) {
+          if (state.attributes.friendly_name) state.attributes.friendly_name = longName;
+        }
+        mockHass.states["sensor.cube_gpu_0_utilization"].attributes.gpu_name = longName;
+        mockHass.states["sensor.cube_gpu_0_utilization"].attributes.driver_version = "535.129.03-technical-driver-build-".repeat(8);
+        mockHass.states["sensor.cube_cpu_usage"].attributes.cpu_model = longName;
+        mockHass.states["sensor.cube_network_eth0_ip_address"].state = "2001:db8:1234:5678:90ab:cdef:1234:5678";
+        mockHass.states["sensor.cube_network_eth0_ip_address"].attributes.mac_address = "aa:bb:cc:dd:ee:ff";
+      }
+
       for (const tag of cardTags) {
         const el = document.createElement(tag);
         el.id = tag.replace("unraid-management-agent-", "");
-        el.setConfig({ type: `custom:${tag}` });
+        el.setConfig({ type: `custom:${tag}`, embedded: params.has("embedded"), ...(params.has("longNames") ? { title: longName } : {}) });
         el.hass = mockHass;
         container.appendChild(el);
       }

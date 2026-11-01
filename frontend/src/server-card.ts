@@ -121,6 +121,7 @@ export class UnraidServerCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           serverName,
           `${device?.model || "Unraid OS"} • Up ${this.formatUptime(uptimeState?.state)}`,
@@ -139,7 +140,7 @@ export class UnraidServerCard extends BaseUnraidCard {
               class="ring-gauge"
               style="--pct: ${cpuPct}; --ring-color: ${cpuPct > 80 ? "var(--unraid-error)" : cpuPct > 50 ? "var(--unraid-warning)" : "var(--unraid-online)"}"
             >
-              <span class="ring-content">${cpuPct}%</span>
+              <span class="ring-content ltr-value">${cpuPct}%</span>
             </span>
             <span class="ring-label">CPU Load</span>
             <span class="ring-subtext">
@@ -157,7 +158,7 @@ export class UnraidServerCard extends BaseUnraidCard {
               class="ring-gauge"
               style="--pct: ${ramPct}; --ring-color: ${ramPct > 85 ? "var(--unraid-error)" : "var(--unraid-info)"}"
             >
-              <span class="ring-content">${ramPct}%</span>
+              <span class="ring-content ltr-value">${ramPct}%</span>
             </span>
             <span class="ring-label">Memory</span>
             <span class="ring-subtext">${ramUsedStr && ramTotalStr ? `${ramUsedStr} / ${ramTotalStr}` : `${ramPct}% used`}</span>
@@ -173,7 +174,7 @@ export class UnraidServerCard extends BaseUnraidCard {
               class="ring-gauge"
               style="--pct: ${arrayPct}; --ring-color: var(--unraid-accent)"
             >
-              <span class="ring-content">${arrayPct}%</span>
+              <span class="ring-content ltr-value">${arrayPct}%</span>
             </span>
             <span class="ring-label">Array Storage</span>
             <span class="ring-subtext">${arrayUsedStr && arrayTotalStr ? `${arrayUsedStr} / ${arrayTotalStr}` : `${arrayPct}% used`}</span>
@@ -190,7 +191,7 @@ export class UnraidServerCard extends BaseUnraidCard {
                 </div>
                 <div class="detail-item">
                   <span class="detail-label">OS Version</span>
-                  <span class="detail-val">${device?.sw_version || "Unraid OS"}</span>
+                  <span class="detail-val ltr-value">${device?.sw_version || "Unraid OS"}</span>
                 </div>
                 <button
                   type="button"
@@ -210,7 +211,7 @@ export class UnraidServerCard extends BaseUnraidCard {
                   title="Click to view Network details"
                 >
                   <span class="detail-label">Primary Network</span>
-                  <span class="detail-val" title="${primaryIface ? `${primaryIface.name} • ${netSpeedText}` : 'Connected'}">
+                  <span class="detail-val ltr-value" title="${primaryIface ? `${primaryIface.name} • ${netSpeedText}` : 'Connected'}">
                     ${primaryIface ? `${primaryIface.name}: ` : ""}${primaryIface?.ip?.state || ipState?.state || "Connected"}
                   </span>
                 </button>
@@ -222,7 +223,7 @@ export class UnraidServerCard extends BaseUnraidCard {
                   title="Click to view Network traffic details"
                 >
                   <span class="detail-label">Network Traffic</span>
-                  <span class="detail-val" title="${netSpeedText ? `Link Speed: ${netSpeedText}` : 'Network Speed'}">${netTrafficText}</span>
+                  <span class="detail-val ltr-value" title="${netSpeedText ? `Link Speed: ${netSpeedText}` : 'Network Speed'}">${netTrafficText}</span>
                 </button>
                 <button
                   type="button"
@@ -249,6 +250,7 @@ export class UnraidServerCard extends BaseUnraidCard {
               </div>
             `
           : nothing}
+      </div>
       </ha-card>
     `;
   }

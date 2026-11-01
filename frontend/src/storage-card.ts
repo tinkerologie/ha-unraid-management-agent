@@ -106,7 +106,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
     // 1. Process usage entities (Data and Cache disks)
     for (const u of usageEntities) {
       const diskKey = extractDiskToken(u.entity_id);
-      const cleanName = formatDiskName((u.attributes.friendly_name as string) || diskKey, diskKey);
+      const cleanName = formatDiskName(this.entityName(u, (u.attributes.friendly_name as string) || diskKey), diskKey);
       const isParity = cleanName.toLowerCase().includes("parity");
       const isCache = cleanName.toLowerCase().includes("cache") || cleanName.toLowerCase().includes("pool");
       const isBoot = cleanName.toLowerCase().includes("boot") || cleanName.toLowerCase().includes("flash");
@@ -142,7 +142,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
       if (/^disk_np/i.test(h.state)) continue;
       if (diskKey.includes("disabled") || diskKey.includes("missing") || diskKey.includes("invalid")) continue;
 
-      const cleanName = formatDiskName((h.attributes.friendly_name as string) || diskKey, diskKey);
+      const cleanName = formatDiskName(this.entityName(h, (h.attributes.friendly_name as string) || diskKey), diskKey);
       const isParity = cleanName.toLowerCase().includes("parity");
       const isCache = cleanName.toLowerCase().includes("cache");
       const isBoot = cleanName.toLowerCase().includes("boot");
@@ -386,6 +386,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           this.config.title || "Storage Array & Disks",
           `${usedStr || `${arrayPct}%`} used of ${totalStr || "Array"}${freeStr ? ` (${freeStr} Free)` : ""}`,
@@ -511,7 +512,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                             </span>
                           `}
 
-                      <span style="font-weight: var(--ha-font-weight-bold, 600); min-width: 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      <span style="font-weight: var(--ha-font-weight-bold, 600); min-width: 0; flex: 1 1 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${disk.name}
                       </span>
                     </div>
@@ -525,10 +526,10 @@ export class UnraidStorageCard extends BaseUnraidCard {
                         ${disk.isBoot ? "--" : tempDisplay}
                       </span>
                       ${healthBadge}
-                      <div style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); width: 85px;">
+                      <div style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); flex: 1 1 85px; min-width: 0;">
                         ${disk.isParity
                           ? html`
-                              <span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-online); font-weight: var(--ha-font-weight-medium, 500); font-family: var(--ha-font-family-code, monospace);">
+                              <span class="ltr-value" style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-online); font-weight: var(--ha-font-weight-medium, 500); font-family: var(--ha-font-family-code, monospace);">
                                 Parity
                               </span>
                             `
@@ -539,7 +540,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                                   style="width: ${disk.usagePct}%; background: ${disk.isBoot ? "var(--unraid-warning)" : disk.isCache ? "var(--unraid-info)" : "var(--unraid-accent)"};"
                                 ></div>
                               </div>
-                              <span style="font-size: var(--ha-font-size-s, 12px); font-family: var(--ha-font-family-code, monospace); color: var(--unraid-subtext);">
+                              <span class="ltr-value" style="font-size: var(--ha-font-size-s, 12px); font-family: var(--ha-font-family-code, monospace); color: var(--unraid-subtext);">
                                 ${disk.usagePct}%
                               </span>
                             `}
@@ -550,6 +551,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
               })
             : html`<div style="text-align: center; color: var(--unraid-subtext); font-size: var(--ha-font-size-s, 12px); padding: var(--ha-space-3, 12px);">No disk devices found</div>`}
         </div>
+      </div>
       </ha-card>
     `;
   }

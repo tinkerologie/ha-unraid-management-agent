@@ -46,7 +46,7 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
       if (!match || !match[1] || !match[2]) continue;
 
       const shareKey = match[1].toLowerCase();
-      const shareName = (this.hass?.formatEntityName?.(stateObj) ?? (stateObj.attributes?.friendly_name as string)) || match[1] || "Remote Share";
+      const shareName = this.entityName(stateObj, (stateObj.attributes?.friendly_name as string) || match[1] || "Remote Share");
       const cleanName = shareName
         .replace(/^(?:.*?\s+)?Remote Share\s+/i, "")
         .replace(/\s+(?:usage|mounted|mount)$/i, "")
@@ -100,6 +100,7 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           serverName,
           "Remote SMB & NFS Shares",
@@ -174,6 +175,7 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
                 })}
               </div>
             `}
+      </div>
       </ha-card>
     `;
   }

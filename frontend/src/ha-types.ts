@@ -33,7 +33,8 @@ export interface EntityRegistryEntry {
 }
 
 export interface HomeAssistant {
-  formatEntityName?: (entity: HassEntity) => string;
+  /** HA's optional, undocumented display-name API; validate its result at runtime. */
+  formatEntityName?: (entity: HassEntity) => unknown;
   states: HassEntities;
   devices?: Record<string, DeviceRegistryEntry>;
   entities?: Record<string, EntityRegistryEntry>;

@@ -181,7 +181,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
 
     for (const sw of switches) {
       const slug = extractEntityContainerSlug(sw.entity_id);
-      let cleanName = (sw.attributes.friendly_name as string) || slug;
+      let cleanName = this.entityName(sw, (sw.attributes.friendly_name as string) || slug);
       // Keep the distinctive container name visible in narrow tiles. Registry
       // names and service targets remain unchanged.
       for (const name of serverNames) {
@@ -267,6 +267,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           this.config.title || "Docker Containers",
           `Unraid Management Agent · ${runningCount} running • ${stoppedCount} stopped`,
@@ -393,7 +394,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
                     <div class="list-row">
                       <div class="row-left">
                         <span class="status-dot ${c.isRunning ? "online" : "offline"}"></span>
-                        <span style="font-weight: var(--ha-font-weight-bold, 600); min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <span style="font-weight: var(--ha-font-weight-bold, 600); min-width: 0; flex: 1 1 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                           ${c.name}
                         </span>
                         ${c.cpuPct !== undefined
@@ -437,6 +438,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
                 )}
               </div>
             `}
+      </div>
       </ha-card>
     `;
   }

@@ -103,7 +103,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
           gpuDevice?.name_by_user ||
           gpuDevice?.name?.replace(/^GPU\s*·\s*/i, "") ||
           undefined;
-        const gpuName =
+        const gpuName = this.entityName(stateObj,
           deviceName ||
           (typeof stateObj.attributes?.gpu_name === "string"
             ? (stateObj.attributes.gpu_name as string)
@@ -111,7 +111,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
           friendlyName ||
           (rawKey !== "0"
             ? rawKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-            : `GPU ${index}`);
+            : `GPU ${index}`));
         const driver =
           (stateObj.attributes?.gpu_driver_version as string) ||
           (stateObj.attributes?.driver_version as string) ||
@@ -172,6 +172,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           serverName,
           "GPU Accelerators",
@@ -198,12 +199,12 @@ export class UnraidGpuCard extends BaseUnraidCard {
                   const util = gpu.utilizationPct ?? 0;
                   return html`
                     <div class="ring-card" style="padding: var(--ha-space-3, 12px); background: color-mix(in srgb, var(--unraid-text) 3%, transparent); border-radius: var(--ha-border-radius-md, 8px);">
-                      <div style="display: flex; justify-content: space-between; align-items: center; margin-block-end: var(--ha-space-2, 8px); width: 100%;">
-                        <div style="display: flex; align-items: center; gap: var(--ha-space-2, 8px);">
+                      <div class="gpu-header">
+                        <div class="gpu-name">
                           ${iconTemplate(mdiExpansionCard, 20)}
-                          <span style="font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-m, 14px);">${gpu.name}</span>
+                          <span class="entity-name" title=${gpu.name}>${gpu.name}</span>
                         </div>
-                        ${gpu.driver ? html`<span class="badge">${gpu.driver}</span>` : nothing}
+                        ${gpu.driver ? html`<span class="badge gpu-driver ltr-value">${gpu.driver}</span>` : nothing}
                       </div>
 
                       <div class="rings-grid" style="grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));">
@@ -220,7 +221,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
                                   class="ring-gauge"
                                   style="--pct: ${util}; --ring-color: ${util > 80 ? "var(--unraid-error)" : util > 50 ? "var(--unraid-warning)" : "var(--unraid-online)"}"
                                 >
-                                  <span class="ring-content">${util}%</span>
+                                  <span class="ring-content ltr-value">${util}%</span>
                                 </span>
                                 <span class="ring-label">GPU Load</span>
                               </button>
@@ -240,7 +241,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
                                   class="ring-gauge"
                                   style="--pct: ${Math.min(100, Math.round((gpu.temp / 90) * 100))}; --ring-color: ${gpu.temp > 80 ? "var(--unraid-error)" : gpu.temp > 65 ? "var(--unraid-warning)" : "var(--unraid-info)"}"
                                 >
-                                  <span class="ring-content">${gpu.temp}°C</span>
+                                  <span class="ring-content ltr-value">${gpu.temp}°C</span>
                                 </span>
                                 <span class="ring-label">Temperature</span>
                               </button>
@@ -257,7 +258,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
                                 title="Click for Power details"
                               >
                                 <span data-block class="ring-gauge" style="--pct: 60; --ring-color: var(--unraid-accent)">
-                                  <span class="ring-content">${gpu.power}W</span>
+                                  <span class="ring-content ltr-value">${gpu.power}W</span>
                                 </span>
                                 <span class="ring-label">Power Draw</span>
                                 ${gpu.energy !== undefined ? html`<span class="ring-subtext">${gpu.energy} kWh</span>` : nothing}
@@ -275,7 +276,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
                                 title="Click for VRAM details"
                               >
                                 <span data-block class="ring-gauge" style="--pct: ${gpu.memUtilPct}; --ring-color: var(--unraid-info)">
-                                  <span class="ring-content">${gpu.memUtilPct}%</span>
+                                  <span class="ring-content ltr-value">${gpu.memUtilPct}%</span>
                                 </span>
                                 <span class="ring-label">VRAM Usage</span>
                               </button>
@@ -287,6 +288,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
                 })}
               </div>
             `}
+      </div>
       </ha-card>
     `;
   }

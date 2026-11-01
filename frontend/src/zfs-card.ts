@@ -199,6 +199,7 @@ export class UnraidZfsCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           serverName,
           "ZFS Storage & Cache",
@@ -234,7 +235,7 @@ export class UnraidZfsCard extends BaseUnraidCard {
                           class="ring-gauge"
                           style="--pct: ${arc.hitRatio}; --ring-color: ${arc.hitRatio > 90 ? "var(--unraid-online)" : arc.hitRatio > 70 ? "var(--unraid-warning)" : "var(--unraid-error)"}"
                         >
-                          <span class="ring-content">${arc.hitRatio}%</span>
+                          <span class="ring-content ltr-value">${arc.hitRatio}%</span>
                         </span>
                         <span class="ring-label">ARC Hit Ratio</span>
                         <span class="ring-subtext">
@@ -284,6 +285,7 @@ export class UnraidZfsCard extends BaseUnraidCard {
                   `
                 : nothing}
             `}
+      </div>
       </ha-card>
     `;
   }

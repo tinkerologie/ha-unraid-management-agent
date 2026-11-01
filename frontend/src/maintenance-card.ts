@@ -45,6 +45,7 @@ export class UnraidMaintenanceCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           serverName,
           "Maintenance & Operations",
@@ -195,6 +196,7 @@ export class UnraidMaintenanceCard extends BaseUnraidCard {
               `
             : nothing}
         </div>
+      </div>
       </ha-card>
     `;
   }

@@ -7,7 +7,6 @@ export const dashboardCardStyles = [
     :host {
       display: block;
       box-sizing: border-box;
-      container-type: inline-size;
       font-family: var(--ha-card-font-family, var(--ha-font-family-body, inherit));
       font-size: var(--ha-font-size-m, 14px);
     }
@@ -61,14 +60,56 @@ export const dashboardCardStyles = [
     ha-card {
       box-sizing: border-box;
       padding: var(--ha-space-4, 16px);
-      display: flex;
-      flex-direction: column;
-      gap: var(--ha-space-3, 12px);
       background: var(--unraid-card-bg);
       border: var(--ha-card-border-width, 1px) solid var(--unraid-border);
       border-radius: var(--unraid-radius);
       color: var(--unraid-text);
     }
+
+    /* Keep containment inside the card so Sections can size the host normally. */
+    .card-content {
+      container: unraid-card / inline-size;
+      display: flex;
+      flex-direction: column;
+      gap: var(--ha-space-3, 12px);
+      min-inline-size: 0;
+    }
+
+    .ltr-value {
+      direction: ltr;
+      unicode-bidi: isolate;
+    }
+
+    .vm-labels {
+      display: flex;
+      flex-direction: column;
+      min-inline-size: 0;
+    }
+
+    .entity-name {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: var(--ha-font-weight-bold, 600);
+      font-size: var(--ha-font-size-m, 14px);
+    }
+
+    .gpu-header, .gpu-name {
+      display: flex;
+      align-items: center;
+      gap: var(--ha-space-2, 8px);
+      min-inline-size: 0;
+    }
+
+    .gpu-header {
+      justify-content: space-between;
+      margin-block-end: var(--ha-space-2, 8px);
+      inline-size: 100%;
+    }
+
+    .gpu-name { flex: 1; }
+    .gpu-driver { white-space: normal; overflow-wrap: anywhere; }
 
     :host([embedded]) ha-card {
       border: none;
@@ -193,6 +234,8 @@ export const dashboardCardStyles = [
       grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
       gap: var(--ha-space-2, 8px);
     }
+
+    .ups-rings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
     .ring-card {
       background: color-mix(in srgb, var(--unraid-text) 3%, transparent);
@@ -509,10 +552,30 @@ export const dashboardCardStyles = [
 
     .btn:disabled, .btn-icon:disabled { cursor: default; opacity: 0.5; }
 
-    @container (max-width: 450px) {
+    @container unraid-card (max-width: 450px) {
       .list-row, .disk-row, .row-left, .row-right, .disk-meta, .container-tile { flex-wrap: wrap; }
       .row-left { min-width: 0; flex-basis: 100%; }
       .row-right, .disk-meta { margin-inline-start: auto; }
+      .network-row, .network-row [data-block] { flex-wrap: wrap; }
+      .network-row span { min-inline-size: 0; flex-wrap: wrap; }
+      .network-row .ltr-value { overflow-wrap: anywhere; }
+    }
+
+    @container unraid-card (max-width: 320px) {
+      .header { flex-wrap: wrap; }
+      .header-main { flex-basis: 100%; }
+      .header-actions { flex-wrap: wrap; min-inline-size: 0; max-inline-size: 100%; }
+      .header-actions .badge { white-space: normal; overflow-wrap: anywhere; }
+      .ring-subtext {
+        max-inline-size: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ups-rings { grid-template-columns: minmax(0, 1fr); }
+      .gpu-header { flex-wrap: wrap; }
+      .gpu-name { flex-basis: 100%; }
+      .gpu-driver { max-inline-size: 100%; }
     }
 
     @media (prefers-reduced-motion: reduce) {

@@ -108,7 +108,8 @@ export class UnraidDashboardCard extends BaseUnraidCard {
     const serverName = this.config.title || device?.name_by_user || device?.name || "Unraid Server";
 
     return html`
-      <ha-card style="gap: var(--ha-space-3, 12px);">
+      <ha-card>
+        <div class="card-content">
         <div class="header">
           <div class="header-main">
             <div class="header-icon">${iconTemplate(mdiServer, 22)}</div>
@@ -183,6 +184,7 @@ export class UnraidDashboardCard extends BaseUnraidCard {
             ? html`<unraid-management-agent-notifications-card .hass=${this.hass} .config=${{ ...this.config, type: "custom:unraid-management-agent-notifications-card", embedded: true }}></unraid-management-agent-notifications-card>`
             : nothing}
         </div>
+      </div>
       </ha-card>
     `;
   }

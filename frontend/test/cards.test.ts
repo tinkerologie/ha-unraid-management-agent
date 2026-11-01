@@ -1824,6 +1824,71 @@ describe("Unraid Custom Cards", () => {
 });
 
 
+describe("dashboard label and preview safeguards", () => {
+  const labelledCards = [
+    UnraidSharesCard, UnraidStorageCard, UnraidVmCard, UnraidDockerCard,
+    UnraidFansCard, UnraidGpuCard, UnraidUnassignedDevicesCard, UnraidRemoteSharesCard,
+  ];
+
+  for (const Card of labelledCards) {
+    it(`${Card.name} uses the guarded HA display name`, async () => {
+      const card = new Card();
+      card.setConfig({ type: "test" });
+      card.hass = { ...createMockHass(), callService: vi.fn(async () => undefined), formatEntityName: vi.fn(() => "FormattedLabel") };
+      document.body.appendChild(card);
+      try {
+        await card.updateComplete;
+        expect(card.hass.formatEntityName).toHaveBeenCalled();
+        expect(card.shadowRoot?.textContent).toContain("FormattedLabel");
+        expect(card.hass.callService).not.toHaveBeenCalled();
+      } finally {
+        card.remove();
+      }
+    });
+
+    it(`${Card.name} keeps existing labels if the formatter fails`, async () => {
+      const card = new Card();
+      card.setConfig({ type: "test" });
+      card.hass = createMockHass();
+      document.body.appendChild(card);
+      try {
+        await card.updateComplete;
+        const labels = card.shadowRoot?.textContent;
+        for (const formatter of [
+          () => { throw new Error("unsupported formatter"); },
+          () => "", () => "   ", () => undefined, () => 42,
+          "not a function" as unknown as HomeAssistant["formatEntityName"],
+        ]) {
+          card.hass = { ...createMockHass(), callService: vi.fn(async () => undefined), formatEntityName: formatter };
+          await card.updateComplete;
+          expect(card.shadowRoot?.textContent).toBe(labels);
+          expect(card.hass.callService).not.toHaveBeenCalled();
+        }
+      } finally {
+        card.remove();
+      }
+    });
+  }
+
+  it("all 15 cards render empty preview config without service calls", async () => {
+    for (const { type } of window.customCards ?? []) {
+      const card = document.createElement(type) as UnraidServerCard;
+      card.setConfig({});
+      document.body.appendChild(card);
+      try {
+        await card.updateComplete;
+        expect(card.shadowRoot?.querySelector("ha-card")).not.toBeNull();
+        card.hass = { ...createMockHass(), states: {}, entities: {}, callService: vi.fn(async () => undefined) };
+        await card.updateComplete;
+        expect(card.shadowRoot?.querySelector("ha-card")).not.toBeNull();
+        expect(card.hass.callService).not.toHaveBeenCalled();
+      } finally {
+        card.remove();
+      }
+    }
+  });
+});
+
 describe("Unraid Management Agent isolation", () => {
   it("registers 15 branded cards and editors without claiming generic Unraid tags", () => {
     expect(window.customCards).toHaveLength(15);

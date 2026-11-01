@@ -65,7 +65,7 @@ export class UnraidSharesCard extends BaseUnraidCard {
       const parts = u.entity_id.split(".");
       const namePart = (parts[1] || "").replace(/^.*?_share_/, "").replace(/_usage$/, "");
       const cleanName = formatShareName(
-        (u.attributes.friendly_name as string) || namePart,
+        this.entityName(u, (u.attributes.friendly_name as string) || namePart),
         namePart
       );
 
@@ -125,6 +125,7 @@ export class UnraidSharesCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           this.config.title || "User Shares",
           `${allShares.length} configured shares`,
@@ -209,7 +210,7 @@ export class UnraidSharesCard extends BaseUnraidCard {
                           ></span>
                         </span>
                         <span
-                          style="font-size: var(--ha-font-size-s, 12px); font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-bold, 600); color: var(--unraid-text); min-width: 32px; text-align: right;"
+                          style="font-size: var(--ha-font-size-s, 12px); font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-bold, 600); color: var(--unraid-text); min-width: 32px; text-align: end;"
                         >
                           ${share.usagePct}%
                         </span>
@@ -224,6 +225,7 @@ export class UnraidSharesCard extends BaseUnraidCard {
                 </div>
               `}
         </div>
+      </div>
       </ha-card>
     `;
   }

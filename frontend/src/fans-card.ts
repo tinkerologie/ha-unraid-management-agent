@@ -82,10 +82,8 @@ export class UnraidFansCard extends BaseUnraidCard {
         stateObj.attributes?.status === "failed";
       const fanId = stateObj.attributes?.fan_id as string | number | undefined;
       const originalName =
-        (stateObj.attributes?.original_name as string) ||
-        (this.hass?.formatEntityName?.(stateObj) ?? (stateObj.attributes?.friendly_name as string)) ||
-        entityId.split(".")[1] ||
-        "Fan";
+        this.entityName(stateObj, (stateObj.attributes?.original_name as string) ||
+          (stateObj.attributes?.friendly_name as string) || entityId.split(".")[1] || "Fan");
 
       const cleanName = originalName
         .replace(/^(?:.*?\s+)?Fan\s+/i, "Fan ")
@@ -131,10 +129,8 @@ export class UnraidFansCard extends BaseUnraidCard {
           : stateObj.state;
 
         const originalName =
-          (stateObj.attributes?.original_name as string) ||
-          (this.hass?.formatEntityName?.(stateObj) ?? (stateObj.attributes?.friendly_name as string)) ||
-          entityId.split(".")[1] ||
-          "Fan";
+          this.entityName(stateObj, (stateObj.attributes?.original_name as string) ||
+          (stateObj.attributes?.friendly_name as string) || entityId.split(".")[1] || "Fan");
 
         const cleanName = originalName
           .replace(/^(?:.*?\s+)?Fan\s+/i, "Fan ")
@@ -165,6 +161,7 @@ export class UnraidFansCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           serverName,
           "Cooling & Fans",
@@ -221,6 +218,7 @@ export class UnraidFansCard extends BaseUnraidCard {
                 })}
               </div>
             `}
+      </div>
       </ha-card>
     `;
   }

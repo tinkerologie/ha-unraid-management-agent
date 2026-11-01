@@ -44,7 +44,7 @@ export class UnraidUnassignedDevicesCard extends BaseUnraidCard {
       if (!match || !match[1] || !match[2]) continue;
 
       const devKey = match[1].toLowerCase();
-      const rawName = (this.hass?.formatEntityName?.(stateObj) ?? (stateObj.attributes?.friendly_name as string)) || match[1] || "Unassigned Device";
+      const rawName = this.entityName(stateObj, (stateObj.attributes?.friendly_name as string) || match[1] || "Unassigned Device");
       const cleanName = rawName
         .replace(/^(?:.*?\s+)?Unassigned Device\s+/i, "")
         .replace(/\s+(?:size|usage|mounted|temperature|temp)$/i, "")
@@ -86,6 +86,7 @@ export class UnraidUnassignedDevicesCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           serverName,
           "Unassigned Storage Devices",
@@ -139,6 +140,7 @@ export class UnraidUnassignedDevicesCard extends BaseUnraidCard {
                 })}
               </div>
             `}
+      </div>
       </ha-card>
     `;
   }

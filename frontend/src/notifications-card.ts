@@ -50,6 +50,7 @@ export class UnraidNotificationsCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           serverName,
           "Notifications Center",
@@ -154,6 +155,7 @@ export class UnraidNotificationsCard extends BaseUnraidCard {
               </div>
             `
           : nothing}
+      </div>
       </ha-card>
     `;
   }

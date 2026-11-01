@@ -82,6 +82,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           this.config.title || `${serverName} Network`,
           `${device?.model || "Unraid"} • ${ifaces.length} Interface${ifaces.length === 1 ? "" : "s"}`,
@@ -113,7 +114,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                 return html`
                   <button
                     type="button"
-                    class="interactive list-row"
+                    class="interactive list-row network-row"
                     style="flex-direction: column; align-items: stretch; gap: var(--ha-space-2, 8px); padding: var(--ha-space-3, 12px) var(--ha-space-3, 12px);"
                     title="Click for details on ${iface.name}"
                     @click=${() => this.handleMoreInfo(primaryEntityId)}
@@ -122,9 +123,9 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                       <span data-block class="row-left" style="gap: var(--ha-space-2, 8px);">
                         <span class="badge ${isConnected ? "badge-online" : "badge-error"}" style="min-width: 50px; justify-content: center;">
                           ${iconTemplate(mdiEthernet, 13)}
-                          <span>${iface.name}</span>
+                          <span class="ltr-value">${iface.name}</span>
                         </span>
-                        <span style="font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-m, 14px);">
+                        <span class="ltr-value" style="font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-m, 14px);">
                           ${ipStr}
                         </span>
                       </span>
@@ -133,7 +134,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                         ${speedText
                           ? html`
                               <span
-                                class="badge"
+                                class="badge ltr-value"
                                 style="color: var(--unraid-info); background: color-mix(in srgb, var(--unraid-info) 12%, transparent); font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-s, 12px);"
                               >
                                 ${speedText}
@@ -152,20 +153,20 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                       <span data-block style="display: flex; align-items: center; gap: var(--ha-space-3, 12px);">
                         <span style="display: flex; align-items: center; gap: var(--ha-space-1, 4px);" title="${totalRx ? `Total Inbound: ${totalRx}` : 'Inbound Transfer Rate'}">
                           <span style="color: var(--unraid-online);">${iconTemplate(mdiDownload, 13)}</span>
-                          <span style="font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-medium, 500);">${rxRate}</span>
-                          ${totalRx ? html`<span style="opacity: 0.7; font-size: var(--ha-font-size-s, 12px);">(${totalRx})</span>` : nothing}
+                          <span class="ltr-value" style="font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-medium, 500);">${rxRate}</span>
+                          ${totalRx ? html`<span class="ltr-value" style="opacity: 0.7; font-size: var(--ha-font-size-s, 12px);">(${totalRx})</span>` : nothing}
                         </span>
 
                         <span style="display: flex; align-items: center; gap: var(--ha-space-1, 4px);" title="${totalTx ? `Total Outbound: ${totalTx}` : 'Outbound Transfer Rate'}">
                           <span style="color: var(--unraid-info);">${iconTemplate(mdiUpload, 13)}</span>
-                          <span style="font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-medium, 500);">${txRate}</span>
-                          ${totalTx ? html`<span style="opacity: 0.7; font-size: var(--ha-font-size-s, 12px);">(${totalTx})</span>` : nothing}
+                          <span class="ltr-value" style="font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-medium, 500);">${txRate}</span>
+                          ${totalTx ? html`<span class="ltr-value" style="opacity: 0.7; font-size: var(--ha-font-size-s, 12px);">(${totalTx})</span>` : nothing}
                         </span>
                       </span>
 
                       <span data-block style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); opacity: 0.8; font-size: var(--ha-font-size-s, 12px);">
-                        ${mtu ? html`<span>MTU ${mtu}</span>` : nothing}
-                        ${macStr ? html`<span style="font-family: var(--ha-font-family-code, monospace);">${macStr}</span>` : nothing}
+                        ${mtu ? html`<span class="ltr-value">MTU ${mtu}</span>` : nothing}
+                        ${macStr ? html`<span class="ltr-value" style="font-family: var(--ha-font-family-code, monospace);">${macStr}</span>` : nothing}
                       </span>
                     </span>
                   </button>
@@ -190,7 +191,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                           href="${lanUrl}"
                           target="_blank"
                           rel="noreferrer"
-                          class="detail-val"
+                          class="detail-val ltr-value"
                           style="color: var(--unraid-accent); text-decoration: none;"
                         >
                           ${lanUrl}
@@ -206,7 +207,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                           href="${fqdnUrl}"
                           target="_blank"
                           rel="noreferrer"
-                          class="detail-val"
+                          class="detail-val ltr-value"
                           style="color: var(--unraid-info); text-decoration: none;"
                         >
                           Connect FQDN
@@ -217,6 +218,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
               </div>
             `
           : nothing}
+      </div>
       </ha-card>
     `;
   }

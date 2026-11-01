@@ -118,13 +118,14 @@ export class UnraidUpsCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="card-content">
         ${this.renderHeader(
           this.config.title || "UPS Power & Battery",
           (statusState?.attributes?.model as string) || "Uninterruptible Power Supply",
           mdiFlash,
           badge
         )}
-        <div class="rings-grid" style="grid-template-columns: repeat(2, 1fr);">
+        <div class="rings-grid ups-rings">
           <button
             type="button"
             ?disabled=${!(batteryState)}
@@ -136,7 +137,7 @@ export class UnraidUpsCard extends BaseUnraidCard {
               class="ring-gauge"
               style="--pct: ${batteryPct ?? 0}; --ring-color: ${batteryPct === null ? "var(--unraid-border)" : batteryPct < 20 ? "var(--unraid-error)" : batteryPct < 50 ? "var(--unraid-warning)" : "var(--unraid-online)"}"
             >
-              <span class="ring-content">${batteryPct !== null ? `${batteryPct}%` : "—"}</span>
+              <span class="ring-content ltr-value">${batteryPct !== null ? `${batteryPct}%` : "—"}</span>
             </span>
             <span class="ring-label">Battery Level</span>
             <span class="ring-subtext">${runtimeFormatted ? `${runtimeFormatted} left` : batteryPct !== null ? "Healthy" : "No Data"}</span>
@@ -152,7 +153,7 @@ export class UnraidUpsCard extends BaseUnraidCard {
               class="ring-gauge"
               style="--pct: ${loadPct ?? 0}; --ring-color: ${loadPct === null ? "var(--unraid-border)" : loadPct > 80 ? "var(--unraid-error)" : loadPct > 50 ? "var(--unraid-warning)" : "var(--unraid-info)"}"
             >
-              <span class="ring-content">${loadPct !== null ? `${loadPct}%` : "—"}</span>
+              <span class="ring-content ltr-value">${loadPct !== null ? `${loadPct}%` : "—"}</span>
             </span>
             <span class="ring-label">UPS Load</span>
             <span class="ring-subtext">${powerW || (loadPct !== null ? `${loadPct}% capacity` : "No Data")}</span>
@@ -208,6 +209,7 @@ export class UnraidUpsCard extends BaseUnraidCard {
             <span class="detail-val" style="${health && !health.toLowerCase().includes("fail") ? "color: var(--unraid-online);" : ""}">${health || "—"}</span>
           </button>
         </div>
+      </div>
       </ha-card>
     `;
   }

@@ -79,7 +79,72 @@ for (const dir of ["ltr", "rtl"]) {
     await setWidth(page, 300, dir);
     expect(await overflowing(page)).toEqual([]);
   });
+
+  for (const embedded of [false, true]) {
+    test(`long names fit all 15 cards at 300px ${dir}, embedded=${embedded}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.goto(`/test/browser/fixture.html?width=300&dir=${dir}&longNames=1${embedded ? "&embedded=1" : ""}`);
+      await page.waitForFunction(() => (window as unknown as { fixtureReady?: boolean }).fixtureReady);
+      expect(await overflowing(page)).toEqual([]);
+      const overflow = await page.evaluate((cards) => cards.filter((id) => {
+        const host = document.getElementById(id)!;
+        return host.scrollWidth > host.clientWidth;
+      }), CARDS);
+      expect(overflow).toEqual([]);
+
+      const vmName = page.locator("#vm-card .entity-name").first();
+      const gpuName = page.locator("#gpu-card .entity-name").first();
+      for (const name of [vmName, gpuName]) {
+        await expect(name).toHaveCSS("text-overflow", "ellipsis");
+        expect(await name.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+      }
+      expect(await page.locator("#ups-card .ups-rings").evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length)).toBe(1);
+      const driver = page.locator("#gpu-card .gpu-driver");
+      await expect(driver).toHaveCSS("white-space", "normal");
+      expect(await driver.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThan(30);
+
+      const technical = page.locator("#network-card .ltr-value");
+      expect(await technical.count()).toBeGreaterThan(0);
+      for (const value of await technical.all()) {
+        await expect(value).toHaveCSS("direction", "ltr");
+        await expect(value).toHaveCSS("unicode-bidi", "isolate");
+      }
+    });
+  }
 }
+
+test("named containers live inside cards and reflow UPS at 320px", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const host = page.locator("#ups-card");
+  await expect(host).toHaveCSS("container-type", "normal");
+  const content = host.locator(".card-content");
+  await expect(content).toHaveCSS("container-name", "unraid-card");
+  await content.evaluate((el) => { (el as HTMLElement).style.width = "321px"; });
+  const columns = () => host.locator(".ups-rings").evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
+  expect(await columns()).toBe(2);
+  await content.evaluate((el) => { (el as HTMLElement).style.width = "320px"; });
+  expect(await columns()).toBe(1);
+});
+
+test("converted row buttons activate once on Space release", async ({ page }) => {
+  for (const id of ["shares-card", "maintenance-card", "ups-card", "network-card", "zfs-card", "unassigned-devices-card", "fans-card"]) {
+    const card = page.locator(`#${id}`);
+    await card.evaluate((el) => {
+      (window as unknown as { opened: string[] }).opened = [];
+      el.addEventListener("hass-more-info", (event) => {
+        (window as unknown as { opened: string[] }).opened.push((event as CustomEvent<{ entityId: string }>).detail.entityId);
+      });
+    });
+    const button = card.locator("button.interactive:not(:disabled)").first();
+    await button.focus();
+    await page.keyboard.down("Space");
+    expect(await page.evaluate(() => (window as unknown as { opened: string[] }).opened)).toEqual([]);
+    await page.keyboard.up("Space");
+    const opened = await page.evaluate(() => (window as unknown as { opened: string[] }).opened);
+    expect(opened).toHaveLength(1);
+    expect(opened[0]).toMatch(/^(sensor|binary_sensor)\./);
+  }
+});
 
 test("clickable rows and gauges are native buttons", async ({ page }) => {
   const bad = await page.evaluate((cards) => {

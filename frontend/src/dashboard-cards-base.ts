@@ -138,6 +138,19 @@ export abstract class BaseUnraidCard extends LitElement {
       .replace(/^_+|_+$/g, "");
   }
 
+  /** Format a display label without changing discovery or legacy fallbacks. */
+  protected entityName(entity: HassEntity, fallback: string): string {
+    try {
+      if (typeof this.hass?.formatEntityName === "function") {
+        const name = this.hass.formatEntityName(entity);
+        if (typeof name === "string" && name.trim()) return name;
+      }
+    } catch {
+      // Older HA versions and preview contexts may not support the formatter.
+    }
+    return fallback;
+  }
+
   override willUpdate(changedProperties: PropertyValues<this>): void {
     super.willUpdate(changedProperties);
     this._agentStates = undefined;
@@ -150,11 +163,14 @@ export abstract class BaseUnraidCard extends LitElement {
     }
   }
 
-  setConfig(config: CardConfig): void {
-    if (!config || typeof config.type !== "string") {
+  setConfig(config: CardConfig | Omit<CardConfig, "type">): void {
+    if (
+      !config || typeof config !== "object" || Array.isArray(config) ||
+      (config.type !== undefined && typeof config.type !== "string")
+    ) {
       throw new Error("Invalid card configuration");
     }
-    this.config = { ...config };
+    this.config = { type: "", ...config };
     if (this.config.embedded) {
       this.setAttribute("embedded", "");
     } else {
