@@ -101,10 +101,10 @@
       "name": "{hostname} VMs"
     },
     "gpu": {
-      "name": "GPU \u00b7 {name}"
+      "name": "GPU · {name}"
     },
     "zfs_pool": {
-      "name": "ZFS pool \u00b7 {name}"
+      "name": "ZFS pool · {name}"
     }
   },
   "entity": {
@@ -1192,23 +1192,22 @@
     },
     "disk_io_errors": {
       "title": "Disk I/O Errors Detected",
-      "description": "Unraid has counted {io_errors} read/write errors on disk **{disk_name}** ({acknowledged} acknowledged). This count accumulates until Unraid's statistics are cleared and is separate from the disk's SMART health.\n\n**Recommended Actions:**\n1. Check the disk's cables and connections\n2. Run a SMART extended self-test\n3. Review the system log for disk errors",
       "fix_flow": {
         "step": {
           "init": {
             "title": "Acknowledge Disk I/O Errors",
-            "description": "Acknowledge {io_errors} I/O errors on disk **{disk_name}**? Unraid's statistics are not changed. You will be warned again if the count increases or the disk's SMART status fails."
+            "description": "Unraid has counted {io_errors} read/write errors on disk **{disk_name}** ({acknowledged} acknowledged). This count accumulates until Unraid's statistics are cleared and is separate from the disk's SMART health.\n\n**Recommended Actions:**\n1. Check the disk's cables and connections\n2. Run a SMART extended self-test\n3. Review the system log for disk errors\n\nAcknowledge {io_errors} I/O errors on disk **{disk_name}**? Unraid's statistics are not changed. You will be warned again if the count increases or the disk's SMART status fails."
           }
         }
       }
     },
     "disk_high_temperature": {
       "title": "Disk High Temperature Warning",
-      "description": "Disk **{disk_name}** temperature is {temperature}\u00b0C (warning threshold: {threshold}\u00b0C).\n\n**Recommended Actions:**\n1. Check cooling/airflow in the system\n2. Verify fan operation\n3. Consider adding additional cooling\n4. Monitor temperature trends\n\nClick Submit to acknowledge this issue."
+      "description": "Disk **{disk_name}** temperature is {temperature}°C (warning threshold: {threshold}°C).\n\n**Recommended Actions:**\n1. Check cooling/airflow in the system\n2. Verify fan operation\n3. Consider adding additional cooling\n4. Monitor temperature trends\n\nClick Submit to acknowledge this issue."
     },
     "disk_critical_temperature": {
       "title": "Disk Critical Temperature",
-      "description": "Disk **{disk_name}** temperature is {temperature}\u00b0C (critical threshold: {threshold}\u00b0C).\n\n\u26a0\ufe0f **URGENT - Immediate action required!**\n\n**Recommended Actions:**\n1. Consider spinning down the disk immediately\n2. Check cooling/airflow in the system urgently\n3. Verify all fans are operational\n4. Improve ventilation or add cooling\n5. Back up important data as a precaution\n\nClick Submit to acknowledge this issue."
+      "description": "Disk **{disk_name}** temperature is {temperature}°C (critical threshold: {threshold}°C).\n\n⚠️ **URGENT - Immediate action required!**\n\n**Recommended Actions:**\n1. Consider spinning down the disk immediately\n2. Check cooling/airflow in the system urgently\n3. Verify all fans are operational\n4. Improve ventilation or add cooling\n5. Back up important data as a precaution\n\nClick Submit to acknowledge this issue."
     },
     "array_parity_invalid": {
       "title": "Array Parity Invalid",
