@@ -823,9 +823,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> b
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> None:
-    """Delete the share repair issues of a removed config entry."""
-    from .repairs import async_delete_share_issues
+    """Delete the disk and share repair issues of a removed config entry."""
+    from .repairs import async_delete_disk_issues, async_delete_share_issues
 
+    async_delete_disk_issues(hass, entry.entry_id)
     async_delete_share_issues(hass, entry.entry_id)
 
 

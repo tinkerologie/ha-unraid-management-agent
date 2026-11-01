@@ -1,4 +1,4 @@
-import { html, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import {
   FANS_CARD_TAG,
   FANS_EDITOR_TAG,
@@ -16,6 +16,7 @@ interface FanItem {
   id: string;
   name: string;
   rpm: number;
+  noReading?: boolean;
   rpmText: string;
   isFailed: boolean;
   fanId?: number | string;
@@ -95,7 +96,8 @@ export class UnraidFansCard extends BaseUnraidCard {
         id: entityId,
         name: cleanName,
         rpm: !isNaN(rpmNum) ? rpmNum : 0,
-        rpmText: !isNaN(rpmNum) ? `${rpmNum} RPM` : stateObj.state,
+        rpmText: !isNaN(rpmNum) ? `${rpmNum} RPM` : "--",
+        noReading: isNaN(rpmNum),
         isFailed,
         fanId,
         controlEntityId: fanId !== undefined ? controlMap.get(String(fanId)) : undefined,
@@ -158,6 +160,30 @@ export class UnraidFansCard extends BaseUnraidCard {
     const device = this.getActiveDevice();
     const serverName = this.config.title || device?.name_by_user || device?.name || "Unraid Server";
     const fans = this.getFans();
+    const registeredFans = fans.length === 0
+      ? this.getServerRegistryEntries()?.filter((entry) =>
+          entry.entity_id.startsWith("sensor.") && (
+            entry.translation_key === "fan" ||
+            entry.translation_key === "hwmon_device_fan" ||
+            (entry.config_entry_id &&
+              entry.unique_id.startsWith(`${entry.config_entry_id}_fan_`))
+          )
+        ) ?? []
+      : [];
+    const disabledCount = registeredFans.filter((entry) => entry.disabled_by).length;
+    const statelessFans = registeredFans.filter((entry) =>
+      !entry.disabled_by && !this.hass?.states[entry.entity_id]
+    );
+    const emptyTitle = disabledCount > 0
+      ? "Fan sensors are disabled"
+      : statelessFans.length > 0
+      ? "Fan sensors are registered but have no state"
+      : "No Fan Sensors Found";
+    const emptyGuidance = disabledCount > 0
+      ? `${disabledCount} fan sensor${disabledCount === 1 ? " is" : "s are"} disabled. Enable them in Settings → Entities.`
+      : statelessFans.length > 0
+      ? "Check the integration options and diagnostics for fan sensor data."
+      : "Check the selected server, its fan entities in Settings → Entities, and the integration diagnostics for reported fans.";
 
     return html`
       <ha-card>
@@ -166,20 +192,20 @@ export class UnraidFansCard extends BaseUnraidCard {
           serverName,
           "Cooling & Fans",
           mdiFan,
-          html`
+          fans.length > 0 ? html`
             <span class="badge ${fans.some((f) => f.isFailed) ? "badge-error" : "badge-online"}">
               <span class="pulse-dot"></span>
               <span>${fans.length} Fan${fans.length === 1 ? "" : "s"}</span>
             </span>
-          `
+          ` : undefined
         )}
 
         ${fans.length === 0
           ? html`
               <div class="empty-state">
                 ${iconTemplate(mdiFan, 32)}
-                <div class="empty-title">No Fan Sensors Found</div>
-                <div class="empty-subtext">No cooling fans reported by system sensors or IPMI.</div>
+                <div class="empty-title">${emptyTitle}</div>
+                <div class="empty-subtext">${emptyGuidance}</div>
               </div>
             `
           : html`
@@ -199,7 +225,7 @@ export class UnraidFansCard extends BaseUnraidCard {
                         <span data-block class="disk-info">
                           <span class="disk-name">${f.name}</span>
                           <span class="disk-subtext">
-                            ${f.isFailed ? "Fan Fault Detected" : f.rpm > 0 ? "Operating Normally" : "Stopped / Idle"}
+                            ${f.isFailed ? "Fan Fault Detected" : f.noReading ? "No reading" : f.rpm > 0 ? "Operating Normally" : "Stopped / Idle"}
                           </span>
                         </span>
                       </span>
@@ -209,6 +235,8 @@ export class UnraidFansCard extends BaseUnraidCard {
                         </span>
                         ${f.isFailed
                           ? html`<span class="badge badge-error">FAULT</span>`
+                          : f.noReading
+                          ? nothing
                           : f.rpm > 0
                           ? html`<span class="badge badge-online">ACTIVE</span>`
                           : html`<span class="badge">OFF</span>`}

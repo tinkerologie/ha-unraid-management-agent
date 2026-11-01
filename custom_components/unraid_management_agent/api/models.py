@@ -749,7 +749,9 @@ class DiskInfo(BaseModel):
 
     # SMART information
     smart_status: str | None = Field(None, description="SMART status (PASSED, FAILED)")
-    smart_errors: CoercedInt = Field(None, description="Number of SMART errors")
+    smart_errors: CoercedInt = Field(
+        None, description="Accumulated Unraid I/O errors (numErrors)"
+    )
     smart_attributes: dict[str, SMARTAttribute] | None = Field(
         None, description="Enhanced SMART attributes"
     )
@@ -898,7 +900,10 @@ class DiskInfo(BaseModel):
     @property
     def has_smart_errors(self) -> bool:
         """
-        Check if the disk has any SMART errors.
+        Check for a SMART failure or accumulated Unraid I/O errors.
+
+        ``smart_errors`` is Unraid's accumulated I/O error count, not a SMART
+        value. Repairs use ``has_smart_failure`` and the count separately.
 
         Returns:
             True if smart_errors > 0 or smart_status is 'FAILED'.
@@ -912,6 +917,11 @@ class DiskInfo(BaseModel):
         if self.smart_status and self.smart_status.upper() == "FAILED":
             return True
         return self.smart_errors is not None and self.smart_errors > 0
+
+    @property
+    def has_smart_failure(self) -> bool:
+        """Return True if the disk's SMART health status is FAILED."""
+        return bool(self.smart_status and self.smart_status.upper() == "FAILED")
 
     def get_temp_thresholds(
         self, settings: DiskSettings | None = None

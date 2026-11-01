@@ -452,12 +452,12 @@ async def test_two_controllers_fans_with_fan_control(
 
 
 @pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_fan_adopted_with_fan_sensors_off(
+async def test_fan_adopted_with_fan_control_off(
     hass: HomeAssistant,
     entity_registry: er.EntityRegistry,
     mock_async_unraid_client: MagicMock,
 ) -> None:
-    """With the fan option off, a saved fan entity still moves to its new ID."""
+    """With controls off, a saved fan keeps its entity ID and reports RPM."""
     system = mock_async_unraid_client.get_system_info.return_value
     system.temperatures = []
     system.fans = [FAN_A]
@@ -469,10 +469,57 @@ async def test_fan_adopted_with_fan_sensors_off(
     flow = entity_registry.async_get("sensor.flow")
     assert flow is not None
     assert flow.unique_id == f"{FAN}octo_07274_50017_fan8"
-    assert hass.states.get("sensor.flow") is None
+    assert _value(hass, "sensor.flow") == 750
     assert f"fan_{FAN_A.device_key}" in _build_valid_dynamic_entity_keys(
         UnraidData(system=_system([], [FAN_A]))
     )
+
+
+@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
+@pytest.mark.parametrize("controls_enabled", [True, False])
+async def test_reported_fans_create_enabled_rpm_sensors(
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+    mock_async_unraid_client: MagicMock,
+    controls_enabled: bool,
+) -> None:
+    """RPM monitoring is enabled regardless of the separate PWM control option."""
+    system = mock_async_unraid_client.get_system_info.return_value
+    system.temperatures = []
+    system.fans = [
+        FanInfo(name="nct6793_fan1", rpm=800),
+        FanInfo(name="nct6793_fan2", rpm=850),
+    ]
+    mock_async_unraid_client.get_fan_status.return_value = FanControlStatus(
+        fans=[
+            FanDevice(
+                id="hwmon2_fan1",
+                name="fan1",
+                controllable=True,
+                pwm_percent=50,
+            )
+        ]
+    )
+    entry = _entry(hass, fans=controls_enabled)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    for name, rpm in (("nct6793_fan1", 800), ("nct6793_fan2", 850)):
+        entity_id = entity_registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{FAN}{name}"
+        )
+        assert entity_id is not None
+        entity = entity_registry.async_get(entity_id)
+        assert entity is not None
+        assert entity.disabled_by is None
+        assert _value(hass, entity_id) == rpm
+
+    controls = [
+        entity
+        for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id)
+        if entity.domain == "number" and "_fan_" in entity.unique_id
+    ]
+    assert len(controls) == (1 if controls_enabled else 0)
 
 
 @pytest.mark.usefixtures("mock_unraid_websocket_client_class")

@@ -14,6 +14,8 @@ CONF_ENABLE_CONTAINER_DEVICES: Final = "enable_container_devices"
 CONF_ENABLE_CONTAINER_UPDATES: Final = "enable_container_updates"
 CONF_READ_ONLY: Final = "read_only"
 CONF_CPU_TEMPERATURE_SOURCE: Final = "cpu_temperature_source"
+# Internal option, not in the options form: {physical disk key: acknowledged count}
+CONF_ACKNOWLEDGED_DISK_IO_ERRORS: Final = "acknowledged_disk_io_errors"
 CONF_ENABLE_VM_DEVICES: Final = "enable_vm_devices"
 CONF_ENABLE_GPU_DEVICES: Final = "enable_gpu_devices"
 CONF_ENABLE_HWMON_DEVICES: Final = "enable_hwmon_devices"

@@ -72,10 +72,8 @@ from .const import (
     ATTR_UPS_MODEL,
     ATTR_UPS_STATUS,
     CONF_CPU_TEMPERATURE_SOURCE,
-    CONF_ENABLE_FAN_CONTROL,
     CPU_TEMPERATURE_SOURCE_AUTO,
     DEFAULT_CPU_TEMPERATURE_SOURCE,
-    DEFAULT_ENABLE_FAN_CONTROL,
     DOMAIN,
 )
 from .coordinator import UnraidData, has_no_array_disks
@@ -2700,7 +2698,7 @@ class UnraidDiskSmartErrorsSensor(UnraidDiskSensorBase):
 
     @property
     def native_value(self) -> int | None:
-        """Return the number of SMART errors."""
+        """Return the accumulated Unraid I/O error count."""
         disk = self._get_disk()
         if not disk:
             return None
@@ -5425,9 +5423,6 @@ async def async_setup_entry(
 
     # Fan sensors - one per fan, created as fans appear. A fan's earlier entity
     # (name-based, before the agent reported a device_id) is adopted first.
-    fan_control_enabled = entry.options.get(
-        CONF_ENABLE_FAN_CONTROL, DEFAULT_ENABLE_FAN_CONTROL
-    )
     seen_fans: set[str] = set()
 
     def _add_fan_sensors() -> None:
@@ -5443,7 +5438,7 @@ async def async_setup_entry(
         for key, fan_name, display, fan in fan_sensor_keys(fans):
             if key in seen_fans:
                 continue
-            # Adopt even with fan sensors off, so stale cleanup keeps the entry
+            # Adopt the earlier entity before creating its sensor.
             adopted = async_adopt_unique_id(
                 hass,
                 "sensor",
@@ -5455,8 +5450,6 @@ async def async_setup_entry(
                     current_data.system.temperatures or [],
                 ),
             )
-            if not fan_control_enabled:
-                continue
             seen_fans.add(key)
             if adopted and adopted.removeprefix(prefix) in seen_fans:
                 # A loaded sensor moved to this key; reload so it reads by it

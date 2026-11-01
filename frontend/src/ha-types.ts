@@ -32,7 +32,15 @@ export interface EntityRegistryEntry {
   name?: string | null;
 }
 
+/** Full registry records also include disabled entities absent from states. */
+export interface FullEntityRegistryEntry extends EntityRegistryEntry {
+  unique_id: string;
+  config_entry_id: string | null;
+  disabled_by: string | null;
+}
+
 export interface HomeAssistant {
+  callWS?: <T>(message: { type: string }) => Promise<T>;
   /** HA's optional, undocumented display-name API; validate its result at runtime. */
   formatEntityName?: (entity: HassEntity) => unknown;
   states: HassEntities;

@@ -4,6 +4,7 @@ import { dashboardCardStyles } from "./dashboard-cards-styles";
 import {
   fireEvent,
   type DeviceRegistryEntry,
+  type FullEntityRegistryEntry,
   type HassEntity,
   type HomeAssistant,
 } from "./ha-types";
@@ -123,6 +124,13 @@ export abstract class BaseUnraidCard extends LitElement {
   private _agentStates?: Record<string, HassEntity>;
   private _agentStatesHass?: HomeAssistant;
   private _agentStatesConfig?: CardConfig;
+  private _registryCache?: {
+    entities: HomeAssistant["entities"];
+    devices: HomeAssistant["devices"];
+    callWS: HomeAssistant["callWS"];
+    entries?: FullEntityRegistryEntry[];
+  };
+  private _registryRequest = 0;
 
   constructor() {
     super();
@@ -249,6 +257,71 @@ export abstract class BaseUnraidCard extends LitElement {
       })
     );
     return this._agentStates;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.requestUpdate();
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._registryRequest += 1;
+    this._registryCache = undefined;
+  }
+
+  /** Fetch full registry evidence on demand; undefined means unknown or loading. */
+  protected getServerRegistryEntries(): FullEntityRegistryEntry[] | undefined {
+    const hass = this.hass;
+    if (!hass || !this.isConnected) return undefined;
+    let cache = this._registryCache;
+    if (
+      !cache ||
+      cache.entities !== hass.entities ||
+      cache.devices !== hass.devices ||
+      cache.callWS !== hass.callWS
+    ) {
+      cache = {
+        entities: hass.entities,
+        devices: hass.devices,
+        callWS: hass.callWS,
+      };
+      this._registryCache = cache;
+      const request = ++this._registryRequest;
+      if (hass.callWS) void this.fetchRegistryEntries(hass, cache, request);
+    }
+    const server = this.getActiveDevice();
+    if (!cache.entries || !server) return undefined;
+    const deviceIds = this.getServerDeviceIds(server.id);
+    return cache.entries.filter((entry) =>
+      entry.platform === "unraid_management_agent" &&
+      !!entry.device_id && deviceIds.has(entry.device_id)
+    );
+  }
+
+  private async fetchRegistryEntries(
+    hass: HomeAssistant,
+    cache: NonNullable<BaseUnraidCard["_registryCache"]>,
+    request: number,
+  ): Promise<void> {
+    let entries: FullEntityRegistryEntry[] | undefined;
+    try {
+      entries = await hass.callWS!<FullEntityRegistryEntry[]>({
+        type: "config/entity_registry/list",
+      });
+    } catch {
+      // Permissions or connection failures leave registry status unknown.
+    }
+    if (
+      !this.isConnected ||
+      request !== this._registryRequest ||
+      cache.entities !== this.hass?.entities ||
+      cache.devices !== this.hass?.devices ||
+      cache.callWS !== this.hass?.callWS
+    )
+      return;
+    cache.entries = entries;
+    this.requestUpdate();
   }
 
   /**
