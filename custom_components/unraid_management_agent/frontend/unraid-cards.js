@@ -1044,7 +1044,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
         </div>
       </div>
       </ha-card>
-    `}},editor:Pt,name:`Unraid Storage & Disks Card`,description:`Array capacity, parity checks, and interactive disk tray with spin state controls.`});function $t(e,t){let n=e.trim(),r=n.match(/^(?:.*?\s+)?Share\s+(.+?)(?:\s+usage)?$/i);return r&&r[1]?r[1].trim():(n=n.replace(/\s+usage$/i,``).replace(/_usage$/i,``).replace(/\s+share$/i,``).replace(/_share$/i,``).trim(),n||t)}X({tag:Me,editorTag:Ne,card:class extends J{static editorTag=Ne;static properties={...J.properties,_searchQuery:{state:!0}};constructor(){super(),this._searchQuery=``}getShares(){let e=this.getEntities(`share_usage`),t=[];for(let n of e){let e=(n.entity_id.split(`.`)[1]||``).replace(/^.*?_share_/,``).replace(/_usage$/,``),r=$t(this.entityName(n,n.attributes.friendly_name||e),e),i=n.attributes.color||``,a=i===`green-on`;t.push({id:e,name:r,entityId:n.entity_id,usagePct:Math.min(100,Math.max(0,Math.round(Number(n.state)||0))),used:n.attributes.used_size||n.attributes.used||``,total:n.attributes.total_size||n.attributes.total||``,free:n.attributes.free_size||n.attributes.free||``,isProtected:a,color:i,allocator:n.attributes.allocator})}return t.sort((e,t)=>e.name.localeCompare(t.name,void 0,{numeric:!0}))}_openMoreInfo(e){W(this,`hass-more-info`,{entityId:e})}render(){let e=this.getShares(),t=this._searchQuery?e.filter(e=>e.name.toLowerCase().includes(this._searchQuery.toLowerCase())):e,n=e.filter(e=>e.isProtected).length,r=e.length-n,i=L`
+    `}},editor:Pt,name:`Unraid Storage & Disks Card`,description:`Array capacity, parity checks, and interactive disk tray with spin state controls.`});function $t(e,t){let n=e.trim(),r=n.match(/^(?:.*?\s+)?Share\s+(.+?)(?:\s+(?:storage\s+)?usage)?$/i);return r&&r[1]?r[1].trim():(n=n.replace(/\s+(?:storage\s+)?usage$/i,``).replace(/_usage$/i,``).replace(/\s+share$/i,``).replace(/_share$/i,``).trim(),n||t)}X({tag:Me,editorTag:Ne,card:class extends J{static editorTag=Ne;static properties={...J.properties,_searchQuery:{state:!0}};constructor(){super(),this._searchQuery=``}getShares(){let e=this.getEntities(`share_usage`),t=[];for(let n of e){let e=(n.entity_id.split(`.`)[1]||``).replace(/^.*?_share_/,``).replace(/_usage$/,``),r=$t(this.entityName(n,n.attributes.friendly_name||e),e),i=n.attributes.color||``,a=i===`green-on`,o=[`storage_used`,`storage_total`,`storage_free`].some(e=>e in n.attributes);t.push({id:e,name:r,entityId:n.entity_id,usagePct:Math.min(100,Math.max(0,Math.round(Number(n.state)||0))),used:o?n.attributes.storage_used||``:n.attributes.used_size||n.attributes.used||``,total:o?n.attributes.storage_total||``:n.attributes.total_size||n.attributes.total||``,free:o?n.attributes.storage_free||``:n.attributes.free_size||n.attributes.free||``,measuredUsed:o?n.attributes.used_size:void 0,isProtected:a,color:i,allocator:n.attributes.allocator})}return t.sort((e,t)=>e.name.localeCompare(t.name,void 0,{numeric:!0}))}_openMoreInfo(e){W(this,`hass-more-info`,{entityId:e})}render(){let e=this.getShares(),t=this._searchQuery?e.filter(e=>e.name.toLowerCase().includes(this._searchQuery.toLowerCase())):e,n=e.filter(e=>e.isProtected).length,r=e.length-n,i=L`
       <span class="badge ${r===0?`badge-online`:`badge-warning`}">
         ${K(r===0?xt:bt,13)}
         <span>${n} Protected${r>0?` • ${r} Unprotected`:``}</span>
@@ -1104,12 +1104,13 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
                           </span>
                         </span>
 
-                        ${e.used&&e.total?L`<span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">${e.used} / ${e.total}${e.free?` • ${e.free} free`:``}</span>`:z}
+                        ${e.measuredUsed==null?z:L`<span class="share-data" style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">Share data: ${e.measuredUsed}</span>`}
+                        ${e.used&&e.total?L`<span class="storage-usage" style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">Storage: ${e.used} / ${e.total}${e.free?` • ${e.free} free`:``}</span>`:z}
                       </span>
                     </span>
 
                     <span data-block class="row-right">
-                      <span data-block style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); width: 110px;">
+                      <span data-block title="Storage usage" style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); width: 110px;">
                         <span data-block class="progress-bar" style="height: 6px; flex: 1;">
                           <span data-block
                             class="progress-fill"

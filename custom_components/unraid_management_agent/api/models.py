@@ -1131,16 +1131,26 @@ class VMInfo(BaseModel):
 
 
 class ShareInfo(BaseModel):
-    """User share information response."""
+    """Share content measurements and backing pool or array capacity."""
 
     name: str | None = Field(None, description="Share name")
     path: str | None = Field(None, description="Share path")
 
-    # Capacity
-    total_bytes: CoercedInt = Field(None, description="Total size in bytes")
-    used_bytes: CoercedInt = Field(None, description="Used space in bytes")
-    free_bytes: CoercedInt = Field(None, description="Free space in bytes")
-    usage_percent: CoercedFloat = Field(None, description="Usage percentage")
+    # Legacy storage counters; used_bytes is measured content on new agents only.
+    total_bytes: CoercedInt = Field(None, description="Legacy storage total bytes")
+    used_bytes: CoercedInt = Field(None, description="Measured share content bytes")
+    free_bytes: CoercedInt = Field(None, description="Legacy storage free bytes")
+    usage_percent: CoercedFloat = Field(
+        None, description="Legacy storage usage percent"
+    )
+    storage_used_bytes: CoercedInt = Field(None, description="Pool or array used bytes")
+    storage_free_bytes: CoercedInt = Field(None, description="Pool or array free bytes")
+    storage_total_bytes: CoercedInt = Field(
+        None, description="Pool or array total bytes"
+    )
+    storage_usage_percent: CoercedFloat = Field(
+        None, description="Pool or array usage percent"
+    )
 
     # Configuration
     comment: str | None = Field(None, description="Share comment/description")
@@ -1200,27 +1210,64 @@ class ShareInfo(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="allow")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_storage(cls, data: Any) -> Any:
+        """Resolve storage aliases without presenting old counters as share data."""
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        has_storage_fields = any(
+            key in data
+            for key in (
+                "storage_used_bytes",
+                "storage_free_bytes",
+                "storage_total_bytes",
+                "storage_usage_percent",
+            )
+        )
+        for canonical, legacy, coerce in (
+            ("storage_free_bytes", "free_bytes", _coerce_int),
+            ("storage_total_bytes", "total_bytes", _coerce_int),
+            ("storage_usage_percent", "usage_percent", _coerce_float),
+        ):
+            if coerce(data.get(canonical)) is None:
+                data[canonical] = data.get(legacy)
+        if not has_storage_fields:
+            # Older agents' used_bytes describes storage, never measured content.
+            data["storage_used_bytes"] = data.get("used_bytes")
+            data["used_bytes"] = None
+        if _coerce_int(data.get("storage_used_bytes")) is None:
+            total = _coerce_int(data.get("storage_total_bytes"))
+            free = _coerce_int(data.get("storage_free_bytes"))
+            if total is not None and total > 0 and free is not None:
+                data["storage_used_bytes"] = total - free
+        return data
+
     @property
     def computed_used_percent(self) -> float | None:
         """
-        Calculate used percentage from total_bytes and used_bytes.
+        Return backing storage utilisation, independent of share content size.
 
-        Falls back to the API-provided usage_percent if available,
-        otherwise computes from raw byte values.
+        Prefer the resolved storage percentage, then compute from storage bytes.
 
         Returns:
             Usage percentage (0-100), or None if insufficient data.
 
         Example:
-            >>> share = ShareInfo(total_bytes=2000, used_bytes=500)
+            >>> share = ShareInfo(storage_total_bytes=2000, storage_used_bytes=500)
             >>> share.computed_used_percent
             25.0
 
         """
-        if self.usage_percent is not None:
-            return self.usage_percent
-        if self.total_bytes and self.used_bytes is not None and self.total_bytes > 0:
-            return round((self.used_bytes / self.total_bytes) * 100, 1)
+        if self.storage_usage_percent is not None:
+            return self.storage_usage_percent
+        if (
+            self.storage_total_bytes is not None
+            and self.storage_total_bytes > 0
+            and self.storage_used_bytes is not None
+        ):
+            return round((self.storage_used_bytes / self.storage_total_bytes) * 100, 1)
         return None
 
     @property

@@ -54,7 +54,7 @@ The integration automatically registers a complete suite of custom Lovelace card
 | `custom:unraid-management-agent-ups-card`                | **UPS Power Monitoring**         | Battery percentage, load %, estimated runtime duration, input/output voltage, and power draw.             |
 | `custom:unraid-management-agent-gpu-card`                | **GPU Telemetry**                | Multi-GPU support (NVIDIA, Intel, AMD), utilization rings, VRAM usage, clocks, driver version, and temps. |
 | `custom:unraid-management-agent-network-card`            | **Network Interfaces**           | Interface status, IPv4/IPv6 addresses, link speeds, MTU, and real-time RX/TX throughput.                  |
-| `custom:unraid-management-agent-shares-card`             | **User Shares**                  | User share capacity usage, free space, and parity protection status badges.                               |
+| `custom:unraid-management-agent-shares-card`             | **User Shares**                  | Measured share data, backing storage usage, free space, and parity protection status badges.              |
 | `custom:unraid-management-agent-remote-shares-card`      | **Remote Shares**                | Mounted remote SMB/NFS shares, mount/unmount switches, and usage metrics.                                 |
 | `custom:unraid-management-agent-unassigned-devices-card` | **Unassigned Devices**           | External USB/SATA drives, file systems, mount switches, and partition details.                            |
 | `custom:unraid-management-agent-zfs-card`                | **ZFS Pools & Datasets**         | Pool status, ARC hit ratio gauges, scrub status, error counts, and dataset capacity.                      |
@@ -126,7 +126,7 @@ The exact entities exposed depend on the hardware, plugins, and collectors activ
 - **Array State**: Array status (Started, Stopped), total capacity, used space, free space, and usage percentage.
 - **Parity Operations**: Parity check progress percentage, parity check state (Running, Paused, Idle), schedule, history timestamp, duration, and parity sync error count.
 - **Flash Boot Drive**: Flash drive utilization, free space, and device status.
-- **User Shares**: Usage per share, and a **FUSE Fallback** problem binary sensor for each share that is, or can be, an Unraid 6.12+ exclusive share (on when the share has silently fallen back to the slower FUSE layer). A repair issue names the disks or pools holding the stray folder and clears itself once the share is exclusive again. Needs an agent that reports exclusive share state.
+- **User Shares**: Each **Share {share_name} Storage Usage** sensor reports backing pool or array utilisation, with `storage_used`, `storage_free` and `storage_total` attributes (null when capacity is unknown). `used_size` is present only when a new agent measures the share content (including zero); legacy `total_size` and `free_size` mirror storage capacity. The Shares card labels storage figures separately from measured share data. Also provides a **FUSE Fallback** problem binary sensor for each share that is, or can be, an Unraid 6.12+ exclusive share (on when the share has silently fallen back to the slower FUSE layer). A repair issue names the disks or pools holding the stray folder and clears itself once the share is exclusive again. Needs an agent that reports exclusive share state.
 
 ### SAS Storage Topology
 

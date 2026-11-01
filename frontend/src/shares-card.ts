@@ -22,6 +22,7 @@ export interface ShareItem {
   used: string;
   total: string;
   free: string;
+  measuredUsed?: string;
   isProtected: boolean;
   color: string;
   allocator?: string;
@@ -29,12 +30,12 @@ export interface ShareItem {
 
 export function formatShareName(rawName: string, id: string): string {
   let name = rawName.trim();
-  const match = name.match(/^(?:.*?\s+)?Share\s+(.+?)(?:\s+usage)?$/i);
+  const match = name.match(/^(?:.*?\s+)?Share\s+(.+?)(?:\s+(?:storage\s+)?usage)?$/i);
   if (match && match[1]) {
     return match[1].trim();
   }
   name = name
-    .replace(/\s+usage$/i, "")
+    .replace(/\s+(?:storage\s+)?usage$/i, "")
     .replace(/_usage$/i, "")
     .replace(/\s+share$/i, "")
     .replace(/_share$/i, "")
@@ -72,24 +73,30 @@ export class UnraidSharesCard extends BaseUnraidCard {
       const color = (u.attributes.color as string) || "";
       // In Unraid, "green-on" means protected on parity-backed array, "yellow-on" means pool/unprotected
       const isProtected = color === "green-on";
+      const hasStorage = ["storage_used", "storage_total", "storage_free"].some(
+        (key) => key in u.attributes
+      );
 
       shares.push({
         id: namePart,
         name: cleanName,
         entityId: u.entity_id,
         usagePct: Math.min(100, Math.max(0, Math.round(Number(u.state) || 0))),
-        used:
-          (u.attributes.used_size as string) ||
-          (u.attributes.used as string) ||
-          "",
-        total:
-          (u.attributes.total_size as string) ||
-          (u.attributes.total as string) ||
-          "",
-        free:
-          (u.attributes.free_size as string) ||
-          (u.attributes.free as string) ||
-          "",
+        used: hasStorage
+          ? (u.attributes.storage_used as string) || ""
+          : (u.attributes.used_size as string) ||
+            (u.attributes.used as string) || "",
+        total: hasStorage
+          ? (u.attributes.storage_total as string) || ""
+          : (u.attributes.total_size as string) ||
+            (u.attributes.total as string) || "",
+        free: hasStorage
+          ? (u.attributes.storage_free as string) || ""
+          : (u.attributes.free_size as string) ||
+            (u.attributes.free as string) || "",
+        measuredUsed: hasStorage
+          ? u.attributes.used_size as string | undefined
+          : undefined,
         isProtected,
         color,
         allocator: u.attributes.allocator as string | undefined,
@@ -195,14 +202,17 @@ export class UnraidSharesCard extends BaseUnraidCard {
                           </span>
                         </span>
 
+                        ${share.measuredUsed != null
+                          ? html`<span class="share-data" style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">Share data: ${share.measuredUsed}</span>`
+                          : nothing}
                         ${share.used && share.total
-                          ? html`<span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">${share.used} / ${share.total}${share.free ? ` • ${share.free} free` : ""}</span>`
+                          ? html`<span class="storage-usage" style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">Storage: ${share.used} / ${share.total}${share.free ? ` • ${share.free} free` : ""}</span>`
                           : nothing}
                       </span>
                     </span>
 
                     <span data-block class="row-right">
-                      <span data-block style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); width: 110px;">
+                      <span data-block title="Storage usage" style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); width: 110px;">
                         <span data-block class="progress-bar" style="height: 6px; flex: 1;">
                           <span data-block
                             class="progress-fill"
