@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop computed UPS, NUT and GPU energy totals jumping back to their restore baseline and stalling (#260): a stale uptime sample is no longer treated as a reboot, a detected reboot keeps the accumulated total, and restore keeps the larger valid total
 - Complete dashboard card UX safeguards (#253): guarded Home Assistant entity labels, content-level named container queries, narrow UPS/GPU/VM and row layouts, and isolated technical values in RTL.
 - Distinguish measured share content from backing pool or array usage (#255). Share storage usage sensors keep their unique IDs, accept both old and new agent counters, and expose `storage_used`, `storage_free` and `storage_total`; `used_size` is present only for measured share data. The Shares card labels storage figures separately from share data.
 
