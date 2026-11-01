@@ -41,7 +41,8 @@ export interface FullEntityRegistryEntry extends EntityRegistryEntry {
 
 export interface HomeAssistant {
   callWS?: <T>(message: { type: string }) => Promise<T>;
-  formatEntityName?: (entity: HassEntity) => string;
+  /** HA display-name API; validate its result at runtime. */
+  formatEntityName?: (entity: HassEntity) => unknown;
   states: HassEntities;
   devices?: Record<string, DeviceRegistryEntry>;
   entities?: Record<string, EntityRegistryEntry>;
