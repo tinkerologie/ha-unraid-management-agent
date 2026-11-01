@@ -193,15 +193,15 @@ export class UnraidGpuCard extends BaseUnraidCard {
               </div>
             `
           : html`
-              <div class="gpu-grid" style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="gpu-grid" style="display: flex; flex-direction: column; gap: var(--ha-space-3, 12px);">
                 ${gpus.map((gpu) => {
                   const util = gpu.utilizationPct ?? 0;
                   return html`
-                    <div class="ring-card" style="padding: 12px; background: rgba(255, 255, 255, 0.02); border-radius: 8px;">
-                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; width: 100%;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="ring-card" style="padding: var(--ha-space-3, 12px); background: color-mix(in srgb, var(--unraid-text) 3%, transparent); border-radius: var(--ha-border-radius-md, 8px);">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-block-end: var(--ha-space-2, 8px); width: 100%;">
+                        <div style="display: flex; align-items: center; gap: var(--ha-space-2, 8px);">
                           ${iconTemplate(mdiExpansionCard, 20)}
-                          <span style="font-weight: 600; font-size: 14px;">${gpu.name}</span>
+                          <span style="font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-m, 14px);">${gpu.name}</span>
                         </div>
                         ${gpu.driver ? html`<span class="badge">${gpu.driver}</span>` : nothing}
                       </div>
@@ -209,96 +209,76 @@ export class UnraidGpuCard extends BaseUnraidCard {
                       <div class="rings-grid" style="grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));">
                         ${gpu.utilizationPct !== undefined
                           ? html`
-                              <div
-                                class="ring-card"
-                                role="${gpu.utilizationEntityId ? "button" : "none"}"
-                                tabindex="${gpu.utilizationEntityId ? "0" : "-1"}"
+                              <button
+                                type="button"
+                                ?disabled=${!(gpu.utilizationEntityId)}
+                                class="interactive ring-card"
                                 @click=${() => gpu.utilizationEntityId && this.openMoreInfo(gpu.utilizationEntityId)}
-                                @keydown=${(e: KeyboardEvent) =>
-                                  (e.key === "Enter" || e.key === " ") &&
-                                  gpu.utilizationEntityId &&
-                                  (e.preventDefault(), this.openMoreInfo(gpu.utilizationEntityId))}
-                                style="${gpu.utilizationEntityId ? "cursor: pointer;" : ""}"
                                 title="Click for GPU load details"
                               >
-                                <div
+                                <span data-block
                                   class="ring-gauge"
                                   style="--pct: ${util}; --ring-color: ${util > 80 ? "var(--unraid-error)" : util > 50 ? "var(--unraid-warning)" : "var(--unraid-online)"}"
                                 >
                                   <span class="ring-content">${util}%</span>
-                                </div>
+                                </span>
                                 <span class="ring-label">GPU Load</span>
-                              </div>
+                              </button>
                             `
                           : nothing}
 
                         ${gpu.temp !== undefined
                           ? html`
-                              <div
-                                class="ring-card"
-                                role="${gpu.tempEntityId ? "button" : "none"}"
-                                tabindex="${gpu.tempEntityId ? "0" : "-1"}"
+                              <button
+                                type="button"
+                                ?disabled=${!(gpu.tempEntityId)}
+                                class="interactive ring-card"
                                 @click=${() => gpu.tempEntityId && this.openMoreInfo(gpu.tempEntityId)}
-                                @keydown=${(e: KeyboardEvent) =>
-                                  (e.key === "Enter" || e.key === " ") &&
-                                  gpu.tempEntityId &&
-                                  (e.preventDefault(), this.openMoreInfo(gpu.tempEntityId))}
-                                style="${gpu.tempEntityId ? "cursor: pointer;" : ""}"
                                 title="Click for Temperature details"
                               >
-                                <div
+                                <span data-block
                                   class="ring-gauge"
                                   style="--pct: ${Math.min(100, Math.round((gpu.temp / 90) * 100))}; --ring-color: ${gpu.temp > 80 ? "var(--unraid-error)" : gpu.temp > 65 ? "var(--unraid-warning)" : "var(--unraid-info)"}"
                                 >
                                   <span class="ring-content">${gpu.temp}°C</span>
-                                </div>
+                                </span>
                                 <span class="ring-label">Temperature</span>
-                              </div>
+                              </button>
                             `
                           : nothing}
 
                         ${gpu.power !== undefined
                           ? html`
-                              <div
-                                class="ring-card"
-                                role="${gpu.powerEntityId ? "button" : "none"}"
-                                tabindex="${gpu.powerEntityId ? "0" : "-1"}"
+                              <button
+                                type="button"
+                                ?disabled=${!(gpu.powerEntityId)}
+                                class="interactive ring-card"
                                 @click=${() => gpu.powerEntityId && this.openMoreInfo(gpu.powerEntityId)}
-                                @keydown=${(e: KeyboardEvent) =>
-                                  (e.key === "Enter" || e.key === " ") &&
-                                  gpu.powerEntityId &&
-                                  (e.preventDefault(), this.openMoreInfo(gpu.powerEntityId))}
-                                style="${gpu.powerEntityId ? "cursor: pointer;" : ""}"
                                 title="Click for Power details"
                               >
-                                <div class="ring-gauge" style="--pct: 60; --ring-color: var(--unraid-accent)">
+                                <span data-block class="ring-gauge" style="--pct: 60; --ring-color: var(--unraid-accent)">
                                   <span class="ring-content">${gpu.power}W</span>
-                                </div>
+                                </span>
                                 <span class="ring-label">Power Draw</span>
                                 ${gpu.energy !== undefined ? html`<span class="ring-subtext">${gpu.energy} kWh</span>` : nothing}
-                              </div>
+                              </button>
                             `
                           : nothing}
 
                         ${gpu.memUtilPct !== undefined
                           ? html`
-                              <div
-                                class="ring-card"
-                                role="${gpu.memUtilEntityId ? "button" : "none"}"
-                                tabindex="${gpu.memUtilEntityId ? "0" : "-1"}"
+                              <button
+                                type="button"
+                                ?disabled=${!(gpu.memUtilEntityId)}
+                                class="interactive ring-card"
                                 @click=${() => gpu.memUtilEntityId && this.openMoreInfo(gpu.memUtilEntityId)}
-                                @keydown=${(e: KeyboardEvent) =>
-                                  (e.key === "Enter" || e.key === " ") &&
-                                  gpu.memUtilEntityId &&
-                                  (e.preventDefault(), this.openMoreInfo(gpu.memUtilEntityId))}
-                                style="${gpu.memUtilEntityId ? "cursor: pointer;" : ""}"
                                 title="Click for VRAM details"
                               >
-                                <div class="ring-gauge" style="--pct: ${gpu.memUtilPct}; --ring-color: var(--unraid-info)">
+                                <span data-block class="ring-gauge" style="--pct: ${gpu.memUtilPct}; --ring-color: var(--unraid-info)">
                                   <span class="ring-content">${gpu.memUtilPct}%</span>
-                                </div>
+                                </span>
                                 <span class="ring-label">VRAM Usage</span>
-                              </div>
+                              </button>
                             `
                           : nothing}
                       </div>

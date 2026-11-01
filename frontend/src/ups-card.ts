@@ -125,112 +125,88 @@ export class UnraidUpsCard extends BaseUnraidCard {
           badge
         )}
         <div class="rings-grid" style="grid-template-columns: repeat(2, 1fr);">
-          <div
-            class="ring-card"
-            role="${batteryState ? "button" : "none"}"
-            tabindex="${batteryState ? "0" : "-1"}"
-            style="${batteryState ? "cursor: pointer;" : ""}"
+          <button
+            type="button"
+            ?disabled=${!(batteryState)}
+            class="interactive ring-card"
             @click=${() => batteryState && this.openMoreInfo(batteryState.entity_id)}
-            @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && batteryState && (e.preventDefault(), this.openMoreInfo(batteryState.entity_id))}
             title="Click to view Battery details"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${batteryPct ?? 0}; --ring-color: ${batteryPct === null ? "var(--unraid-border)" : batteryPct < 20 ? "var(--unraid-error)" : batteryPct < 50 ? "var(--unraid-warning)" : "var(--unraid-online)"}"
             >
               <span class="ring-content">${batteryPct !== null ? `${batteryPct}%` : "—"}</span>
-            </div>
+            </span>
             <span class="ring-label">Battery Level</span>
             <span class="ring-subtext">${runtimeFormatted ? `${runtimeFormatted} left` : batteryPct !== null ? "Healthy" : "No Data"}</span>
-          </div>
-          <div
-            class="ring-card"
-            role="${loadState ? "button" : "none"}"
-            tabindex="${loadState ? "0" : "-1"}"
-            style="${loadState ? "cursor: pointer;" : ""}"
+          </button>
+          <button
+            type="button"
+            ?disabled=${!(loadState)}
+            class="interactive ring-card"
             @click=${() => loadState && this.openMoreInfo(loadState.entity_id)}
-            @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && loadState && (e.preventDefault(), this.openMoreInfo(loadState.entity_id))}
             title="Click to view Load details"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${loadPct ?? 0}; --ring-color: ${loadPct === null ? "var(--unraid-border)" : loadPct > 80 ? "var(--unraid-error)" : loadPct > 50 ? "var(--unraid-warning)" : "var(--unraid-info)"}"
             >
               <span class="ring-content">${loadPct !== null ? `${loadPct}%` : "—"}</span>
-            </div>
+            </span>
             <span class="ring-label">UPS Load</span>
             <span class="ring-subtext">${powerW || (loadPct !== null ? `${loadPct}% capacity` : "No Data")}</span>
-          </div>
+          </button>
         </div>
 
         <div class="divider"></div>
         <div class="detail-grid">
-          <div
-            class="detail-item"
-            role="${runtimeState ? "button" : "none"}"
-            tabindex="${runtimeState ? "0" : "-1"}"
-            style="${runtimeState ? "cursor: pointer;" : ""}"
+          <button
+            type="button"
+            ?disabled=${!(runtimeState)}
+            class="interactive detail-item"
             @click=${() => runtimeState && this.openMoreInfo(runtimeState.entity_id)}
-            @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && runtimeState && (e.preventDefault(), this.openMoreInfo(runtimeState.entity_id))}
             title="Click to view Runtime details"
           >
             <span class="detail-label">Runtime Remaining</span>
             <span class="detail-val">${runtimeFormatted || "—"}</span>
-          </div>
-          <div
-            class="detail-item"
-            role="${powerState ? "button" : "none"}"
-            tabindex="${powerState ? "0" : "-1"}"
-            style="${powerState ? "cursor: pointer;" : ""}"
+          </button>
+          <button
+            type="button"
+            ?disabled=${!(powerState)}
+            class="interactive detail-item"
             @click=${() => powerState && this.openMoreInfo(powerState.entity_id)}
-            @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && powerState && (e.preventDefault(), this.openMoreInfo(powerState.entity_id))}
             title="Click to view Power details"
           >
             <span class="detail-label">Power Consumption</span>
             <span class="detail-val">${powerW || "—"}</span>
-          </div>
-          <div
-            class="detail-item"
-            role="${voltageOut || energyState ? "button" : "none"}"
-            tabindex="${voltageOut || energyState ? "0" : "-1"}"
-            style="${voltageOut || energyState ? "cursor: pointer;" : ""}"
+          </button>
+          <button
+            type="button"
+            ?disabled=${!(voltageOut || energyState)}
+            class="interactive detail-item"
             @click=${() => {
               const target = voltageOut || energyState;
               if (target) this.openMoreInfo(target.entity_id);
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              const target = voltageOut || energyState;
-              if ((e.key === "Enter" || e.key === " ") && target) {
-                e.preventDefault();
-                this.openMoreInfo(target.entity_id);
-              }
             }}
             title="${voltageOut ? "Click to view Voltage details" : "Click to view Energy details"}"
           >
             <span class="detail-label">${hasVoltage ? "Output Voltage" : hasEnergy ? "Energy Consumed" : "Output Voltage"}</span>
             <span class="detail-val">${voltageV || energyFormatted || "—"}</span>
-          </div>
-          <div
-            class="detail-item"
-            role="${healthState || batteryState ? "button" : "none"}"
-            tabindex="${healthState || batteryState ? "0" : "-1"}"
-            style="${healthState || batteryState ? "cursor: pointer;" : ""}"
+          </button>
+          <button
+            type="button"
+            ?disabled=${!(healthState || batteryState)}
+            class="interactive detail-item"
             @click=${() => {
               const target = healthState || batteryState;
               if (target) this.openMoreInfo(target.entity_id);
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              const target = healthState || batteryState;
-              if ((e.key === "Enter" || e.key === " ") && target) {
-                e.preventDefault();
-                this.openMoreInfo(target.entity_id);
-              }
             }}
             title="Click to view Battery Health details"
           >
             <span class="detail-label">Battery Health</span>
             <span class="detail-val" style="${health && !health.toLowerCase().includes("fail") ? "color: var(--unraid-online);" : ""}">${health || "—"}</span>
-          </div>
+          </button>
         </div>
       </ha-card>
     `;

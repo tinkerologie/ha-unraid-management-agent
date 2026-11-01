@@ -133,18 +133,18 @@ export class UnraidSharesCard extends BaseUnraidCard {
         )}
         ${allShares.length > 4
           ? html`
-              <div style="margin-bottom: 4px;">
+              <div style="margin-block-end: var(--ha-space-1, 4px);">
                 <input
                   type="text"
                   placeholder="Filter shares..."
                   style="
                     width: 100%;
-                    padding: 6px 10px;
-                    border-radius: 6px;
+                    padding: var(--ha-space-2, 8px) var(--ha-space-2, 8px);
+                    border-radius: var(--ha-border-radius-md, 8px);
                     border: 1px solid var(--unraid-border);
                     background: color-mix(in srgb, var(--unraid-text) 4%, transparent);
                     color: var(--unraid-text);
-                    font-size: 0.8rem;
+                    font-size: var(--ha-font-size-s, 12px);
                     box-sizing: border-box;
                   "
                   .value=${this._searchQuery}
@@ -165,64 +165,61 @@ export class UnraidSharesCard extends BaseUnraidCard {
                     : "var(--unraid-online)";
 
                 return html`
-                  <div
-                    class="list-row"
-                    role="button"
-                    tabindex="0"
-                    style="cursor: pointer;"
+                  <button
+                    type="button"
+                    class="interactive list-row"
                     title="Click for details on ${share.name}"
                     @click=${() => this._openMoreInfo(share.entityId)}
-                    @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), this._openMoreInfo(share.entityId))}
                   >
-                    <div class="row-left">
-                      <div
+                    <span data-block class="row-left">
+                      <span data-block
                         style="color: ${share.isProtected ? "var(--unraid-accent)" : "var(--unraid-warning)"}; display: flex; align-items: center;"
                       >
                         ${iconTemplate(mdiFolder, 18)}
-                      </div>
+                      </span>
 
-                      <div style="display: flex; flex-direction: column; min-width: 0;">
-                        <div style="display: flex; align-items: center; gap: 6px;">
+                      <span data-block style="display: flex; flex-direction: column; min-width: 0;">
+                        <span data-block style="display: flex; align-items: center; gap: var(--ha-space-2, 8px);">
                           <span
-                            style="font-weight: 600; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                            style="font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-s, 12px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
                           >
                             ${share.name}
                           </span>
                           <span
                             class="badge ${share.isProtected ? "badge-online" : "badge-warning"}"
-                            style="font-size: 0.62rem; padding: 1px 6px;"
+                            style="font-size: var(--ha-font-size-s, 12px); padding: 1px var(--ha-space-2, 8px);"
                             title="${share.isProtected ? "Data protected on parity array" : "Data on pool / unprotected storage"}"
                           >
                             ${share.isProtected ? "Protected" : "Unprotected"}
                           </span>
-                        </div>
+                        </span>
 
                         ${share.used && share.total
-                          ? html`<span style="font-size: 0.7rem; color: var(--unraid-subtext);">${share.used} / ${share.total}${share.free ? ` • ${share.free} free` : ""}</span>`
+                          ? html`<span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">${share.used} / ${share.total}${share.free ? ` • ${share.free} free` : ""}</span>`
                           : nothing}
-                      </div>
-                    </div>
+                      </span>
+                    </span>
 
-                    <div class="row-right">
-                      <div style="display: flex; align-items: center; gap: 6px; width: 110px;">
-                        <div class="progress-bar" style="height: 6px; flex: 1;">
-                          <div
+                    <span data-block class="row-right">
+                      <span data-block style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); width: 110px;">
+                        <span data-block class="progress-bar" style="height: 6px; flex: 1;">
+                          <span data-block
                             class="progress-fill"
                             style="width: ${share.usagePct}%; background: ${barColor};"
-                          ></div>
-                        </div>
+                          ></span>
+                        </span>
                         <span
-                          style="font-size: 0.72rem; font-family: monospace; font-weight: 600; color: var(--unraid-text); min-width: 32px; text-align: right;"
+                          style="font-size: var(--ha-font-size-s, 12px); font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-bold, 600); color: var(--unraid-text); min-width: 32px; text-align: right;"
                         >
                           ${share.usagePct}%
                         </span>
-                      </div>
-                    </div>
-                  </div>
+                      </span>
+                    </span>
+                  </button>
                 `;
               })
             : html`
-                <div style="text-align: center; color: var(--unraid-subtext); font-size: 0.8rem; padding: 16px;">
+                <div style="text-align: center; color: var(--unraid-subtext); font-size: var(--ha-font-size-s, 12px); padding: var(--ha-space-4, 16px);">
                   ${allShares.length === 0 ? "No user shares found" : "No shares matching filter"}
                 </div>
               `}

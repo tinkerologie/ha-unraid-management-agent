@@ -83,7 +83,7 @@ export class UnraidFansCard extends BaseUnraidCard {
       const fanId = stateObj.attributes?.fan_id as string | number | undefined;
       const originalName =
         (stateObj.attributes?.original_name as string) ||
-        (stateObj.attributes?.friendly_name as string) ||
+        (this.hass?.formatEntityName?.(stateObj) ?? (stateObj.attributes?.friendly_name as string)) ||
         entityId.split(".")[1] ||
         "Fan";
 
@@ -132,7 +132,7 @@ export class UnraidFansCard extends BaseUnraidCard {
 
         const originalName =
           (stateObj.attributes?.original_name as string) ||
-          (stateObj.attributes?.friendly_name as string) ||
+          (this.hass?.formatEntityName?.(stateObj) ?? (stateObj.attributes?.friendly_name as string)) ||
           entityId.split(".")[1] ||
           "Fan";
 
@@ -189,24 +189,24 @@ export class UnraidFansCard extends BaseUnraidCard {
               <div class="disk-list">
                 ${fans.map((f) => {
                   return html`
-                    <div
-                      class="disk-row"
+                    <button
+                      type="button"
+                      class="interactive disk-row"
                       @click=${() => this.openMoreInfo(f.controlEntityId || f.rpmEntityId)}
-                      style="cursor: pointer;"
                       title="Click to view fan details / controls"
                     >
-                      <div class="disk-main">
+                      <span data-block class="disk-main">
                         <span class="disk-icon ${f.isFailed ? "disk-warning" : "disk-online"}">
                           ${iconTemplate(f.isFailed ? mdiAlertCircle : mdiFan, 18)}
                         </span>
-                        <div class="disk-info">
+                        <span data-block class="disk-info">
                           <span class="disk-name">${f.name}</span>
                           <span class="disk-subtext">
                             ${f.isFailed ? "Fan Fault Detected" : f.rpm > 0 ? "Operating Normally" : "Stopped / Idle"}
                           </span>
-                        </div>
-                      </div>
-                      <div class="disk-meta">
+                        </span>
+                      </span>
+                      <span data-block class="disk-meta">
                         <span class="disk-temp" style="color: ${f.isFailed ? "var(--unraid-error)" : f.rpm > 2000 ? "var(--unraid-warning)" : "var(--unraid-text)"};">
                           ${f.rpmText}
                         </span>
@@ -215,8 +215,8 @@ export class UnraidFansCard extends BaseUnraidCard {
                           : f.rpm > 0
                           ? html`<span class="badge badge-online">ACTIVE</span>`
                           : html`<span class="badge">OFF</span>`}
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                   `;
                 })}
               </div>

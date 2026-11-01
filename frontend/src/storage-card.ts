@@ -373,8 +373,8 @@ export class UnraidStorageCard extends BaseUnraidCard {
           mdiHarddisk,
           badge
         )}
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <div style="display: flex; justify-content: space-between; font-size: 0.76rem; font-weight: 600;">
+        <div style="display: flex; flex-direction: column; gap: var(--ha-space-1, 4px);">
+          <div style="display: flex; justify-content: space-between; font-size: var(--ha-font-size-s, 12px); font-weight: var(--ha-font-weight-bold, 600);">
             <span>Array Capacity</span>
             <span>${arrayPct}%</span>
           </div>
@@ -388,12 +388,12 @@ export class UnraidStorageCard extends BaseUnraidCard {
               ${iconTemplate(rowIcon, 18)}
             </div>
             <div style="display: flex; flex-direction: column; min-width: 0;">
-              <span style="font-weight: 600; font-size: 0.78rem;">
+              <span style="font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-s, 12px);">
                 ${parityTitle}
               </span>
               ${showHistoryLine
                 ? html`
-                    <span style="font-size: 0.7rem; color: var(--unraid-subtext);">
+                    <span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">
                       ${historyText}${errorsText}
                     </span>
                   `
@@ -431,20 +431,20 @@ export class UnraidStorageCard extends BaseUnraidCard {
 
                 const healthBadge = disk.health === "healthy"
                   ? html`
-                      <span class="badge badge-online" style="font-size: 0.68rem; gap: 4px;">
+                      <span class="badge badge-online" style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px);">
                         ${iconTemplate(mdiCheckCircle, 11)}
                         <span>Healthy</span>
                       </span>
                     `
                   : disk.health === "warning"
                   ? html`
-                      <span class="badge badge-warning" style="font-size: 0.68rem; gap: 4px;">
+                      <span class="badge badge-warning" style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px);">
                         ${iconTemplate(mdiAlertCircle, 11)}
                         <span>Warning${disk.errors > 0 ? ` (${disk.errors})` : ""}</span>
                       </span>
                     `
                   : html`
-                      <span class="badge badge-error" style="font-size: 0.68rem; gap: 4px;">
+                      <span class="badge badge-error" style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px);">
                         ${iconTemplate(mdiAlertCircle, 11)}
                         <span>Error${disk.errors > 0 ? ` (${disk.errors})` : ""}</span>
                       </span>
@@ -457,7 +457,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                         ? html`
                             <span
                               class="badge badge-online"
-                              style="font-size: 0.68rem; gap: 4px; min-width: 60px; justify-content: center;"
+                              style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px); min-width: 60px; justify-content: center;"
                               title="USB Flash Boot Drive"
                             >
                               ${iconTemplate(mdiUsbFlashDrive, 11)}
@@ -482,7 +482,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                             </span>
                           `}
 
-                      <span style="font-weight: 600; min-width: 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      <span style="font-weight: var(--ha-font-weight-bold, 600); min-width: 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${disk.name}
                       </span>
                     </div>
@@ -490,16 +490,16 @@ export class UnraidStorageCard extends BaseUnraidCard {
                     <div class="row-right">
                       <span
                         class="badge"
-                        style="color: ${disk.isBoot ? "var(--unraid-text-dim)" : tempColor}; background: color-mix(in srgb, ${disk.isBoot ? "var(--unraid-text-dim)" : tempColor} 12%, transparent); min-width: 44px; justify-content: center;"
+                        style="color: ${disk.isBoot ? "var(--unraid-subtext)" : tempColor}; background: color-mix(in srgb, ${disk.isBoot ? "var(--unraid-subtext)" : tempColor} 12%, transparent); min-width: 44px; justify-content: center;"
                         title="${disk.isBoot ? "USB Flash Drive" : disk.isSpinning ? `Temperature: ${tempDisplay}` : "Disk is in standby"}"
                       >
                         ${disk.isBoot ? "--" : tempDisplay}
                       </span>
                       ${healthBadge}
-                      <div style="display: flex; align-items: center; gap: 6px; width: 85px;">
+                      <div style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); width: 85px;">
                         ${disk.isParity
                           ? html`
-                              <span style="font-size: 0.72rem; color: var(--unraid-online); font-weight: 500; font-family: monospace;">
+                              <span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-online); font-weight: var(--ha-font-weight-medium, 500); font-family: var(--ha-font-family-code, monospace);">
                                 Parity
                               </span>
                             `
@@ -510,7 +510,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                                   style="width: ${disk.usagePct}%; background: ${disk.isBoot ? "var(--unraid-warning)" : disk.isCache ? "var(--unraid-info)" : "var(--unraid-accent)"};"
                                 ></div>
                               </div>
-                              <span style="font-size: 0.7rem; font-family: monospace; color: var(--unraid-subtext);">
+                              <span style="font-size: var(--ha-font-size-s, 12px); font-family: var(--ha-font-family-code, monospace); color: var(--unraid-subtext);">
                                 ${disk.usagePct}%
                               </span>
                             `}
@@ -519,7 +519,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                   </div>
                 `;
               })
-            : html`<div style="text-align: center; color: var(--unraid-subtext); font-size: 0.8rem; padding: 12px;">No disk devices found</div>`}
+            : html`<div style="text-align: center; color: var(--unraid-subtext); font-size: var(--ha-font-size-s, 12px); padding: var(--ha-space-3, 12px);">No disk devices found</div>`}
         </div>
       </ha-card>
     `;

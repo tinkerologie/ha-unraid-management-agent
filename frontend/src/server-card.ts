@@ -136,62 +136,56 @@ export class UnraidServerCard extends BaseUnraidCard {
           badge
         )}
         <div class="rings-grid">
-          <div
-            class="ring-card"
-            role="${cpuState ? "button" : "none"}"
-            tabindex="${cpuState ? "0" : "-1"}"
-            style="${cpuState ? "cursor: pointer;" : ""}"
+          <button
+            type="button"
+            ?disabled=${!(cpuState)}
+            class="interactive ring-card"
             @click=${() => cpuState && this.openMoreInfo(cpuState.entity_id)}
-            @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && cpuState && (e.preventDefault(), this.openMoreInfo(cpuState.entity_id))}
             title="Click to view CPU details"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${cpuPct}; --ring-color: ${cpuPct > 80 ? "var(--unraid-error)" : cpuPct > 50 ? "var(--unraid-warning)" : "var(--unraid-online)"}"
             >
               <span class="ring-content">${cpuPct}%</span>
-            </div>
+            </span>
             <span class="ring-label">CPU Load</span>
             <span class="ring-subtext">
               ${tempState?.state ? `${tempState.state}°C` : ""}${powerState?.state ? ` • ${powerState.state}W` : ""}
             </span>
-          </div>
-          <div
-            class="ring-card"
-            role="${ramState ? "button" : "none"}"
-            tabindex="${ramState ? "0" : "-1"}"
-            style="${ramState ? "cursor: pointer;" : ""}"
+          </button>
+          <button
+            type="button"
+            ?disabled=${!(ramState)}
+            class="interactive ring-card"
             @click=${() => ramState && this.openMoreInfo(ramState.entity_id)}
-            @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && ramState && (e.preventDefault(), this.openMoreInfo(ramState.entity_id))}
             title="Click to view Memory details"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${ramPct}; --ring-color: ${ramPct > 85 ? "var(--unraid-error)" : "var(--unraid-info)"}"
             >
               <span class="ring-content">${ramPct}%</span>
-            </div>
+            </span>
             <span class="ring-label">Memory</span>
             <span class="ring-subtext">${ramUsedStr && ramTotalStr ? `${ramUsedStr} / ${ramTotalStr}` : `${ramPct}% used`}</span>
-          </div>
-          <div
-            class="ring-card"
-            role="${arrayUsage ? "button" : "none"}"
-            tabindex="${arrayUsage ? "0" : "-1"}"
-            style="${arrayUsage ? "cursor: pointer;" : ""}"
+          </button>
+          <button
+            type="button"
+            ?disabled=${!(arrayUsage)}
+            class="interactive ring-card"
             @click=${() => arrayUsage && this.openMoreInfo(arrayUsage.entity_id)}
-            @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && arrayUsage && (e.preventDefault(), this.openMoreInfo(arrayUsage.entity_id))}
             title="Click to view Array storage details"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${arrayPct}; --ring-color: var(--unraid-accent)"
             >
               <span class="ring-content">${arrayPct}%</span>
-            </div>
+            </span>
             <span class="ring-label">Array Storage</span>
             <span class="ring-subtext">${arrayUsedStr && arrayTotalStr ? `${arrayUsedStr} / ${arrayTotalStr}` : `${arrayPct}% used`}</span>
-          </div>
+          </button>
         </div>
 
         ${this.config.show_system_info !== false
@@ -206,70 +200,60 @@ export class UnraidServerCard extends BaseUnraidCard {
                   <span class="detail-label">OS Version</span>
                   <span class="detail-val">${device?.sw_version || "Unraid OS"}</span>
                 </div>
-                <div
-                  class="detail-item"
-                  role="${uptimeState ? "button" : "none"}"
-                  tabindex="${uptimeState ? "0" : "-1"}"
-                  style="${uptimeState ? "cursor: pointer;" : ""}"
+                <button
+                  type="button"
+                  ?disabled=${!(uptimeState)}
+                  class="interactive detail-item"
                   @click=${() => uptimeState && this.openMoreInfo(uptimeState.entity_id)}
-                  @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && uptimeState && (e.preventDefault(), this.openMoreInfo(uptimeState.entity_id))}
                   title="Click to view Uptime details"
                 >
                   <span class="detail-label">System Uptime</span>
                   <span class="detail-val">${this.formatUptime(uptimeState?.state)}</span>
-                </div>
-                <div
-                  class="detail-item"
-                  role="${primaryIface?.rx || ipState ? "button" : "none"}"
-                  tabindex="${primaryIface?.rx || ipState ? "0" : "-1"}"
-                  style="${primaryIface?.rx || ipState ? "cursor: pointer;" : ""}"
+                </button>
+                <button
+                  type="button"
+                  ?disabled=${!(primaryIface?.rx || ipState)}
+                  class="interactive detail-item"
                   @click=${() => (primaryIface?.rx ? this.openMoreInfo(primaryIface.rx.entity_id) : ipState && this.openMoreInfo(ipState.entity_id))}
-                  @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (primaryIface?.rx || ipState) && (e.preventDefault(), primaryIface?.rx ? this.openMoreInfo(primaryIface.rx.entity_id) : ipState && this.openMoreInfo(ipState.entity_id))}
                   title="Click to view Network details"
                 >
                   <span class="detail-label">Primary Network</span>
                   <span class="detail-val" title="${primaryIface ? `${primaryIface.name} • ${netSpeedText}` : 'Connected'}">
                     ${primaryIface ? `${primaryIface.name}: ` : ""}${primaryIface?.ip?.state || ipState?.state || "Connected"}
                   </span>
-                </div>
-                <div
-                  class="detail-item"
-                  role="${primaryIface?.rx || primaryIface?.speed ? "button" : "none"}"
-                  tabindex="${primaryIface?.rx || primaryIface?.speed ? "0" : "-1"}"
-                  style="${primaryIface?.rx || primaryIface?.speed ? "cursor: pointer;" : ""}"
+                </button>
+                <button
+                  type="button"
+                  ?disabled=${!(primaryIface?.rx || primaryIface?.speed)}
+                  class="interactive detail-item"
                   @click=${() => (primaryIface?.rx ? this.openMoreInfo(primaryIface.rx.entity_id) : primaryIface?.speed && this.openMoreInfo(primaryIface.speed.entity_id))}
-                  @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (primaryIface?.rx || primaryIface?.speed) && (e.preventDefault(), primaryIface?.rx ? this.openMoreInfo(primaryIface.rx.entity_id) : primaryIface?.speed && this.openMoreInfo(primaryIface.speed.entity_id))}
                   title="Click to view Network traffic details"
                 >
                   <span class="detail-label">Network Traffic</span>
                   <span class="detail-val" title="${netSpeedText ? `Link Speed: ${netSpeedText}` : 'Network Speed'}">${netTrafficText}</span>
-                </div>
-                <div
-                  class="detail-item"
-                  role="${bootDisk ? "button" : "none"}"
-                  tabindex="${bootDisk ? "0" : "-1"}"
-                  style="${bootDisk ? "cursor: pointer;" : ""}"
+                </button>
+                <button
+                  type="button"
+                  ?disabled=${!(bootDisk)}
+                  class="interactive detail-item"
                   @click=${() => bootDisk && this.openMoreInfo(bootDisk.entity_id)}
-                  @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && bootDisk && (e.preventDefault(), this.openMoreInfo(bootDisk.entity_id))}
                   title="Click to view Boot device details"
                 >
                   <span class="detail-label">Boot Device</span>
                   <span class="detail-val" title="${bootTooltip}">${bootText}</span>
-                </div>
-                <div
-                  class="detail-item"
-                  role="${alertsState ? "button" : "none"}"
-                  tabindex="${alertsState ? "0" : "-1"}"
-                  style="${alertsState ? "cursor: pointer;" : ""}"
+                </button>
+                <button
+                  type="button"
+                  ?disabled=${!(alertsState)}
+                  class="interactive detail-item"
                   @click=${() => alertsState && this.openMoreInfo(alertsState.entity_id)}
-                  @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && alertsState && (e.preventDefault(), this.openMoreInfo(alertsState.entity_id))}
                   title="Click to view Notifications"
                 >
                   <span class="detail-label">System Health</span>
                   <span class="detail-val" style="color: ${alertCount === 0 ? "var(--unraid-online)" : "var(--unraid-error)"}">
                     ${alertCount === 0 ? "Normal • Healthy" : `${alertCount} Active Alerts`}
                   </span>
-                </div>
+                </button>
               </div>
             `
           : nothing}

@@ -236,7 +236,7 @@ it("uses the Agent tag, server and selected-state semantics for every embedded t
     const child = dashboard.shadowRoot!.querySelector(`unraid-management-agent-${module}-card`) as any;
     expect(child, label).not.toBeNull();
     expect(child.config).toMatchObject({ type: `custom:unraid-management-agent-${module}-card`, server: "agent", embedded: true });
-    expect(tab.getAttribute("aria-pressed")).toBe("true");
-    expect(dashboard.shadowRoot!.querySelectorAll('.tab-btn[aria-pressed="true"]')).toHaveLength(1);
+    expect(tab.getAttribute("aria-selected")).toBe("true");
+    expect(dashboard.shadowRoot!.querySelectorAll('.tab-btn[aria-selected="true"]')).toHaveLength(1);
   }
 });

@@ -1829,7 +1829,7 @@ describe("Unraid Management Agent isolation", () => {
     for (const card of window.customCards ?? []) {
       expect(card.type).toMatch(/^unraid-management-agent-/);
       expect(card.name).toMatch(/^Unraid Management Agent /);
-      expect(card.preview).toBe(false);
+      expect(card.preview).toBe(true);
       expect(customElements.get(`${card.type}-editor`)).toBeDefined();
       expect(customElements.get(card.type.replace("unraid-management-agent-", "unraid-"))).toBeUndefined();
     }

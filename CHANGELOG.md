@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Align dashboard cards with Home Assistant 2026.10+ UI patterns (#253): design tokens, theme colour fallbacks for light and dark, container queries and RTL fit at 300px, native keyboard-operable controls, accessible dashboard tabs and card picker previews. Card types, config and service calls are unchanged.
+
 ## [2026.10.1] — 2026-10-25
 
 ### Fixed
