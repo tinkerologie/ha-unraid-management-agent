@@ -128,7 +128,6 @@ export abstract class BaseUnraidCard extends LitElement {
     entities: HomeAssistant["entities"];
     devices: HomeAssistant["devices"];
     callWS: HomeAssistant["callWS"];
-    config: CardConfig;
     entries?: FullEntityRegistryEntry[];
   };
   private _registryRequest = 0;
@@ -277,14 +276,15 @@ export abstract class BaseUnraidCard extends LitElement {
     if (!hass || !this.isConnected) return undefined;
     let cache = this._registryCache;
     if (
-      !cache || cache.entities !== hass.entities || cache.devices !== hass.devices ||
-      cache.callWS !== hass.callWS || cache.config !== this.config
+      !cache ||
+      cache.entities !== hass.entities ||
+      cache.devices !== hass.devices ||
+      cache.callWS !== hass.callWS
     ) {
       cache = {
         entities: hass.entities,
         devices: hass.devices,
         callWS: hass.callWS,
-        config: this.config,
       };
       this._registryCache = cache;
       const request = ++this._registryRequest;
@@ -313,10 +313,13 @@ export abstract class BaseUnraidCard extends LitElement {
       // Permissions or connection failures leave registry status unknown.
     }
     if (
-      !this.isConnected || request !== this._registryRequest ||
-      cache.config !== this.config || cache.entities !== this.hass?.entities ||
-      cache.devices !== this.hass?.devices || cache.callWS !== this.hass?.callWS
-    ) return;
+      !this.isConnected ||
+      request !== this._registryRequest ||
+      cache.entities !== this.hass?.entities ||
+      cache.devices !== this.hass?.devices ||
+      cache.callWS !== this.hass?.callWS
+    )
+      return;
     cache.entries = entries;
     this.requestUpdate();
   }
