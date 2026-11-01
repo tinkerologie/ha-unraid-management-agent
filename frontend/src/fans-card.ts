@@ -1,4 +1,4 @@
-import { html, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import {
   FANS_CARD_TAG,
   FANS_EDITOR_TAG,
@@ -16,6 +16,7 @@ interface FanItem {
   id: string;
   name: string;
   rpm: number;
+  noReading?: boolean;
   rpmText: string;
   isFailed: boolean;
   fanId?: number | string;
@@ -95,7 +96,8 @@ export class UnraidFansCard extends BaseUnraidCard {
         id: entityId,
         name: cleanName,
         rpm: !isNaN(rpmNum) ? rpmNum : 0,
-        rpmText: !isNaN(rpmNum) ? `${rpmNum} RPM` : stateObj.state,
+        rpmText: !isNaN(rpmNum) ? `${rpmNum} RPM` : "--",
+        noReading: isNaN(rpmNum),
         isFailed,
         fanId,
         controlEntityId: fanId !== undefined ? controlMap.get(String(fanId)) : undefined,
@@ -223,7 +225,7 @@ export class UnraidFansCard extends BaseUnraidCard {
                         <span data-block class="disk-info">
                           <span class="disk-name">${f.name}</span>
                           <span class="disk-subtext">
-                            ${f.isFailed ? "Fan Fault Detected" : f.rpm > 0 ? "Operating Normally" : "Stopped / Idle"}
+                            ${f.isFailed ? "Fan Fault Detected" : f.noReading ? "No reading" : f.rpm > 0 ? "Operating Normally" : "Stopped / Idle"}
                           </span>
                         </span>
                       </span>
@@ -233,6 +235,8 @@ export class UnraidFansCard extends BaseUnraidCard {
                         </span>
                         ${f.isFailed
                           ? html`<span class="badge badge-error">FAULT</span>`
+                          : f.noReading
+                          ? nothing
                           : f.rpm > 0
                           ? html`<span class="badge badge-online">ACTIVE</span>`
                           : html`<span class="badge">OFF</span>`}

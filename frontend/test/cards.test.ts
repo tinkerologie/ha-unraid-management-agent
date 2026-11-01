@@ -2362,3 +2362,25 @@ describe("Live entity formatting", () => {
     card.remove();
   });
 });
+
+describe("Fans card readings", () => {
+  it("shows no reading instead of stopped when a fan has no value", async () => {
+    const card = new UnraidFansCard();
+    card.setConfig({ type: "custom:unraid-management-agent-fans-card" });
+    const hass = createMockHass();
+    hass.states["sensor.cube_fan_nct6793_fan5"] = {
+      entity_id: "sensor.cube_fan_nct6793_fan5",
+      state: "unknown",
+      attributes: { unit_of_measurement: "RPM", friendly_name: "Cube Fan nct6793_fan5" },
+      last_changed: "",
+      last_updated: "",
+    };
+    card.hass = withMockRegistry(hass);
+    document.body.appendChild(card);
+    await card.updateComplete;
+    const row = card.shadowRoot?.textContent?.replace(/\s+/g, " ") ?? "";
+    expect(row).toContain("No reading");
+    expect(row).not.toContain("unknown");
+    card.remove();
+  });
+});
