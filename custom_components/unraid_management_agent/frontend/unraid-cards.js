@@ -126,7 +126,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
     }
 
     .gpu-name { flex: 1; }
-    .gpu-driver { white-space: normal; overflow-wrap: anywhere; }
+    .badge.gpu-driver { white-space: normal; overflow-wrap: anywhere; }
 
     :host([embedded]) ha-card {
       border: none;
