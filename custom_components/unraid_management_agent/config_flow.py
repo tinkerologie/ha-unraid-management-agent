@@ -390,11 +390,10 @@ def _has_controllable_fans(data: UnraidData) -> bool:
 
 def _has_fans(data: UnraidData) -> bool:
     """
-    Return True when the fan control option has anything to act on.
+    Return True when fan telemetry or controllable fans are reported.
 
-    The option gates the fan RPM sensors (one per reported fan) as well as the
-    fan control entities, so any reported fan counts, not only controllable
-    ones.
+    Keep the control option visible for any reported fan. The option gates
+    PWM control entities only; RPM sensors are always created for reported fans.
     """
     system = data.system
     return bool(system is not None and system.fans) or _has_controllable_fans(data)
