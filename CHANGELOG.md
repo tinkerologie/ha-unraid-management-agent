@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Complete dashboard card UX safeguards (#253): guarded Home Assistant entity labels, content-level named container queries, narrow UPS/GPU/VM and row layouts, and isolated technical values in RTL.
+- Distinguish measured share content from backing pool or array usage (#255). Share storage usage sensors keep their unique IDs, accept both old and new agent counters, and expose `storage_used`, `storage_free` and `storage_total`; `used_size` is present only for measured share data. The Shares card labels storage figures separately from share data.
+
 - Dashboard cards now show live data correctly: network rates use the sensor's unit (kbit/s was labelled MB/s), interface IP and speed come from the rate sensor's attributes, disks read `spin_state`, a failed SMART status shows Error and an unknown one shows Unknown rather than Healthy, flash free space is scaled with its unit, and empty disk slots are no longer listed.
 
 ## [2026.10.1] — 2026-10-25

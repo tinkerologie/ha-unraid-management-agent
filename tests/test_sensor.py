@@ -1986,6 +1986,9 @@ def test_share_usage_sensor_with_data() -> None:
     mock_share.total_bytes = 10000000000000
     mock_share.used_bytes = 7500000000000
     mock_share.free_bytes = 2500000000000
+    mock_share.storage_used_bytes = mock_share.used_bytes
+    mock_share.storage_free_bytes = mock_share.free_bytes
+    mock_share.storage_total_bytes = mock_share.total_bytes
     mock_coordinator.data.shares = [mock_share]
     mock_entry = MagicMock()
     mock_entry.entry_id = "test_entry"
@@ -2020,6 +2023,9 @@ def test_share_usage_sensor_extra_attrs_with_cache() -> None:
     mock_share.total_bytes = 500000000000
     mock_share.used_bytes = 150000000000
     mock_share.free_bytes = 350000000000
+    mock_share.storage_used_bytes = mock_share.used_bytes
+    mock_share.storage_free_bytes = mock_share.free_bytes
+    mock_share.storage_total_bytes = mock_share.total_bytes
     mock_share.use_cache = "prefer"
     mock_share.cache_pool = "cache"
     mock_share.mover_action = "cache_to_array"
@@ -2046,6 +2052,9 @@ def test_share_usage_sensor_extra_attrs_no_cache() -> None:
     mock_share.total_bytes = 1000000000000
     mock_share.used_bytes = 500000000000
     mock_share.free_bytes = 500000000000
+    mock_share.storage_used_bytes = mock_share.used_bytes
+    mock_share.storage_free_bytes = mock_share.free_bytes
+    mock_share.storage_total_bytes = mock_share.total_bytes
     mock_share.use_cache = None
     mock_share.cache_pool = None
     mock_share.mover_action = None
@@ -2072,6 +2081,9 @@ def test_share_usage_sensor_extra_attrs_partial_cache() -> None:
     mock_share.total_bytes = 2000000000000
     mock_share.used_bytes = 500000000000
     mock_share.free_bytes = 1500000000000
+    mock_share.storage_used_bytes = mock_share.used_bytes
+    mock_share.storage_free_bytes = mock_share.free_bytes
+    mock_share.storage_total_bytes = mock_share.total_bytes
     mock_share.use_cache = "yes"
     mock_share.cache_pool = "cache"
     mock_share.mover_action = None  # No mover action
@@ -2504,6 +2516,9 @@ def test_share_usage_sensor_extra_attributes() -> None:
     mock_share.total_bytes = 10000000000000
     mock_share.used_bytes = 5000000000000
     mock_share.free_bytes = 5000000000000
+    mock_share.storage_used_bytes = mock_share.used_bytes
+    mock_share.storage_free_bytes = mock_share.free_bytes
+    mock_share.storage_total_bytes = mock_share.total_bytes
     mock_coordinator.data.shares = [mock_share]
     mock_entry = MagicMock()
     mock_entry.entry_id = "test_entry"
@@ -2543,6 +2558,9 @@ def test_share_usage_sensor_with_zero_values() -> None:
     mock_share.total_bytes = 0
     mock_share.used_bytes = 0
     mock_share.free_bytes = 0
+    mock_share.storage_used_bytes = mock_share.used_bytes
+    mock_share.storage_free_bytes = mock_share.free_bytes
+    mock_share.storage_total_bytes = mock_share.total_bytes
     mock_coordinator.data.shares = [mock_share]
     mock_entry = MagicMock()
     mock_entry.entry_id = "test_entry"

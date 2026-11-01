@@ -296,7 +296,7 @@
         "name": "Disk {disk_name} Write"
       },
       "share_usage": {
-        "name": "Share {share_name} Usage"
+        "name": "Share {share_name} Storage Usage"
       },
       "zfs_pool_usage": {
         "name": "ZFS Pool {pool_name} Usage"

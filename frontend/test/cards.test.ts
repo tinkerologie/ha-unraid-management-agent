@@ -427,6 +427,8 @@ describe("Unraid Custom Cards", () => {
     expect(formatDiskName("disk_2", "disk_2")).toBe("Disk 2");
 
     expect(formatShareName("Cube Share appdata usage", "appdata")).toBe("appdata");
+    expect(formatShareName("Cube Share appdata Storage Usage", "appdata")).toBe("appdata");
+    expect(formatShareName("appdata Storage Usage", "appdata")).toBe("appdata");
     expect(formatShareName("Media Share", "media")).toBe("Media");
   });
 
@@ -724,6 +726,72 @@ describe("Unraid Custom Cards", () => {
     expect(card.shadowRoot?.innerHTML).toContain("Protected");
     expect(card.shadowRoot?.innerHTML).toContain("46.6 GB");
     expect(card.shadowRoot?.innerHTML).toContain("480.6 GB");
+    const storageLines = Array.from(card.shadowRoot!.querySelectorAll(".storage-usage"));
+    expect(storageLines.map((line) => line.textContent?.trim())).toEqual([
+      "Storage: 46.6 GB / 480.6 GB • 434.0 GB free",
+      "Storage: 350 GB / 1 TB",
+      "Storage: 18.0 TB / 40.0 TB • 22.0 TB free",
+    ]);
+    expect(card.shadowRoot?.querySelector(".share-data")).toBeNull();
+    document.body.removeChild(card);
+  });
+
+  it.each([undefined, "0.0 B", "2.0 GB"])(
+    "separates measured share data (%s) from storage usage",
+    async (usedSize) => {
+      const card = new UnraidSharesCard();
+      card.setConfig({ type: "custom:unraid-management-agent-shares-card" });
+      const hass = createMockHass();
+      const share = hass.states["sensor.cube_share_appdata_usage"]!;
+      share.attributes = {
+        friendly_name: "Cube Share appdata Storage Usage",
+        storage_used: "100.0 GB",
+        storage_total: "500.0 GB",
+        storage_free: "400.0 GB",
+        // Conflicting legacy aliases must never override canonical counters.
+        total_size: "999.0 GB",
+        free_size: "888.0 GB",
+        ...(usedSize === undefined ? {} : { used_size: usedSize }),
+      };
+      card.hass = hass;
+      document.body.appendChild(card);
+      await card.updateComplete;
+      const row = card.shadowRoot!.querySelector(".list-row")!;
+      expect(row.querySelector(".storage-usage")?.textContent?.trim()).toBe(
+        "Storage: 100.0 GB / 500.0 GB • 400.0 GB free"
+      );
+      expect(row.querySelector("[title='Storage usage']")).not.toBeNull();
+      if (usedSize === undefined) {
+        expect(row.querySelector(".share-data")).toBeNull();
+      } else {
+        expect(row.querySelector(".share-data")?.textContent?.trim()).toBe(
+          `Share data: ${usedSize}`
+        );
+      }
+      expect(row.textContent).not.toContain("999.0 GB");
+      expect(row.textContent).not.toContain("Storage Usage");
+      document.body.removeChild(card);
+    }
+  );
+
+  it("shows measured share data when storage capacity is unknown", async () => {
+    const card = new UnraidSharesCard();
+    card.setConfig({ type: "custom:unraid-management-agent-shares-card" });
+    const hass = createMockHass();
+    hass.states["sensor.cube_share_appdata_usage"]!.attributes = {
+      storage_used: null,
+      storage_total: null,
+      storage_free: null,
+      used_size: "2.0 GB",
+      // Do not fall back to stale legacy storage attributes.
+      total_size: "999.0 GB",
+    };
+    card.hass = hass;
+    document.body.appendChild(card);
+    await card.updateComplete;
+    const row = card.shadowRoot!.querySelector(".list-row")!;
+    expect(row.querySelector(".share-data")?.textContent?.trim()).toBe("Share data: 2.0 GB");
+    expect(row.querySelector(".storage-usage")).toBeNull();
     document.body.removeChild(card);
   });
 

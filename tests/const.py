@@ -416,6 +416,10 @@ def mock_shares() -> list[MagicMock]:
     share.total_bytes = 1000000000000
     share.used_bytes = 500000000000
     share.free_bytes = 500000000000
+    share.storage_used_bytes = 500000000000
+    share.storage_free_bytes = 500000000000
+    share.storage_total_bytes = 1000000000000
+    share.storage_usage_percent = 50.0
     share.computed_used_percent = 50.0
     share.include_disks = "disk1,disk2"
     share.exclude_disks = ""

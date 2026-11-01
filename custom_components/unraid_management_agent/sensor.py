@@ -2831,7 +2831,7 @@ class UnraidDiskWriteBytesSensor(UnraidDiskSensorBase):
 
 
 class UnraidShareUsageSensor(UnraidBaseEntity, SensorEntity):
-    """Share usage sensor."""
+    """Share backing storage usage sensor."""
 
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -2879,20 +2879,33 @@ class UnraidShareUsageSensor(UnraidBaseEntity, SensorEntity):
         if not share:
             return {}
 
-        total = share.total_bytes or 0
-        used = share.used_bytes or 0
-        free = share.free_bytes or 0
+        total = share.storage_total_bytes
+        used = share.storage_used_bytes
+        free = share.storage_free_bytes
 
-        attrs = {
+        attrs: dict[str, Any] = {
             "share_name": self._share_name,
+            # Keep the schema distinguishable from legacy attributes even when
+            # storage capacity is unknown, so cards cannot mislabel share data.
+            "storage_used": None,
+            "storage_free": None,
+            "storage_total": None,
         }
 
         if total:
             attrs["total_size"] = format_bytes(total)
-        if used:
-            attrs["used_size"] = format_bytes(used)
         if free:
             attrs["free_size"] = format_bytes(free)
+        if share.used_bytes is not None:
+            attrs["used_size"] = format_bytes(share.used_bytes)
+        if total is not None and total > 0:
+            for key, value in (
+                ("storage_used", used),
+                ("storage_free", free),
+                ("storage_total", total),
+            ):
+                if value is not None:
+                    attrs[key] = format_bytes(value)
 
         # Cache configuration attributes from the vendored API models
         use_cache = share.use_cache
