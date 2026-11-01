@@ -72,7 +72,7 @@
         },
         "data_description": {
           "enable_container_updates": "Periodically check Docker containers for available image updates. This may slow down polling and use additional network requests. Also creates an update entity for each container, from which its image update can be installed.",
-          "enable_fan_control": "Create fan speed sensor and control entities. Disable if your system does not have controllable fans.",
+          "enable_fan_control": "Create PWM fan speed control entities. Fan speed sensors are always created for reported fans.",
           "read_only": "Only create sensors. Switches, buttons, and number controls are not created (existing ones are removed), and the integration's actions refuse to run, so Home Assistant cannot start, stop, or reboot anything on the server. Update entities still show available updates but do not offer to install them.",
           "enable_websocket": "WebSocket provides instant updates instead of polling. When disabled, data is polled every 30 seconds.",
           "enable_container_devices": "Give each container its own device under the server's Docker device, holding its switches, restart button, and metric sensors with short names (Running, CPU, Memory). When off, container entities stay on the server device, named after the container.",

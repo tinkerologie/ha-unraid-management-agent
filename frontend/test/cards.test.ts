@@ -22,7 +22,7 @@ import {
   UnraidServerCardEditor,
   UnraidSharesCardEditor,
 } from "../src/dashboard-cards-editor";
-import type { HomeAssistant } from "../src/ha-types";
+import type { FullEntityRegistryEntry, HomeAssistant } from "../src/ha-types";
 
 function createMockHass(): HomeAssistant {
   const hass: HomeAssistant = {
@@ -396,6 +396,40 @@ function withMockRegistry(hass: HomeAssistant): HomeAssistant {
     hass.entities[entity_id] ??= { entity_id, device_id: "dev_1", platform: "unraid_management_agent" };
   }
   return hass;
+}
+
+function emptyFansHass(): HomeAssistant {
+  const hass = createMockHass();
+  for (const id of Object.keys(hass.states)) {
+    if (id.includes("fan")) delete hass.states[id];
+  }
+  return hass;
+}
+
+// Full registry fixtures are independent of states and hass.entities.
+function registeredFan(
+  overrides: Partial<FullEntityRegistryEntry> = {},
+): FullEntityRegistryEntry {
+  return {
+    entity_id: "sensor.renamed_cooling",
+    unique_id: "entry_fan_nct6793_fan1",
+    device_id: "dev_1",
+    platform: "unraid_management_agent",
+    config_entry_id: "entry",
+    translation_key: "fan",
+    disabled_by: "user",
+    ...overrides,
+  };
+}
+
+async function mountFansCard(hass: HomeAssistant): Promise<UnraidFansCard> {
+  const card = new UnraidFansCard();
+  card.setConfig({ type: "custom:unraid-management-agent-fans-card" });
+  card.hass = hass;
+  document.body.appendChild(card);
+  await card.updateComplete;
+  await card.updateComplete;
+  return card;
 }
 
 describe("Unraid Custom Cards", () => {
@@ -1383,6 +1417,136 @@ describe("Unraid Custom Cards", () => {
       card as unknown as { getActiveDevice(): { id: string } | undefined }
     ).getActiveDevice();
     expect(active?.id).toBe("dev_1");
+  });
+
+  it("renders ordinary fan1 and fan2 readings without a registry request", async () => {
+    const hass = emptyFansHass();
+    hass.callWS = vi.fn().mockResolvedValue([]);
+    for (const [index, rpm] of [[1, 800], [2, 850]]) {
+      const entity_id = `sensor.cube_nct6793_fan${index}`;
+      hass.states[entity_id] = {
+        entity_id, state: String(rpm), last_changed: "", last_updated: "",
+        attributes: { unit_of_measurement: "RPM", friendly_name: `Fan ${index}` },
+      };
+      hass.entities![entity_id] = {
+        entity_id, device_id: "dev_1", platform: "unraid_management_agent",
+        translation_key: "fan",
+      };
+    }
+    const card = await mountFansCard(hass);
+    expect(card.shadowRoot?.textContent).toContain("800 RPM");
+    expect(card.shadowRoot?.textContent).toContain("850 RPM");
+    expect(hass.callWS).not.toHaveBeenCalled();
+    card.remove();
+  });
+
+  it.each(["user", "integration"])("explains %s-disabled registry-only fan sensors", async (disabled_by) => {
+    const hass = emptyFansHass();
+    hass.callWS = vi.fn().mockResolvedValue([
+      registeredFan({ disabled_by }),
+      registeredFan({ entity_id: "sensor.cooling2", unique_id: "entry_fan_nct6793_fan2", disabled_by }),
+    ]);
+    const card = await mountFansCard(hass);
+    expect(card.shadowRoot?.textContent).toContain("Fan sensors are disabled");
+    expect(card.shadowRoot?.textContent).toContain("2 fan sensors are disabled");
+    expect(card.shadowRoot?.textContent).toContain("Settings → Entities");
+    expect(card.shadowRoot?.querySelector(".badge-online")).toBeNull();
+    expect(hass.callWS).toHaveBeenCalledExactlyOnceWith({ type: "config/entity_registry/list" });
+    card.remove();
+  });
+
+  it.each(["fan", "hwmon_device_fan", undefined])("recognizes stateless fans with translation key %s or legacy IDs", async (translation_key) => {
+    const hass = emptyFansHass();
+    hass.callWS = vi.fn().mockResolvedValue([registeredFan({
+      disabled_by: null,
+      translation_key,
+      unique_id: translation_key ? "legacy_hardware_id" : "entry_fan_nct6793_fan1",
+    })]);
+    const card = await mountFansCard(hass);
+    expect(card.shadowRoot?.textContent).toContain("Fan sensors are registered but have no state");
+    expect(card.shadowRoot?.textContent).toContain("integration options and diagnostics");
+    expect(card.shadowRoot?.textContent).not.toContain("Fan sensors are disabled");
+    card.remove();
+  });
+
+  it.each(["absent", "rejected", "empty"])("uses generic guidance when the registry is %s", async (status) => {
+    const hass = emptyFansHass();
+    if (status === "rejected") hass.callWS = vi.fn().mockRejectedValue(new Error("Forbidden"));
+    if (status === "empty") hass.callWS = vi.fn().mockResolvedValue([]);
+    const card = await mountFansCard(hass);
+    expect(card.shadowRoot?.textContent).toContain("No Fan Sensors Found");
+    expect(card.shadowRoot?.textContent).toContain("integration diagnostics");
+    expect(card.shadowRoot?.textContent).not.toContain("No cooling fans reported");
+    expect(card.shadowRoot?.querySelector(".badge-online")).toBeNull();
+    card.remove();
+  });
+
+  it("scopes registry evidence to Agent devices under the selected server", async () => {
+    const hass = emptyFansHass();
+    hass.devices!.other = { id: "other", name: "Other", identifiers: [["unraid_management_agent", "other"]] };
+    hass.devices!.octo = {
+      id: "octo", name: "Octo", identifiers: [["unraid_management_agent", "octo"]],
+      via_device_id: "dev_1",
+    };
+    hass.callWS = vi.fn().mockResolvedValue([
+      registeredFan({ device_id: "other" }),
+      registeredFan({ platform: "unraid" }),
+      registeredFan({ device_id: null }),
+      registeredFan({ entity_id: "number.cube_fan_control" }),
+      registeredFan({ entity_id: "sensor.cpu", translation_key: "cpu", unique_id: "entry_cpu" }),
+      registeredFan({ entity_id: "sensor.gpu_fan_speed", translation_key: "gpu_fan_speed", unique_id: "entry_gpu_card_fan_speed" }),
+      registeredFan({ device_id: "octo", disabled_by: null }),
+    ]);
+    const card = await mountFansCard(hass);
+    expect(card.shadowRoot?.textContent).toContain("Fan sensors are registered but have no state");
+    expect(card.shadowRoot?.textContent).not.toContain("Fan sensors are disabled");
+    card.setConfig({ type: "custom:unraid-management-agent-fans-card", server: "missing" });
+    await card.updateComplete;
+    await card.updateComplete;
+    expect(card.shadowRoot?.textContent).toContain("No Fan Sensors Found");
+    card.remove();
+  });
+
+  it("caches registry results across state updates and refreshes on registry changes", async () => {
+    const hass = emptyFansHass();
+    const callWS = vi.fn().mockResolvedValue([registeredFan()]);
+    hass.callWS = callWS;
+    const card = await mountFansCard(hass);
+    card.hass = { ...hass, states: { ...hass.states } };
+    await card.updateComplete;
+    expect(callWS).toHaveBeenCalledTimes(1);
+    callWS.mockResolvedValue([registeredFan({ disabled_by: null })]);
+    card.hass = { ...hass, entities: { ...hass.entities } };
+    await card.updateComplete;
+    await card.updateComplete;
+    expect(callWS).toHaveBeenCalledTimes(2);
+    expect(card.shadowRoot?.textContent).toContain("Fan sensors are registered but have no state");
+    card.remove();
+  });
+
+  it.each(["config", "entities", "devices", "disconnect"])("ignores registry responses after %s changes", async (change) => {
+    const hass = emptyFansHass();
+    let resolveOld!: (entries: FullEntityRegistryEntry[]) => void;
+    const oldResult = new Promise<FullEntityRegistryEntry[]>((resolve) => { resolveOld = resolve; });
+    const callWS = vi.fn().mockReturnValueOnce(oldResult).mockResolvedValue([]);
+    hass.callWS = callWS;
+    const card = await mountFansCard(hass);
+    if (change === "config") card.setConfig({ type: "custom:unraid-management-agent-fans-card", title: "Changed" });
+    if (change === "entities") card.hass = { ...hass, entities: { ...hass.entities } };
+    if (change === "devices") card.hass = { ...hass, devices: { ...hass.devices } };
+    if (change === "disconnect") card.remove();
+    resolveOld([registeredFan()]);
+    await oldResult;
+    await card.updateComplete;
+    await card.updateComplete;
+    expect(card.shadowRoot?.textContent).not.toContain("Fan sensors are disabled");
+    if (change === "disconnect") {
+      document.body.appendChild(card);
+      await card.updateComplete;
+      await card.updateComplete;
+    }
+    expect(callWS).toHaveBeenCalledTimes(2);
+    card.remove();
   });
 
   it("renders UnraidFansCard with cooling fan telemetry", async () => {
