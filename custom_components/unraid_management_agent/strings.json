@@ -101,10 +101,10 @@
       "name": "{hostname} VMs"
     },
     "gpu": {
-      "name": "GPU \u00b7 {name}"
+      "name": "GPU · {name}"
     },
     "zfs_pool": {
-      "name": "ZFS pool \u00b7 {name}"
+      "name": "ZFS pool · {name}"
     }
   },
   "entity": {
@@ -287,7 +287,7 @@
         "name": "Disk {disk_name} Temperature"
       },
       "disk_smart_errors": {
-        "name": "Disk {disk_name} SMART Errors"
+        "name": "Disk {disk_name} I/O Errors"
       },
       "disk_read_bytes": {
         "name": "Disk {disk_name} Read"
@@ -1186,17 +1186,28 @@
       "title": "Connection to Unraid Server Failed",
       "description": "Failed to connect to Unraid server at {host}:{port}.\n\nError: {error}\n\n**Troubleshooting Steps:**\n1. Verify the Unraid server is running\n2. Check the host and port are correct\n3. Ensure the Unraid Management Agent daemon is running\n4. Check firewall settings\n5. Verify network connectivity\n\nClick Submit to acknowledge this issue."
     },
-    "disk_smart_errors": {
-      "title": "Disk SMART Errors Detected",
-      "description": "Disk **{disk_name}** has {smart_errors} SMART errors.\n\nSMART Status: {smart_status}\n\n**Recommended Actions:**\n1. Back up important data immediately\n2. Run a full SMART test\n3. Consider replacing the disk\n4. Monitor disk health closely\n\nClick Submit to acknowledge this issue."
+    "disk_smart_failure": {
+      "title": "Disk SMART Failure",
+      "description": "Disk **{disk_name}** reports SMART health status {smart_status}.\n\n**Recommended Actions:**\n1. Back up important data immediately\n2. Review the disk's SMART attributes\n3. Plan to replace the disk\n\nThis issue clears when the disk reports a healthy SMART status."
+    },
+    "disk_io_errors": {
+      "title": "Disk I/O Errors Detected",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Acknowledge Disk I/O Errors",
+            "description": "Unraid has counted {io_errors} read/write errors on disk **{disk_name}** ({acknowledged} acknowledged). This count accumulates until Unraid's statistics are cleared and is separate from the disk's SMART health.\n\n**Recommended Actions:**\n1. Check the disk's cables and connections\n2. Run a SMART extended self-test\n3. Review the system log for disk errors\n\nAcknowledge {io_errors} I/O errors on disk **{disk_name}**? Unraid's statistics are not changed. You will be warned again if the count increases or the disk's SMART status fails."
+          }
+        }
+      }
     },
     "disk_high_temperature": {
       "title": "Disk High Temperature Warning",
-      "description": "Disk **{disk_name}** temperature is {temperature}\u00b0C (warning threshold: {threshold}\u00b0C).\n\n**Recommended Actions:**\n1. Check cooling/airflow in the system\n2. Verify fan operation\n3. Consider adding additional cooling\n4. Monitor temperature trends\n\nClick Submit to acknowledge this issue."
+      "description": "Disk **{disk_name}** temperature is {temperature}°C (warning threshold: {threshold}°C).\n\n**Recommended Actions:**\n1. Check cooling/airflow in the system\n2. Verify fan operation\n3. Consider adding additional cooling\n4. Monitor temperature trends\n\nClick Submit to acknowledge this issue."
     },
     "disk_critical_temperature": {
       "title": "Disk Critical Temperature",
-      "description": "Disk **{disk_name}** temperature is {temperature}\u00b0C (critical threshold: {threshold}\u00b0C).\n\n\u26a0\ufe0f **URGENT - Immediate action required!**\n\n**Recommended Actions:**\n1. Consider spinning down the disk immediately\n2. Check cooling/airflow in the system urgently\n3. Verify all fans are operational\n4. Improve ventilation or add cooling\n5. Back up important data as a precaution\n\nClick Submit to acknowledge this issue."
+      "description": "Disk **{disk_name}** temperature is {temperature}°C (critical threshold: {threshold}°C).\n\n⚠️ **URGENT - Immediate action required!**\n\n**Recommended Actions:**\n1. Consider spinning down the disk immediately\n2. Check cooling/airflow in the system urgently\n3. Verify all fans are operational\n4. Improve ventilation or add cooling\n5. Back up important data as a precaution\n\nClick Submit to acknowledge this issue."
     },
     "array_parity_invalid": {
       "title": "Array Parity Invalid",

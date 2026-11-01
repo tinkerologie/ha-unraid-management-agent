@@ -2698,7 +2698,7 @@ class UnraidDiskSmartErrorsSensor(UnraidDiskSensorBase):
 
     @property
     def native_value(self) -> int | None:
-        """Return the number of SMART errors."""
+        """Return the accumulated Unraid I/O error count."""
         disk = self._get_disk()
         if not disk:
             return None

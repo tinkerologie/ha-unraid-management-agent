@@ -101,6 +101,7 @@ def mock_disks() -> list[MagicMock]:
     disk1.is_ssd = False
     disk1.is_standby = False
     disk1.has_smart_errors = False
+    disk1.has_smart_failure = False
     disk1.smart_errors = 0
     disk1.read_bytes = 1024000000
     disk1.write_bytes = 512000000
@@ -132,6 +133,7 @@ def mock_disks() -> list[MagicMock]:
     disk2.is_ssd = True
     disk2.is_standby = False
     disk2.has_smart_errors = False
+    disk2.has_smart_failure = False
     disk2.smart_errors = 0
     disk2.read_bytes = 2048000000
     disk2.write_bytes = 1024000000
