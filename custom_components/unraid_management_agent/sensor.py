@@ -315,7 +315,8 @@ class UnraidGPUEnergySensorExtraStoredData(UnraidEnergySensorExtraStoredData):
         )
 
 
-# Uptime drops smaller than this are stale samples, not host reboots
+# Uptime drops smaller than this, without a gap this long in the samples, are
+# stale samples, not host reboots
 _ENERGY_REBOOT_TOLERANCE_SECONDS = 300
 
 
@@ -349,6 +350,7 @@ def _did_system_reboot(
 def _track_energy_uptime(
     current_uptime_seconds: int | None,
     remembered_uptime_seconds: int | None,
+    seconds_since_last_sample: float,
 ) -> tuple[bool, int | None]:
     """
     Return whether the host rebooted and the uptime to remember for energy.
@@ -356,14 +358,16 @@ def _track_energy_uptime(
     A coordinator poll can publish a system snapshot older than a WebSocket
     event that arrived during the poll, so a small decrease is not a reboot.
     The remembered uptime is a high-water mark, so a stale sample can't lower it.
+    Stale samples arrive between regular updates, so any decrease after a long
+    silence is a reboot, even one soon after the previous boot.
     """
     if current_uptime_seconds is None:
         return False, remembered_uptime_seconds
     if remembered_uptime_seconds is None:
         return False, current_uptime_seconds
-    if (
-        current_uptime_seconds
-        < remembered_uptime_seconds - _ENERGY_REBOOT_TOLERANCE_SECONDS
+    drop = remembered_uptime_seconds - current_uptime_seconds
+    if drop > _ENERGY_REBOOT_TOLERANCE_SECONDS or (
+        drop > 0 and seconds_since_last_sample > _ENERGY_REBOOT_TOLERANCE_SECONDS
     ):
         return True, current_uptime_seconds
     return False, max(current_uptime_seconds, remembered_uptime_seconds)
@@ -3797,15 +3801,18 @@ class UnraidUPSEnergySensor(UnraidBaseEntity, RestoreEntity, SensorEntity):
             self._last_power = None
             return
 
+        now = dt_util.utcnow().timestamp()
+        last_sample = self._energy_integrator.last_timestamp
         rebooted, self._last_uptime_seconds = _track_energy_uptime(
             _get_system_uptime_seconds(self.coordinator.data),
             self._last_uptime_seconds,
+            now - last_sample if last_sample is not None else 0.0,
         )
         if rebooted:
             # The gap isn't interpolated, and the accumulated total is kept
             self._energy_integrator.break_series()
 
-        self._energy_integrator.add_sample(current_power, dt_util.utcnow().timestamp())
+        self._energy_integrator.add_sample(current_power, now)
         self._last_power = current_power
 
     def _total_kwh(self) -> float:
@@ -4132,15 +4139,18 @@ class UnraidGPUEnergySensor(UnraidGPUEntity, RestoreEntity, SensorEntity):
         if current_power is None or current_power < 0:
             return
 
+        now = dt_util.utcnow().timestamp()
+        last_sample = self._energy_integrator.last_timestamp
         rebooted, self._last_uptime_seconds = _track_energy_uptime(
             _get_system_uptime_seconds(self.coordinator.data),
             self._last_uptime_seconds,
+            now - last_sample if last_sample is not None else 0.0,
         )
         if rebooted:
             # The gap isn't interpolated, and the accumulated total is kept
             self._energy_integrator.break_series()
 
-        self._energy_integrator.add_sample(current_power, dt_util.utcnow().timestamp())
+        self._energy_integrator.add_sample(current_power, now)
         self._last_power = current_power
 
     @property

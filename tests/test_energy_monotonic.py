@@ -77,6 +77,18 @@ def test_reboot_keeps_total_and_skips_the_gap(make_sensor: Any) -> None:
     assert sensor.native_value == pytest.approx(427.2)
 
 
+@pytest.mark.parametrize("make_sensor", [_ups, _gpu])
+def test_outage_soon_after_boot_adds_no_energy(make_sensor: Any) -> None:
+    """A small uptime drop after a long silence is a reboot, not a stale sample."""
+    sensor = make_sensor()
+    sensor._total_energy = 427.0
+    _sample(sensor, 0.0, 180)
+    _sample(sensor, 3000.0, 10)
+
+    assert sensor.native_value == pytest.approx(427.0)
+    assert sensor._last_uptime_seconds == 10
+
+
 @pytest.mark.parametrize(
     ("state", "extra", "expected"),
     [
