@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Align dashboard cards with Home Assistant 2026.10+ UI patterns (#253): design tokens, theme colour fallbacks for light and dark, container queries and RTL fit at 300px, native keyboard-operable controls, accessible dashboard tabs and card picker previews. Card types, config and service calls are unchanged.
+
+### Fixed
+
+- Complete dashboard card UX safeguards (#253): guarded Home Assistant entity labels, content-level named container queries, narrow UPS/GPU/VM and row layouts, and isolated technical values in RTL.
+- Dashboard cards now show live data correctly: network rates use the sensor's unit (kbit/s was labelled MB/s), interface IP and speed come from the rate sensor's attributes, disks read `spin_state`, a failed SMART status shows Error and an unknown one shows Unknown rather than Healthy, flash free space is scaled with its unit, and empty disk slots are no longer listed.
+
 ### Fixed
 
 - Separate SMART failures from Unraid's accumulated I/O error count (#251). A disk with SMART PASSED and a positive `smart_errors` count no longer gets a recurring "SMART errors" repair. It gets a "Disk I/O Errors Detected" repair, which you can acknowledge per physical disk without changing Unraid's statistics; a later increase or a counter reset warns again. A SMART FAILED status raises its own repair, independent of any acknowledgement, and the sensor is renamed "I/O Errors" with its entity ID and history unchanged.

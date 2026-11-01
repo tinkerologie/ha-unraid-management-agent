@@ -199,6 +199,7 @@ export class UnraidZfsCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           serverName,
           "ZFS Storage & Cache",
@@ -223,26 +224,24 @@ export class UnraidZfsCard extends BaseUnraidCard {
               ${arc.hitRatio !== undefined
                 ? html`
                     <div class="rings-grid">
-                      <div
-                        class="ring-card"
-                        role="${arc.hitRatioEntityId ? "button" : "none"}"
-                        tabindex="${arc.hitRatioEntityId ? "0" : "-1"}"
-                        style="${arc.hitRatioEntityId ? "cursor: pointer;" : ""}"
+                      <button
+                        type="button"
+                        ?disabled=${!(arc.hitRatioEntityId)}
+                        class="interactive ring-card"
                         @click=${() => arc.hitRatioEntityId && this.openMoreInfo(arc.hitRatioEntityId)}
-                        @keydown=${(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && arc.hitRatioEntityId && (e.preventDefault(), this.openMoreInfo(arc.hitRatioEntityId))}
                         title="Click to view ARC Cache details"
                       >
-                        <div
+                        <span data-block
                           class="ring-gauge"
                           style="--pct: ${arc.hitRatio}; --ring-color: ${arc.hitRatio > 90 ? "var(--unraid-online)" : arc.hitRatio > 70 ? "var(--unraid-warning)" : "var(--unraid-error)"}"
                         >
-                          <span class="ring-content">${arc.hitRatio}%</span>
-                        </div>
+                          <span class="ring-content ltr-value">${arc.hitRatio}%</span>
+                        </span>
                         <span class="ring-label">ARC Hit Ratio</span>
                         <span class="ring-subtext">
                           ${arc.configuredMax ? `Max: ${arc.configuredMax}` : "ZFS Adaptive Cache"}
                         </span>
-                      </div>
+                      </button>
                     </div>
                   `
                 : nothing}
@@ -255,36 +254,38 @@ export class UnraidZfsCard extends BaseUnraidCard {
                         const isDegraded = p.health.toUpperCase() !== "ONLINE";
                         const hasCorrupted = (p.corruptedFiles || 0) > 0;
                         return html`
-                          <div
-                            class="disk-row"
+                          <button
+                            type="button"
+                            ?disabled=${!(p.usageEntityId)}
+                            class="interactive disk-row"
                             @click=${() => p.usageEntityId && this.openMoreInfo(p.usageEntityId)}
-                            style="${p.usageEntityId ? "cursor: pointer;" : ""}"
                           >
-                            <div class="disk-main">
+                            <span data-block class="disk-main">
                               <span class="disk-icon ${isDegraded ? "disk-warning" : "disk-online"}">
                                 ${iconTemplate(isDegraded ? mdiAlertCircle : mdiDatabase, 18)}
                               </span>
-                              <div class="disk-info">
+                              <span data-block class="disk-info">
                                 <span class="disk-name">${p.name}</span>
                                 <span class="disk-subtext">
                                   ${p.usedSize && p.totalSize ? `${p.usedSize} / ${p.totalSize}` : `${p.usagePct}% used`}
                                   ${hasCorrupted ? ` • ${p.corruptedFiles} corrupted` : ""}
                                 </span>
-                              </div>
-                            </div>
-                            <div class="disk-meta">
+                              </span>
+                            </span>
+                            <span data-block class="disk-meta">
                               <span class="disk-temp">${p.usagePct}%</span>
                               <span class="badge ${isDegraded ? "badge-error" : "badge-online"}">
                                 ${p.health}
                               </span>
-                            </div>
-                          </div>
+                            </span>
+                          </button>
                         `;
                       })}
                     </div>
                   `
                 : nothing}
             `}
+      </div>
       </ha-card>
     `;
   }

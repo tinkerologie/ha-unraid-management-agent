@@ -58,7 +58,7 @@ export class UnraidVmCard extends BaseUnraidCard {
 
     for (const sw of switches) {
       const slug = extractEntityVmSlug(sw.entity_id);
-      const cleanName = (sw.attributes.friendly_name as string) || slug;
+      const cleanName = this.entityName(sw, (sw.attributes.friendly_name as string) || slug);
       const isRunning = sw.state === "on";
 
       const status =
@@ -97,6 +97,7 @@ export class UnraidVmCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || "Virtual Machines",
           `${runningCount} running of ${vms.length} VMs`,
@@ -111,9 +112,9 @@ export class UnraidVmCard extends BaseUnraidCard {
                   <div class="list-row">
                     <div class="row-left">
                       <span class="status-dot ${v.isRunning ? "online" : "offline"}"></span>
-                      <div style="display: flex; flex-direction: column;">
-                        <span style="font-weight: 600;">${v.name}</span>
-                        <span style="font-size: 0.7rem; color: var(--unraid-subtext); text-transform: capitalize;">
+                      <div class="vm-labels">
+                        <span class="entity-name" title=${v.name}>${v.name}</span>
+                        <span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext); text-transform: capitalize;">
                           ${v.status}
                         </span>
                       </div>
@@ -123,7 +124,7 @@ export class UnraidVmCard extends BaseUnraidCard {
                         ? html`
                             <button
                               class="btn"
-                              style="padding: 3px 8px;"
+                              style="padding: 3px var(--ha-space-2, 8px);"
                               title="Reboot VM"
                               @click=${() => this.pressButton(v.rebootEntityId!)}
                             >
@@ -134,7 +135,7 @@ export class UnraidVmCard extends BaseUnraidCard {
                         : nothing}
                       <button
                         class="btn ${v.isRunning ? "btn" : "btn-primary"}"
-                        style="padding: 3px 8px;"
+                        style="padding: 3px var(--ha-space-2, 8px);"
                         @click=${() => this.handleToggle(v.switchEntityId, v.isRunning, v.name)}
                       >
                         ${iconTemplate(mdiPower, 13)}
@@ -144,8 +145,9 @@ export class UnraidVmCard extends BaseUnraidCard {
                   </div>
                 `
               )
-            : html`<div style="text-align: center; color: var(--unraid-subtext); font-size: 0.8rem; padding: 12px;">No virtual machines configured</div>`}
+            : html`<div style="text-align: center; color: var(--unraid-subtext); font-size: var(--ha-font-size-s, 12px); padding: var(--ha-space-3, 12px);">No virtual machines configured</div>`}
         </div>
+      </div>
       </ha-card>
     `;
   }

@@ -44,7 +44,7 @@ export class UnraidUnassignedDevicesCard extends BaseUnraidCard {
       if (!match || !match[1] || !match[2]) continue;
 
       const devKey = match[1].toLowerCase();
-      const rawName = (stateObj.attributes?.friendly_name as string) || match[1] || "Unassigned Device";
+      const rawName = this.entityName(stateObj, (stateObj.attributes?.friendly_name as string) || match[1] || "Unassigned Device");
       const cleanName = rawName
         .replace(/^(?:.*?\s+)?Unassigned Device\s+/i, "")
         .replace(/\s+(?:size|usage|mounted|temperature|temp)$/i, "")
@@ -86,6 +86,7 @@ export class UnraidUnassignedDevicesCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           serverName,
           "Unassigned Storage Devices",
@@ -110,35 +111,36 @@ export class UnraidUnassignedDevicesCard extends BaseUnraidCard {
               <div class="disk-list">
                 ${devices.map((dev) => {
                   return html`
-                    <div
-                      class="disk-row"
+                    <button
+                      type="button"
+                      class="interactive disk-row"
                       @click=${() => (dev.sizeEntityId || dev.mountedEntityId) && this.openMoreInfo((dev.sizeEntityId || dev.mountedEntityId)!)}
-                      style="cursor: pointer;"
                     >
-                      <div class="disk-main">
+                      <span data-block class="disk-main">
                         <span class="disk-icon ${dev.isMounted ? "disk-online" : "disk-standby"}">
                           ${iconTemplate(mdiHarddisk, 18)}
                         </span>
-                        <div class="disk-info">
+                        <span data-block class="disk-info">
                           <span class="disk-name">${dev.name}</span>
                           <span class="disk-subtext">
                             ${dev.size ? dev.size : "Disk"}
                             ${dev.fsType ? ` • ${dev.fsType}` : ""}
                             ${dev.temp ? ` • ${dev.temp}` : ""}
                           </span>
-                        </div>
-                      </div>
-                      <div class="disk-meta">
+                        </span>
+                      </span>
+                      <span data-block class="disk-meta">
                         ${dev.usagePct !== undefined ? html`<span class="disk-temp">${dev.usagePct}%</span>` : nothing}
                         <span class="badge ${dev.isMounted ? "badge-online" : ""}">
                           ${dev.isMounted ? "MOUNTED" : "UNMOUNTED"}
                         </span>
-                      </div>
-                    </div>
+                      </span>
+                    </button>
                   `;
                 })}
               </div>
             `}
+      </div>
       </ha-card>
     `;
   }

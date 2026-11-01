@@ -9,6 +9,60 @@ import {
 } from "./ha-types";
 import { iconTemplate } from "./icons";
 
+const UNAVAILABLE_STATES = ["unavailable", "unknown", "none", "--", ""];
+
+const RATE_UNITS: Record<string, [number, readonly string[]]> = {
+  "bit/s": [1, ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"]],
+  "kbit/s": [1e3, ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"]],
+  "Mbit/s": [1e6, ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"]],
+  "Gbit/s": [1e9, ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"]],
+  "B/s": [1, ["B/s", "kB/s", "MB/s", "GB/s"]],
+  "kB/s": [1e3, ["B/s", "kB/s", "MB/s", "GB/s"]],
+  "MB/s": [1e6, ["B/s", "kB/s", "MB/s", "GB/s"]],
+  "GB/s": [1e9, ["B/s", "kB/s", "MB/s", "GB/s"]],
+};
+
+/**
+ * Format a data rate entity using the unit it reports, scaled to a readable
+ * size. Entities without a unit are treated as MB/s.
+ */
+export function formatDataRate(entity?: HassEntity): string {
+  const state = entity?.state?.toLowerCase().trim();
+  if (state === undefined || UNAVAILABLE_STATES.includes(state)) return "--";
+  const value = parseFloat(state);
+  if (isNaN(value)) return "--";
+  const unit = String(entity?.attributes?.unit_of_measurement ?? "MB/s");
+  const known = RATE_UNITS[unit];
+  if (!known) return `${value.toFixed(2)} ${unit}`;
+  const [factor, scale] = known;
+  if (value <= 0) return `0 ${scale[1]}`;
+  const base = value * factor;
+  const step = Math.max(1, Math.min(scale.length - 1, Math.floor(Math.log10(base) / 3)));
+  const scaled = base / 10 ** (step * 3);
+  return `${scaled.toFixed(step === 1 ? 1 : 2)} ${scale[step]}`;
+}
+
+/**
+ * Format a data size entity in its reported unit, moving up to GB or TB when
+ * the number would otherwise be hard to read.
+ */
+export function formatDataSize(entity?: HassEntity): string | undefined {
+  const state = entity?.state?.toLowerCase().trim();
+  if (state === undefined || UNAVAILABLE_STATES.includes(state)) return undefined;
+  const value = parseFloat(state);
+  if (isNaN(value)) return undefined;
+  const units = ["B", "kB", "MB", "GB", "TB", "PB"];
+  const unit = String(entity?.attributes?.unit_of_measurement ?? "");
+  let index = units.indexOf(unit);
+  if (index < 0) return unit ? `${value} ${unit}` : `${value}`;
+  let scaled = value;
+  while (scaled >= 1000 && index < units.length - 1) {
+    scaled /= 1000;
+    index += 1;
+  }
+  return `${scaled.toFixed(1)} ${units[index]}`;
+}
+
 /**
  * Format timestamp into human-friendly date string (e.g. "Jan 13, 2026, 15:16").
  */
@@ -84,6 +138,19 @@ export abstract class BaseUnraidCard extends LitElement {
       .replace(/^_+|_+$/g, "");
   }
 
+  /** Format a display label without changing discovery or legacy fallbacks. */
+  protected entityName(entity: HassEntity, fallback: string): string {
+    try {
+      if (typeof this.hass?.formatEntityName === "function") {
+        const name = this.hass.formatEntityName(entity);
+        if (typeof name === "string" && name.trim()) return name;
+      }
+    } catch {
+      // Older HA versions and preview contexts may not support the formatter.
+    }
+    return fallback;
+  }
+
   override willUpdate(changedProperties: PropertyValues<this>): void {
     super.willUpdate(changedProperties);
     this._agentStates = undefined;
@@ -96,11 +163,14 @@ export abstract class BaseUnraidCard extends LitElement {
     }
   }
 
-  setConfig(config: CardConfig): void {
-    if (!config || typeof config.type !== "string") {
+  setConfig(config: CardConfig | Omit<CardConfig, "type">): void {
+    if (
+      !config || typeof config !== "object" || Array.isArray(config) ||
+      (config.type !== undefined && typeof config.type !== "string")
+    ) {
       throw new Error("Invalid card configuration");
     }
-    this.config = { ...config };
+    this.config = { type: "", ...config };
     if (this.config.embedded) {
       this.setAttribute("embedded", "");
     } else {

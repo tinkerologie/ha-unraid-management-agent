@@ -33,7 +33,7 @@ export function registerDashboardCard(
       type: registration.tag,
       name: registration.name.replace(/^Unraid /, "Unraid Management Agent "),
       description: registration.description,
-      preview: false,
+      preview: true,
       documentationURL: "https://github.com/tinkerologie/ha-unraid-management-agent",
     });
   }

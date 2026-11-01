@@ -3,7 +3,7 @@ import {
   MAINTENANCE_CARD_TAG,
   MAINTENANCE_EDITOR_TAG,
 } from "./config";
-import { BaseUnraidCard, formatFriendlyDateTime } from "./dashboard-cards-base";
+import { BaseUnraidCard, formatDataSize, formatFriendlyDateTime } from "./dashboard-cards-base";
 import { UnraidMaintenanceCardEditor } from "./dashboard-cards-editor";
 import {
   iconTemplate,
@@ -33,6 +33,7 @@ export class UnraidMaintenanceCard extends BaseUnraidCard {
     const isCheckRunning = parityRunning?.state === "on";
     const isParityInvalid = parityValid?.state === "on"; // parity_valid is Problem sensor: on means problem/invalid
 
+    const flashFreeText = formatDataSize(flashFree);
     const flashPct = Math.round(Number(flashUsage?.state) || 0);
     const numPluginUpdates = Number(pluginUpdates?.state) || 0;
     const numContainerUpdates = Number(containerUpdates?.state) || 0;
@@ -44,6 +45,7 @@ export class UnraidMaintenanceCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           serverName,
           "Maintenance & Operations",
@@ -57,173 +59,144 @@ export class UnraidMaintenanceCard extends BaseUnraidCard {
         )}
 
         <div class="rings-grid">
-          <div
-            class="ring-card"
-            role="${flashUsage ? "button" : "none"}"
-            tabindex="${flashUsage ? "0" : "-1"}"
+          <button
+            type="button"
+            ?disabled=${!(flashUsage)}
+            class="interactive ring-card"
             @click=${() => flashUsage && this.openMoreInfo(flashUsage.entity_id)}
-            @keydown=${(e: KeyboardEvent) =>
-              (e.key === "Enter" || e.key === " ") &&
-              flashUsage &&
-              (e.preventDefault(), this.openMoreInfo(flashUsage.entity_id))}
-            style="${flashUsage ? "cursor: pointer;" : ""}"
             title="Click for Flash USB details"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${flashPct}; --ring-color: ${flashPct > 80 ? "var(--unraid-error)" : flashPct > 60 ? "var(--unraid-warning)" : "var(--unraid-online)"}"
             >
               <span class="ring-content">${flashPct}%</span>
-            </div>
+            </span>
             <span class="ring-label">Flash Boot Drive</span>
-            <span class="ring-subtext">${flashFree?.state ? `${flashFree.state} Free` : "USB Boot Drive"}</span>
-          </div>
+            <span class="ring-subtext">${flashFreeText ? `${flashFreeText} Free` : "USB Boot Drive"}</span>
+          </button>
 
-          <div
-            class="ring-card"
-            role="${lastParity ? "button" : "none"}"
-            tabindex="${lastParity ? "0" : "-1"}"
+          <button
+            type="button"
+            ?disabled=${!(lastParity)}
+            class="interactive ring-card"
             @click=${() => lastParity && this.openMoreInfo(lastParity.entity_id)}
-            @keydown=${(e: KeyboardEvent) =>
-              (e.key === "Enter" || e.key === " ") &&
-              lastParity &&
-              (e.preventDefault(), this.openMoreInfo(lastParity.entity_id))}
-            style="${lastParity ? "cursor: pointer;" : ""}"
             title="Click for Parity status"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${isCheckRunning ? 50 : 100}; --ring-color: ${isParityInvalid ? "var(--unraid-error)" : "var(--unraid-online)"}"
             >
               <span class="ring-content">${isCheckRunning ? "SYNC" : isParityInvalid ? "FAIL" : "OK"}</span>
-            </div>
+            </span>
             <span class="ring-label">Parity Health</span>
             <span class="ring-subtext">${lastErrors !== undefined ? `${lastErrors} Sync Errors` : "Parity Protected"}</span>
-          </div>
+          </button>
         </div>
 
         <div class="divider"></div>
 
         <div class="disk-list">
-          <div
-            class="disk-row"
-            role="${lastParity ? "button" : "none"}"
-            tabindex="${lastParity ? "0" : "-1"}"
+          <button
+            type="button"
+            ?disabled=${!(lastParity)}
+            class="interactive disk-row"
             @click=${() => lastParity && this.openMoreInfo(lastParity.entity_id)}
-            @keydown=${(e: KeyboardEvent) =>
-              (e.key === "Enter" || e.key === " ") &&
-              lastParity &&
-              (e.preventDefault(), this.openMoreInfo(lastParity.entity_id))}
-            style="${lastParity ? "cursor: pointer;" : ""}"
           >
-            <div class="disk-main">
+            <span data-block class="disk-main">
               <span class="disk-icon ${lastErrors ? "disk-warning" : "disk-online"}">
                 ${iconTemplate(mdiShieldCheck, 18)}
               </span>
-              <div class="disk-info">
+              <span data-block class="disk-info">
                 <span class="disk-name">Last Parity Check</span>
                 <span class="disk-subtext">
                   ${lastResult && lastResult !== lastParity?.state ? lastResult : "Completed"}
                   ${lastDuration ? ` • Duration: ${lastDuration}` : ""}
                   ${lastErrors !== undefined ? (lastErrors === 0 ? " • 0 sync errors" : ` • ${lastErrors} errors`) : ""}
                 </span>
-              </div>
-            </div>
-            <div class="disk-meta">
+              </span>
+            </span>
+            <span data-block class="disk-meta">
               <span class="disk-temp">${formatFriendlyDateTime(lastParity?.state)}</span>
-            </div>
-          </div>
+            </span>
+          </button>
 
           ${nextParity?.state && nextParity.state !== "unavailable" && nextParity.state !== "unknown"
             ? html`
-                <div
-                  class="disk-row"
-                  role="button"
-                  tabindex="0"
+                <button
+                  type="button"
+                  class="interactive disk-row"
                   @click=${() => this.openMoreInfo(nextParity.entity_id)}
-                  @keydown=${(e: KeyboardEvent) =>
-                    (e.key === "Enter" || e.key === " ") &&
-                    (e.preventDefault(), this.openMoreInfo(nextParity.entity_id))}
-                  style="cursor: pointer;"
                 >
-                  <div class="disk-main">
+                  <span data-block class="disk-main">
                     <span class="disk-icon disk-online">
                       ${iconTemplate(mdiClockOutline, 18)}
                     </span>
-                    <div class="disk-info">
+                    <span data-block class="disk-info">
                       <span class="disk-name">Next Scheduled Parity</span>
                       <span class="disk-subtext">
                         Automated Parity Verification${nextParity.attributes?.mode ? ` (${typeof nextParity.attributes.mode === "string" ? nextParity.attributes.mode.charAt(0).toUpperCase() + nextParity.attributes.mode.slice(1) : nextParity.attributes.mode})` : ""}
                       </span>
-                    </div>
-                  </div>
-                  <div class="disk-meta">
+                    </span>
+                  </span>
+                  <span data-block class="disk-meta">
                     <span class="disk-temp">${formatFriendlyDateTime(nextParity.state)}</span>
-                  </div>
-                </div>
+                  </span>
+                </button>
               `
             : nothing}
 
           ${pluginUpdates
             ? html`
-                <div
-                  class="disk-row"
-                  role="button"
-                  tabindex="0"
+                <button
+                  type="button"
+                  class="interactive disk-row"
                   @click=${() => this.openMoreInfo(pluginUpdates.entity_id)}
-                  @keydown=${(e: KeyboardEvent) =>
-                    (e.key === "Enter" || e.key === " ") &&
-                    (e.preventDefault(), this.openMoreInfo(pluginUpdates.entity_id))}
-                  style="cursor: pointer;"
                 >
-                  <div class="disk-main">
+                  <span data-block class="disk-main">
                     <span class="disk-icon ${numPluginUpdates > 0 ? "disk-warning" : "disk-online"}">
                       ${iconTemplate(mdiDownload, 18)}
                     </span>
-                    <div class="disk-info">
+                    <span data-block class="disk-info">
                       <span class="disk-name">Plugin Updates</span>
                       <span class="disk-subtext">${numPluginUpdates > 0 ? `${numPluginUpdates} plugin updates pending` : "All plugins are up to date"}</span>
-                    </div>
-                  </div>
-                  <div class="disk-meta">
+                    </span>
+                  </span>
+                  <span data-block class="disk-meta">
                     <span class="badge ${numPluginUpdates > 0 ? "badge-warning" : "badge-online"}">
                       ${numPluginUpdates > 0 ? `${numPluginUpdates} NEW` : "CURRENT"}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </button>
               `
             : nothing}
 
           ${containerUpdates
             ? html`
-                <div
-                  class="disk-row"
-                  role="button"
-                  tabindex="0"
+                <button
+                  type="button"
+                  class="interactive disk-row"
                   @click=${() => this.openMoreInfo(containerUpdates.entity_id)}
-                  @keydown=${(e: KeyboardEvent) =>
-                    (e.key === "Enter" || e.key === " ") &&
-                    (e.preventDefault(), this.openMoreInfo(containerUpdates.entity_id))}
-                  style="cursor: pointer;"
                 >
-                  <div class="disk-main">
+                  <span data-block class="disk-main">
                     <span class="disk-icon ${numContainerUpdates > 0 ? "disk-warning" : "disk-online"}">
                       ${iconTemplate(mdiDownload, 18)}
                     </span>
-                    <div class="disk-info">
+                    <span data-block class="disk-info">
                       <span class="disk-name">Docker Image Updates</span>
                       <span class="disk-subtext">${numContainerUpdates > 0 ? `${numContainerUpdates} container image updates available` : "All container images are current"}</span>
-                    </div>
-                  </div>
-                  <div class="disk-meta">
+                    </span>
+                  </span>
+                  <span data-block class="disk-meta">
                     <span class="badge ${numContainerUpdates > 0 ? "badge-warning" : "badge-online"}">
                       ${numContainerUpdates > 0 ? `${numContainerUpdates} NEW` : "CURRENT"}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </button>
               `
             : nothing}
         </div>
+      </div>
       </ha-card>
     `;
   }

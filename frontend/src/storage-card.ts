@@ -18,7 +18,7 @@ import {
 } from "./icons";
 import { registerDashboardCard } from "./register-dashboard-card";
 
-export type DiskHealthLevel = "healthy" | "warning" | "error";
+export type DiskHealthLevel = "healthy" | "warning" | "error" | "unknown";
 
 export interface DiskItem {
   id: string;
@@ -36,6 +36,28 @@ export interface DiskItem {
   spinEntityId?: string;
   freeSpace?: string;
   totalSpace?: string;
+}
+
+/** Read a disk's spin state from whichever attribute its entity exposes. */
+function spinningFromAttributes(attrs: Record<string, unknown>): boolean | undefined {
+  if (attrs.spin_state !== undefined) return attrs.spin_state === "active";
+  if (attrs.spinning !== undefined) return Boolean(attrs.spinning);
+  if (attrs.standby !== undefined) return !attrs.standby;
+  return undefined;
+}
+
+/** Read a temperature that may be a number or text such as "41 °C". */
+function parseTemperature(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : parseFloat(String(value));
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+/** Map a disk health entity state (SMART text or binary sensor) to a level. */
+function healthFromState(state: string): DiskHealthLevel {
+  const clean = state.toLowerCase().trim();
+  if (clean === "on" || clean.startsWith("fail")) return "error";
+  if (["unknown", "unavailable", "none", ""].includes(clean)) return "unknown";
+  return "healthy";
 }
 
 export function formatDiskName(rawName: string, id: string): string {
@@ -84,12 +106,12 @@ export class UnraidStorageCard extends BaseUnraidCard {
     // 1. Process usage entities (Data and Cache disks)
     for (const u of usageEntities) {
       const diskKey = extractDiskToken(u.entity_id);
-      const cleanName = formatDiskName((u.attributes.friendly_name as string) || diskKey, diskKey);
+      const cleanName = formatDiskName(this.entityName(u, (u.attributes.friendly_name as string) || diskKey), diskKey);
       const isParity = cleanName.toLowerCase().includes("parity");
       const isCache = cleanName.toLowerCase().includes("cache") || cleanName.toLowerCase().includes("pool");
       const isBoot = cleanName.toLowerCase().includes("boot") || cleanName.toLowerCase().includes("flash");
 
-      const attrSpin = u.attributes.spin_state === "active" || u.attributes.spinning === true;
+      const attrSpin = spinningFromAttributes(u.attributes) ?? false;
       const attrTemp = u.attributes.temperature_celsius ?? u.attributes.temperature;
       const attrErrors = Number(u.attributes.num_errors ?? 0);
       const attrStatus = (u.attributes.status as string) || "DISK_OK";
@@ -116,14 +138,16 @@ export class UnraidStorageCard extends BaseUnraidCard {
     for (const h of healthEntities) {
       const diskKey = extractDiskToken(h.entity_id);
       if (diskMap.has(diskKey)) continue;
+      // Unraid reports an empty slot as DISK_NP or DISK_NP_DSBL.
+      if (/^disk_np/i.test(h.state)) continue;
       if (diskKey.includes("disabled") || diskKey.includes("missing") || diskKey.includes("invalid")) continue;
 
-      const cleanName = formatDiskName((h.attributes.friendly_name as string) || diskKey, diskKey);
+      const cleanName = formatDiskName(this.entityName(h, (h.attributes.friendly_name as string) || diskKey), diskKey);
       const isParity = cleanName.toLowerCase().includes("parity");
       const isCache = cleanName.toLowerCase().includes("cache");
       const isBoot = cleanName.toLowerCase().includes("boot");
-      const attrSpin = h.attributes.spinning === true || (h.attributes.standby !== undefined ? !h.attributes.standby : false);
-      const attrTemp = h.attributes.temperature;
+      const attrSpin = spinningFromAttributes(h.attributes) ?? false;
+      const attrTemp = parseTemperature(h.attributes.temperature);
       const attrStatus = (h.attributes.status as string) || "DISK_OK";
 
       diskMap.set(diskKey, {
@@ -136,7 +160,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
         temp: attrTemp !== undefined && attrTemp !== null ? `${attrTemp}°C` : "*",
         tempNum: typeof attrTemp === "number" ? attrTemp : undefined,
         errors: 0,
-        health: h.state === "on" ? "error" : "healthy",
+        health: healthFromState(h.state),
         statusText: attrStatus,
         isSpinning: attrSpin,
       });
@@ -180,18 +204,13 @@ export class UnraidStorageCard extends BaseUnraidCard {
         if (h.attributes.status) {
           disk.statusText = h.attributes.status as string;
         }
-        if (h.attributes.spinning !== undefined) {
-          disk.isSpinning = Boolean(h.attributes.spinning);
-        } else if (h.attributes.standby !== undefined) {
-          disk.isSpinning = !h.attributes.standby;
+        disk.isSpinning = spinningFromAttributes(h.attributes) ?? disk.isSpinning;
+        const healthTemp = parseTemperature(h.attributes.temperature);
+        if (healthTemp !== undefined && disk.temp === "*") {
+          disk.temp = `${healthTemp}°C`;
+          disk.tempNum = healthTemp;
         }
-        if (h.attributes.temperature !== undefined && disk.temp === "*") {
-          disk.temp = `${h.attributes.temperature}°C`;
-          disk.tempNum = Number(h.attributes.temperature);
-        }
-        if (h.state === "on") {
-          disk.health = "error";
-        }
+        disk.health = healthFromState(h.state);
       }
     }
 
@@ -204,7 +223,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
         disk.health = "error";
       } else if (disk.errors > 0 || (disk.tempNum !== undefined && disk.tempNum > 45)) {
         disk.health = "warning";
-      } else {
+      } else if (disk.health !== "unknown") {
         disk.health = "healthy";
       }
     }
@@ -367,14 +386,15 @@ export class UnraidStorageCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || "Storage Array & Disks",
           `${usedStr || `${arrayPct}%`} used of ${totalStr || "Array"}${freeStr ? ` (${freeStr} Free)` : ""}`,
           mdiHarddisk,
           badge
         )}
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <div style="display: flex; justify-content: space-between; font-size: 0.76rem; font-weight: 600;">
+        <div style="display: flex; flex-direction: column; gap: var(--ha-space-1, 4px);">
+          <div style="display: flex; justify-content: space-between; font-size: var(--ha-font-size-s, 12px); font-weight: var(--ha-font-weight-bold, 600);">
             <span>Array Capacity</span>
             <span>${arrayPct}%</span>
           </div>
@@ -388,12 +408,12 @@ export class UnraidStorageCard extends BaseUnraidCard {
               ${iconTemplate(rowIcon, 18)}
             </div>
             <div style="display: flex; flex-direction: column; min-width: 0;">
-              <span style="font-weight: 600; font-size: 0.78rem;">
+              <span style="font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-s, 12px);">
                 ${parityTitle}
               </span>
               ${showHistoryLine
                 ? html`
-                    <span style="font-size: 0.7rem; color: var(--unraid-subtext);">
+                    <span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">
                       ${historyText}${errorsText}
                     </span>
                   `
@@ -429,22 +449,32 @@ export class UnraidStorageCard extends BaseUnraidCard {
 
                 const tempDisplay = hasValidTemp ? `${Math.round(tempNum)}°C` : "--";
 
-                const healthBadge = disk.health === "healthy"
+                const healthBadge = disk.health === "unknown"
                   ? html`
-                      <span class="badge badge-online" style="font-size: 0.68rem; gap: 4px;">
+                      <span
+                        class="badge badge-standby"
+                        style="font-size: var(--ha-font-size-s, 12px);"
+                        title="SMART status can't be read, usually because the disk is spun down"
+                      >
+                        <span>Unknown</span>
+                      </span>
+                    `
+                  : disk.health === "healthy"
+                  ? html`
+                      <span class="badge badge-online" style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px);">
                         ${iconTemplate(mdiCheckCircle, 11)}
                         <span>Healthy</span>
                       </span>
                     `
                   : disk.health === "warning"
                   ? html`
-                      <span class="badge badge-warning" style="font-size: 0.68rem; gap: 4px;">
+                      <span class="badge badge-warning" style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px);">
                         ${iconTemplate(mdiAlertCircle, 11)}
                         <span>Warning${disk.errors > 0 ? ` (${disk.errors})` : ""}</span>
                       </span>
                     `
                   : html`
-                      <span class="badge badge-error" style="font-size: 0.68rem; gap: 4px;">
+                      <span class="badge badge-error" style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px);">
                         ${iconTemplate(mdiAlertCircle, 11)}
                         <span>Error${disk.errors > 0 ? ` (${disk.errors})` : ""}</span>
                       </span>
@@ -457,7 +487,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                         ? html`
                             <span
                               class="badge badge-online"
-                              style="font-size: 0.68rem; gap: 4px; min-width: 60px; justify-content: center;"
+                              style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px); min-width: 60px; justify-content: center;"
                               title="USB Flash Boot Drive"
                             >
                               ${iconTemplate(mdiUsbFlashDrive, 11)}
@@ -482,7 +512,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                             </span>
                           `}
 
-                      <span style="font-weight: 600; min-width: 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      <span style="font-weight: var(--ha-font-weight-bold, 600); min-width: 0; flex: 1 1 75px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${disk.name}
                       </span>
                     </div>
@@ -490,16 +520,16 @@ export class UnraidStorageCard extends BaseUnraidCard {
                     <div class="row-right">
                       <span
                         class="badge"
-                        style="color: ${disk.isBoot ? "var(--unraid-text-dim)" : tempColor}; background: color-mix(in srgb, ${disk.isBoot ? "var(--unraid-text-dim)" : tempColor} 12%, transparent); min-width: 44px; justify-content: center;"
+                        style="color: ${disk.isBoot ? "var(--unraid-subtext)" : tempColor}; background: color-mix(in srgb, ${disk.isBoot ? "var(--unraid-subtext)" : tempColor} 12%, transparent); min-width: 44px; justify-content: center;"
                         title="${disk.isBoot ? "USB Flash Drive" : disk.isSpinning ? `Temperature: ${tempDisplay}` : "Disk is in standby"}"
                       >
                         ${disk.isBoot ? "--" : tempDisplay}
                       </span>
                       ${healthBadge}
-                      <div style="display: flex; align-items: center; gap: 6px; width: 85px;">
+                      <div style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); flex: 1 1 85px; min-width: 0;">
                         ${disk.isParity
                           ? html`
-                              <span style="font-size: 0.72rem; color: var(--unraid-online); font-weight: 500; font-family: monospace;">
+                              <span class="ltr-value" style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-online); font-weight: var(--ha-font-weight-medium, 500); font-family: var(--ha-font-family-code, monospace);">
                                 Parity
                               </span>
                             `
@@ -510,7 +540,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
                                   style="width: ${disk.usagePct}%; background: ${disk.isBoot ? "var(--unraid-warning)" : disk.isCache ? "var(--unraid-info)" : "var(--unraid-accent)"};"
                                 ></div>
                               </div>
-                              <span style="font-size: 0.7rem; font-family: monospace; color: var(--unraid-subtext);">
+                              <span class="ltr-value" style="font-size: var(--ha-font-size-s, 12px); font-family: var(--ha-font-family-code, monospace); color: var(--unraid-subtext);">
                                 ${disk.usagePct}%
                               </span>
                             `}
@@ -519,8 +549,9 @@ export class UnraidStorageCard extends BaseUnraidCard {
                   </div>
                 `;
               })
-            : html`<div style="text-align: center; color: var(--unraid-subtext); font-size: 0.8rem; padding: 12px;">No disk devices found</div>`}
+            : html`<div style="text-align: center; color: var(--unraid-subtext); font-size: var(--ha-font-size-s, 12px); padding: var(--ha-space-3, 12px);">No disk devices found</div>`}
         </div>
+      </div>
       </ha-card>
     `;
   }

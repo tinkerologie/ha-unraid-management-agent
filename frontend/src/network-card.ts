@@ -3,7 +3,7 @@ import {
   NETWORK_CARD_TAG,
   NETWORK_EDITOR_TAG,
 } from "./config";
-import { BaseUnraidCard } from "./dashboard-cards-base";
+import { BaseUnraidCard, formatDataRate } from "./dashboard-cards-base";
 import { UnraidNetworkCardEditor } from "./dashboard-cards-editor";
 import { fireEvent } from "./ha-types";
 import {
@@ -17,17 +17,6 @@ import { registerDashboardCard } from "./register-dashboard-card";
 
 export class UnraidNetworkCard extends BaseUnraidCard {
   static override editorTag = NETWORK_EDITOR_TAG;
-
-  private formatDataRate(valStr?: string, unit = "MB/s"): string {
-    if (!valStr) return "--";
-    const clean = valStr.toLowerCase().trim();
-    if (["unavailable", "unknown", "none", "--"].includes(clean)) return "--";
-    const num = parseFloat(valStr);
-    if (isNaN(num)) return "--";
-    if (num <= 0) return "0 kB/s";
-    if (num < 0.1) return `${(num * 1000).toFixed(1)} kB/s`;
-    return `${num.toFixed(2)} ${unit}`;
-  }
 
   private isValidIp(s?: string): boolean {
     return (
@@ -93,6 +82,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || `${serverName} Network`,
           `${device?.model || "Unraid"} • ${ifaces.length} Interface${ifaces.length === 1 ? "" : "s"}`,
@@ -104,14 +94,15 @@ export class UnraidNetworkCard extends BaseUnraidCard {
             ? ifaces.map((iface) => {
                 const isConnected =
                   iface.link?.state === "on" || this.isValidIp(iface.ip?.state);
-                const ipStr = this.isValidIp(iface.ip?.state) ? iface.ip!.state : "--";
+                const attrIp = iface.rx?.attributes?.network_ip as string | undefined;
+                const ipStr = this.isValidIp(iface.ip?.state) ? iface.ip!.state : this.isValidIp(attrIp) ? attrIp! : "--";
                 const macStr = (iface.ip?.attributes?.mac_address as string) || (iface.link?.attributes?.mac_address as string) || "";
                 const mtu = (iface.link?.attributes?.mtu as number) || (iface.ip?.attributes?.mtu as number) || undefined;
-                const speedVal = iface.speed?.state || (iface.link?.attributes?.speed_mbps as string | number | undefined);
+                const speedVal = iface.speed?.state || (iface.link?.attributes?.speed_mbps as string | number | undefined) || (iface.rx?.attributes?.network_speed as number | undefined);
                 const speedText = this.formatSpeed(speedVal != null ? String(speedVal) : undefined);
 
-                const rxRate = this.formatDataRate(iface.rx?.state);
-                const txRate = this.formatDataRate(iface.tx?.state);
+                const rxRate = formatDataRate(iface.rx);
+                const txRate = formatDataRate(iface.tx);
                 const totalRx = (iface.rx?.attributes?.total_received as string) || "";
                 const totalTx = (iface.tx?.attributes?.total_sent as string) || "";
 
@@ -121,34 +112,30 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                   iface.link?.entity_id;
 
                 return html`
-                  <div
-                    class="list-row"
-                    role="button"
-                    tabindex="0"
-                    style="cursor: pointer; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 14px;"
+                  <button
+                    type="button"
+                    class="interactive list-row network-row"
+                    style="flex-direction: column; align-items: stretch; gap: var(--ha-space-2, 8px); padding: var(--ha-space-3, 12px) var(--ha-space-3, 12px);"
                     title="Click for details on ${iface.name}"
                     @click=${() => this.handleMoreInfo(primaryEntityId)}
-                    @keydown=${(e: KeyboardEvent) =>
-                      (e.key === "Enter" || e.key === " ") &&
-                      (e.preventDefault(), this.handleMoreInfo(primaryEntityId))}
                   >
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                      <div class="row-left" style="gap: 8px;">
+                    <span data-block style="display: flex; flex-wrap: wrap; gap: var(--ha-space-1, 4px); align-items: center; justify-content: space-between;">
+                      <span data-block class="row-left" style="gap: var(--ha-space-2, 8px);">
                         <span class="badge ${isConnected ? "badge-online" : "badge-error"}" style="min-width: 50px; justify-content: center;">
                           ${iconTemplate(mdiEthernet, 13)}
-                          <span>${iface.name}</span>
+                          <span class="ltr-value">${iface.name}</span>
                         </span>
-                        <span style="font-weight: 600; font-size: 0.88rem;">
+                        <span class="ltr-value" style="font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-m, 14px);">
                           ${ipStr}
                         </span>
-                      </div>
+                      </span>
 
-                      <div class="row-right" style="gap: 6px;">
+                      <span data-block class="row-right" style="gap: var(--ha-space-2, 8px);">
                         ${speedText
                           ? html`
                               <span
-                                class="badge"
-                                style="color: var(--unraid-info); background: color-mix(in srgb, var(--unraid-info) 12%, transparent); font-weight: 600; font-size: 0.72rem;"
+                                class="badge ltr-value"
+                                style="color: var(--unraid-info); background: color-mix(in srgb, var(--unraid-info) 12%, transparent); font-weight: var(--ha-font-weight-bold, 600); font-size: var(--ha-font-size-s, 12px);"
                               >
                                 ${speedText}
                               </span>
@@ -156,33 +143,33 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                           : nothing}
                         <span
                           class="badge ${isConnected ? "badge-online" : "badge-standby"}"
-                          style="font-size: 0.68rem;"
+                          style="font-size: var(--ha-font-size-s, 12px);"
                         >
                           ${isConnected ? "Up" : "Down"}
                         </span>
-                      </div>
-                    </div>
-                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: var(--unraid-subtext); border-top: 1px solid var(--unraid-border, rgba(255,255,255,0.06)); padding-top: 6px;">
-                      <div style="display: flex; align-items: center; gap: 14px;">
-                        <span style="display: flex; align-items: center; gap: 4px;" title="${totalRx ? `Total Inbound: ${totalRx}` : 'Inbound Transfer Rate'}">
+                      </span>
+                    </span>
+                    <span data-block style="display: flex; flex-wrap: wrap; gap: var(--ha-space-1, 4px); align-items: center; justify-content: space-between; font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext); border-block-start: 1px solid var(--unraid-border); padding-block-start: var(--ha-space-2, 8px);">
+                      <span data-block style="display: flex; align-items: center; gap: var(--ha-space-3, 12px);">
+                        <span style="display: flex; align-items: center; gap: var(--ha-space-1, 4px);" title="${totalRx ? `Total Inbound: ${totalRx}` : 'Inbound Transfer Rate'}">
                           <span style="color: var(--unraid-online);">${iconTemplate(mdiDownload, 13)}</span>
-                          <span style="font-family: monospace; font-weight: 500;">${rxRate}</span>
-                          ${totalRx ? html`<span style="opacity: 0.7; font-size: 0.68rem;">(${totalRx})</span>` : nothing}
+                          <span class="ltr-value" style="font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-medium, 500);">${rxRate}</span>
+                          ${totalRx ? html`<span class="ltr-value" style="opacity: 0.7; font-size: var(--ha-font-size-s, 12px);">(${totalRx})</span>` : nothing}
                         </span>
 
-                        <span style="display: flex; align-items: center; gap: 4px;" title="${totalTx ? `Total Outbound: ${totalTx}` : 'Outbound Transfer Rate'}">
+                        <span style="display: flex; align-items: center; gap: var(--ha-space-1, 4px);" title="${totalTx ? `Total Outbound: ${totalTx}` : 'Outbound Transfer Rate'}">
                           <span style="color: var(--unraid-info);">${iconTemplate(mdiUpload, 13)}</span>
-                          <span style="font-family: monospace; font-weight: 500;">${txRate}</span>
-                          ${totalTx ? html`<span style="opacity: 0.7; font-size: 0.68rem;">(${totalTx})</span>` : nothing}
+                          <span class="ltr-value" style="font-family: var(--ha-font-family-code, monospace); font-weight: var(--ha-font-weight-medium, 500);">${txRate}</span>
+                          ${totalTx ? html`<span class="ltr-value" style="opacity: 0.7; font-size: var(--ha-font-size-s, 12px);">(${totalTx})</span>` : nothing}
                         </span>
-                      </div>
+                      </span>
 
-                      <div style="display: flex; align-items: center; gap: 8px; opacity: 0.8; font-size: 0.7rem;">
-                        ${mtu ? html`<span>MTU ${mtu}</span>` : nothing}
-                        ${macStr ? html`<span style="font-family: monospace;">${macStr}</span>` : nothing}
-                      </div>
-                    </div>
-                  </div>
+                      <span data-block style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); opacity: 0.8; font-size: var(--ha-font-size-s, 12px);">
+                        ${mtu ? html`<span class="ltr-value">MTU ${mtu}</span>` : nothing}
+                        ${macStr ? html`<span class="ltr-value" style="font-family: var(--ha-font-family-code, monospace);">${macStr}</span>` : nothing}
+                      </span>
+                    </span>
+                  </button>
                 `;
               })
             : html`
@@ -204,7 +191,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                           href="${lanUrl}"
                           target="_blank"
                           rel="noreferrer"
-                          class="detail-val"
+                          class="detail-val ltr-value"
                           style="color: var(--unraid-accent); text-decoration: none;"
                         >
                           ${lanUrl}
@@ -220,7 +207,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
                           href="${fqdnUrl}"
                           target="_blank"
                           rel="noreferrer"
-                          class="detail-val"
+                          class="detail-val ltr-value"
                           style="color: var(--unraid-info); text-decoration: none;"
                         >
                           Connect FQDN
@@ -231,6 +218,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
               </div>
             `
           : nothing}
+      </div>
       </ha-card>
     `;
   }

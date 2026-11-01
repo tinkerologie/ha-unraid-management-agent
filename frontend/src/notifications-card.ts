@@ -50,6 +50,7 @@ export class UnraidNotificationsCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           serverName,
           "Notifications Center",
@@ -63,71 +64,56 @@ export class UnraidNotificationsCard extends BaseUnraidCard {
         )}
 
         <div class="rings-grid">
-          <div
-            class="ring-card"
-            role="${alertsState ? "button" : "none"}"
-            tabindex="${alertsState ? "0" : "-1"}"
+          <button
+            type="button"
+            ?disabled=${!(alertsState)}
+            class="interactive ring-card"
             @click=${() => alertsState && this.openMoreInfo(alertsState.entity_id)}
-            @keydown=${(e: KeyboardEvent) =>
-              (e.key === "Enter" || e.key === " ") &&
-              alertsState &&
-              (e.preventDefault(), this.openMoreInfo(alertsState.entity_id))}
-            style="${alertsState ? "cursor: pointer;" : ""}"
             title="Click for Alerts"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${alertCount > 0 ? 100 : 0}; --ring-color: var(--unraid-error)"
             >
               <span class="ring-content">${alertCount}</span>
-            </div>
+            </span>
             <span class="ring-label">Alerts</span>
             <span class="ring-subtext">Critical Issues</span>
-          </div>
+          </button>
 
-          <div
-            class="ring-card"
-            role="${warningsState ? "button" : "none"}"
-            tabindex="${warningsState ? "0" : "-1"}"
+          <button
+            type="button"
+            ?disabled=${!(warningsState)}
+            class="interactive ring-card"
             @click=${() => warningsState && this.openMoreInfo(warningsState.entity_id)}
-            @keydown=${(e: KeyboardEvent) =>
-              (e.key === "Enter" || e.key === " ") &&
-              warningsState &&
-              (e.preventDefault(), this.openMoreInfo(warningsState.entity_id))}
-            style="${warningsState ? "cursor: pointer;" : ""}"
             title="Click for Warnings"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${warningCount > 0 ? 100 : 0}; --ring-color: var(--unraid-warning)"
             >
               <span class="ring-content">${warningCount}</span>
-            </div>
+            </span>
             <span class="ring-label">Warnings</span>
             <span class="ring-subtext">Action Required</span>
-          </div>
+          </button>
 
-          <div
-            class="ring-card"
-            role="${infoState ? "button" : "none"}"
-            tabindex="${infoState ? "0" : "-1"}"
+          <button
+            type="button"
+            ?disabled=${!(infoState)}
+            class="interactive ring-card"
             @click=${() => infoState && this.openMoreInfo(infoState.entity_id)}
-            @keydown=${(e: KeyboardEvent) =>
-              (e.key === "Enter" || e.key === " ") &&
-              infoState &&
-              (e.preventDefault(), this.openMoreInfo(infoState.entity_id))}
-            style="${infoState ? "cursor: pointer;" : ""}"
             title="Click for Informational"
           >
-            <div
+            <span data-block
               class="ring-gauge"
               style="--pct: ${infoCount > 0 ? 100 : 0}; --ring-color: var(--unraid-info)"
             >
               <span class="ring-content">${infoCount}</span>
-            </div>
+            </span>
             <span class="ring-label">Notices</span>
             <span class="ring-subtext">System Information</span>
-          </div>
+          </button>
         </div>
 
         ${!hasUnread && !latestEvent
@@ -169,6 +155,7 @@ export class UnraidNotificationsCard extends BaseUnraidCard {
               </div>
             `
           : nothing}
+      </div>
       </ha-card>
     `;
   }

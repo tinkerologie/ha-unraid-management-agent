@@ -181,7 +181,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
 
     for (const sw of switches) {
       const slug = extractEntityContainerSlug(sw.entity_id);
-      let cleanName = (sw.attributes.friendly_name as string) || slug;
+      let cleanName = this.entityName(sw, (sw.attributes.friendly_name as string) || slug);
       // Keep the distinctive container name visible in narrow tiles. Registry
       // names and service targets remain unchanged.
       for (const name of serverNames) {
@@ -267,14 +267,15 @@ export class UnraidDockerCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || "Docker Containers",
           `Unraid Management Agent · ${runningCount} running • ${stoppedCount} stopped`,
           mdiDocker,
           badge
         )}
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
-          <div role="group" aria-label="Container status" style="display: flex; gap: 4px; overflow-x: auto;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ha-space-2, 8px); flex-wrap: wrap;">
+          <div role="group" aria-label="Container status" style="display: flex; gap: var(--ha-space-1, 4px); overflow-x: auto;">
             <button
               class="tab-btn ${this._filter === "all" ? "active" : ""}"
               aria-pressed=${this._filter === "all"}
@@ -310,7 +311,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
               : nothing}
           </div>
 
-          <div style="display: flex; align-items: center; gap: 6px;">
+          <div style="display: flex; align-items: center; gap: var(--ha-space-2, 8px);">
             ${checkUpdatesBtn
               ? html`
                   <button
@@ -344,12 +345,12 @@ export class UnraidDockerCard extends BaseUnraidCard {
                       class="container-tile"
                       role="group" aria-label=${c.name}
                     >
-                      <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                      <div style="display: flex; align-items: center; gap: var(--ha-space-2, 8px); min-width: 0;">
                         <span class="status-dot ${c.isRunning ? "online" : "offline"}"></span>
                         <button class="tile-name btn" title=${c.name} aria-label=${`Show details for ${c.name}`}
                           @click=${() => this.openMoreInfo(c.switchEntityId)}>${c.name}</button>
                       </div>
-                      <div style="display: flex; align-items: center; gap: 4px;">
+                      <div style="display: flex; align-items: center; gap: var(--ha-space-1, 4px);">
                         ${c.hasUpdate
                           ? html`<span style="color: var(--unraid-warning);">${iconTemplate(mdiAlertCircle, 14)}</span>`
                           : nothing}
@@ -393,14 +394,14 @@ export class UnraidDockerCard extends BaseUnraidCard {
                     <div class="list-row">
                       <div class="row-left">
                         <span class="status-dot ${c.isRunning ? "online" : "offline"}"></span>
-                        <span style="font-weight: 600; min-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <span style="font-weight: var(--ha-font-weight-bold, 600); min-width: 0; flex: 1 1 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                           ${c.name}
                         </span>
                         ${c.cpuPct !== undefined
-                          ? html`<span style="font-size: 0.72rem; color: var(--unraid-subtext);">${c.cpuPct}% CPU</span>`
+                          ? html`<span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">${c.cpuPct}% CPU</span>`
                           : nothing}
                         ${c.memoryUsage
-                          ? html`<span style="font-size: 0.72rem; color: var(--unraid-subtext);">${c.memoryUsage}</span>`
+                          ? html`<span style="font-size: var(--ha-font-size-s, 12px); color: var(--unraid-subtext);">${c.memoryUsage}</span>`
                           : nothing}
                       </div>
                       <div class="row-right">
@@ -413,7 +414,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
                           ? html`
                               <button
                                 class="btn"
-                                style="padding: 3px 8px;"
+                                style="padding: 3px var(--ha-space-2, 8px);"
                                 aria-label=${`Restart ${c.name}`} ?disabled=${this._busy}
                                 @click=${() => this.requestRestart(c.restartEntityId!, c.name)}
                               >
@@ -424,7 +425,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
                           : nothing}
                         <button
                           class="btn ${c.isRunning ? "btn" : "btn-primary"}"
-                          style="padding: 3px 8px;"
+                          style="padding: 3px var(--ha-space-2, 8px);"
                           aria-label=${`${c.isRunning ? "Stop" : "Start"} ${c.name}`} ?disabled=${this._busy}
                           @click=${() => this.handleToggle(c.switchEntityId, c.isRunning, c.name)}
                         >
@@ -437,6 +438,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
                 )}
               </div>
             `}
+      </div>
       </ha-card>
     `;
   }

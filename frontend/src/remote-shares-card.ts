@@ -46,7 +46,7 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
       if (!match || !match[1] || !match[2]) continue;
 
       const shareKey = match[1].toLowerCase();
-      const shareName = (stateObj.attributes?.friendly_name as string) || match[1] || "Remote Share";
+      const shareName = this.entityName(stateObj, (stateObj.attributes?.friendly_name as string) || match[1] || "Remote Share");
       const cleanName = shareName
         .replace(/^(?:.*?\s+)?Remote Share\s+/i, "")
         .replace(/\s+(?:usage|mounted|mount)$/i, "")
@@ -100,6 +100,7 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
+        <div class="uma-card-content">
         ${this.renderHeader(
           serverName,
           "Remote SMB & NFS Shares",
@@ -125,15 +126,16 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
                 ${remoteShares.map((share) => {
                   return html`
                     <div class="disk-row">
-                      <div
-                        class="disk-main"
+                      <button
+                        type="button"
+                        ?disabled=${!(share.usageEntityId)}
+                        class="interactive disk-main"
                         @click=${() => share.usageEntityId && this.openMoreInfo(share.usageEntityId)}
-                        style="${share.usageEntityId ? "cursor: pointer;" : ""}"
                       >
                         <span class="disk-icon ${share.isMounted ? "disk-online" : "disk-standby"}">
                           ${iconTemplate(mdiFolder, 18)}
                         </span>
-                        <div class="disk-info">
+                        <span data-block class="disk-info">
                           <span class="disk-name">${share.name}</span>
                           <span class="disk-subtext">
                             ${share.isMounted
@@ -144,10 +146,10 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
                                 : "Mounted"
                               : "Unmounted"}
                           </span>
-                        </div>
-                      </div>
+                        </span>
+                      </button>
 
-                      <div class="disk-meta" style="align-items: center; gap: 8px;">
+                      <div class="disk-meta" style="align-items: center; gap: var(--ha-space-2, 8px);">
                         ${share.usagePct !== undefined
                           ? html`<span class="disk-temp">${share.usagePct}%</span>`
                           : nothing}
@@ -157,7 +159,7 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
                                 class="btn-icon ${share.isMounted ? "active" : ""}"
                                 @click=${() => this.handleToggleMount(share)}
                                 title="${share.isMounted ? "Unmount Remote Share" : "Mount Remote Share"}"
-                                style="border: none; background: transparent; cursor: pointer; color: ${share.isMounted ? "var(--unraid-online)" : "var(--unraid-subtext)"}; padding: 4px;"
+                                style="border: none; background: transparent; cursor: pointer; color: ${share.isMounted ? "var(--unraid-online)" : "var(--unraid-subtext)"}; padding: var(--ha-space-1, 4px);"
                               >
                                 ${iconTemplate(mdiPower, 18)}
                               </button>
@@ -173,6 +175,7 @@ export class UnraidRemoteSharesCard extends BaseUnraidCard {
                 })}
               </div>
             `}
+      </div>
       </ha-card>
     `;
   }

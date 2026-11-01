@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import "../src/index";
 import { UnraidServerCard } from "../src/server-card";
 import { UnraidStorageCard, formatDiskName } from "../src/storage-card";
+import { formatDataRate, formatDataSize } from "../src/dashboard-cards-base";
 import { UnraidSharesCard, formatShareName } from "../src/shares-card";
 import { UnraidDockerCard } from "../src/docker-card";
 import { UnraidUpsCard, formatRuntime } from "../src/ups-card";
@@ -1823,13 +1824,78 @@ describe("Unraid Custom Cards", () => {
 });
 
 
+describe("dashboard label and preview safeguards", () => {
+  const labelledCards = [
+    UnraidSharesCard, UnraidStorageCard, UnraidVmCard, UnraidDockerCard,
+    UnraidFansCard, UnraidGpuCard, UnraidUnassignedDevicesCard, UnraidRemoteSharesCard,
+  ];
+
+  for (const Card of labelledCards) {
+    it(`${Card.name} uses the guarded HA display name`, async () => {
+      const card = new Card();
+      card.setConfig({ type: "test" });
+      card.hass = { ...createMockHass(), callService: vi.fn(async () => undefined), formatEntityName: vi.fn(() => "FormattedLabel") };
+      document.body.appendChild(card);
+      try {
+        await card.updateComplete;
+        expect(card.hass.formatEntityName).toHaveBeenCalled();
+        expect(card.shadowRoot?.textContent).toContain("FormattedLabel");
+        expect(card.hass.callService).not.toHaveBeenCalled();
+      } finally {
+        card.remove();
+      }
+    });
+
+    it(`${Card.name} keeps existing labels if the formatter fails`, async () => {
+      const card = new Card();
+      card.setConfig({ type: "test" });
+      card.hass = createMockHass();
+      document.body.appendChild(card);
+      try {
+        await card.updateComplete;
+        const labels = card.shadowRoot?.textContent;
+        for (const formatter of [
+          () => { throw new Error("unsupported formatter"); },
+          () => "", () => "   ", () => undefined, () => 42,
+          "not a function" as unknown as HomeAssistant["formatEntityName"],
+        ]) {
+          card.hass = { ...createMockHass(), callService: vi.fn(async () => undefined), formatEntityName: formatter };
+          await card.updateComplete;
+          expect(card.shadowRoot?.textContent).toBe(labels);
+          expect(card.hass.callService).not.toHaveBeenCalled();
+        }
+      } finally {
+        card.remove();
+      }
+    });
+  }
+
+  it("all 15 cards render empty preview config without service calls", async () => {
+    for (const { type } of window.customCards ?? []) {
+      const card = document.createElement(type) as UnraidServerCard;
+      card.setConfig({});
+      document.body.appendChild(card);
+      try {
+        await card.updateComplete;
+        expect(card.shadowRoot?.querySelector("ha-card")).not.toBeNull();
+        card.hass = { ...createMockHass(), states: {}, entities: {}, callService: vi.fn(async () => undefined) };
+        await card.updateComplete;
+        expect(card.shadowRoot?.querySelector("ha-card")).not.toBeNull();
+        expect(card.hass.callService).not.toHaveBeenCalled();
+      } finally {
+        card.remove();
+      }
+    }
+  });
+});
+
 describe("Unraid Management Agent isolation", () => {
   it("registers 15 branded cards and editors without claiming generic Unraid tags", () => {
     expect(window.customCards).toHaveLength(15);
     for (const card of window.customCards ?? []) {
       expect(card.type).toMatch(/^unraid-management-agent-/);
       expect(card.name).toMatch(/^Unraid Management Agent /);
-      expect(card.preview).toBe(false);
+      expect(card.preview).toBe(true);
       expect(customElements.get(`${card.type}-editor`)).toBeDefined();
       expect(customElements.get(card.type.replace("unraid-management-agent-", "unraid-"))).toBeUndefined();
     }
@@ -1941,4 +2007,69 @@ describe("Unraid Management Agent isolation", () => {
     expect(card.getContainers().find((c: any) => c.switchEntityId === entity.entity_id).name).toBe("CUBE custom name");
   });
 
+});
+
+describe("Live entity formatting", () => {
+  const entity = (state: string, unit?: string) => ({
+    entity_id: "sensor.x",
+    state,
+    attributes: unit ? { unit_of_measurement: unit } : {},
+    last_changed: "",
+    last_updated: "",
+  });
+
+  it("uses the unit a rate entity reports", () => {
+    expect(formatDataRate(entity("316.84", "kbit/s"))).toBe("316.8 kbit/s");
+    expect(formatDataRate(entity("2500", "kbit/s"))).toBe("2.50 Mbit/s");
+    expect(formatDataRate(entity("0.5", "kbit/s"))).toBe("0.5 kbit/s");
+    expect(formatDataRate(entity("12.4"))).toBe("12.40 MB/s");
+    expect(formatDataRate(entity("0.05"))).toBe("50.0 kB/s");
+    expect(formatDataRate(entity("0", "kbit/s"))).toBe("0 kbit/s");
+    expect(formatDataRate(entity("unavailable", "kbit/s"))).toBe("--");
+    expect(formatDataRate(undefined)).toBe("--");
+  });
+
+  it("scales a size entity and keeps its unit", () => {
+    expect(formatDataSize(entity("27989.377024", "MB"))).toBe("28.0 GB");
+    expect(formatDataSize(entity("512", "MB"))).toBe("512.0 MB");
+    expect(formatDataSize(entity("unknown", "MB"))).toBeUndefined();
+  });
+
+  it("reads SMART text states and spin_state on disk health entities", async () => {
+    const card = new UnraidStorageCard();
+    card.setConfig({ type: "custom:unraid-management-agent-storage-card" });
+    const hass = createMockHass();
+    for (const id of Object.keys(hass.states)) {
+      if (id.includes("_disk_")) delete hass.states[id];
+    }
+    const health = (disk: string, state: string, attributes: Record<string, unknown>) => {
+      hass.states[`sensor.cube_disk_${disk}_health`] = {
+        entity_id: `sensor.cube_disk_${disk}_health`,
+        state,
+        attributes,
+        last_changed: "",
+        last_updated: "",
+      };
+    };
+    health("cache", "PASSED", { spin_state: "active", temperature: "41 °C" });
+    health("parity", "UNKNOWN", { spin_state: "standby" });
+    health("1", "FAILED", { spin_state: "active" });
+    health("parity2", "DISK_NP_DSBL", {});
+    card.hass = withMockRegistry(hass);
+    document.body.appendChild(card);
+    await card.updateComplete;
+
+    const rows = [...card.shadowRoot!.querySelectorAll(".list-row")].map((row) => row.textContent ?? "");
+    const row = (name: string) => rows.find((text) => text.includes(name) && !text.includes("Parity Status")) ?? "";
+    expect(row("Cache")).toContain("Active");
+    expect(row("Cache")).toContain("41°C");
+    expect(row("Cache")).toContain("Healthy");
+    expect(row("Parity")).toContain("Standby");
+    expect(row("Parity")).toContain("Unknown");
+    expect(row("Parity")).not.toContain("Healthy");
+    expect(row("Parity 2")).toBe("");
+    expect(row("Disk 1")).toContain("Error");
+    expect(row("Disk 1")).not.toContain("Healthy");
+    card.remove();
+  });
 });

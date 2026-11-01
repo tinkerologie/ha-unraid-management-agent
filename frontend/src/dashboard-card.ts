@@ -55,6 +55,23 @@ type ActiveTab =
   | "maintenance"
   | "notifications";
 
+const TABS: [ActiveTab, string, string][] = [
+  ["overview", mdiServer, "Overview"],
+  ["storage", mdiHarddisk, "Storage"],
+  ["zfs", mdiDatabase, "ZFS"],
+  ["shares", mdiFolder, "Shares"],
+  ["remote-shares", mdiServerNetwork, "Remote"],
+  ["unassigned", mdiHarddiskPlus, "Unassigned"],
+  ["network", mdiLanConnect, "Network"],
+  ["docker", mdiDocker, "Docker"],
+  ["vms", mdiMonitor, "VMs"],
+  ["fans", mdiFan, "Fans"],
+  ["gpu", mdiExpansionCard, "GPU"],
+  ["ups", mdiFlash, "UPS"],
+  ["maintenance", mdiWrench, "Maintenance"],
+  ["notifications", mdiBell, "Notifications"],
+];
+
 export class UnraidDashboardCard extends BaseUnraidCard {
   static override editorTag = DASHBOARD_EDITOR_TAG;
 
@@ -70,12 +87,29 @@ export class UnraidDashboardCard extends BaseUnraidCard {
     this._activeTab = "overview";
   }
 
+  private readonly _onTabKeydown = async (event: KeyboardEvent): Promise<void> => {
+    const current = TABS.findIndex(([id]) => id === this._activeTab);
+    const rtl = getComputedStyle(this).direction === "rtl";
+    const next = {
+      ArrowRight: current + (rtl ? -1 : 1),
+      ArrowLeft: current + (rtl ? 1 : -1),
+      Home: 0,
+      End: TABS.length - 1,
+    }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    this._activeTab = TABS[(next + TABS.length) % TABS.length]![0];
+    await this.updateComplete;
+    this.shadowRoot?.querySelector<HTMLElement>(`#tab-${this._activeTab}`)?.focus();
+  };
+
   protected override render(): TemplateResult {
     const device = this.getActiveDevice();
     const serverName = this.config.title || device?.name_by_user || device?.name || "Unraid Server";
 
     return html`
-      <ha-card style="gap: 12px;">
+      <ha-card>
+        <div class="uma-card-content">
         <div class="header">
           <div class="header-main">
             <div class="header-icon">${iconTemplate(mdiServer, 22)}</div>
@@ -85,107 +119,28 @@ export class UnraidDashboardCard extends BaseUnraidCard {
             </div>
           </div>
         </div>
-        <div class="tab-strip" role="group" aria-label="Dashboard section" style="display: flex; flex-wrap: wrap; gap: 6px;">
-          <button
-            class="tab-btn ${this._activeTab === "overview" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "overview"}
-            @click=${() => (this._activeTab = "overview")}
-          >
-            ${iconTemplate(mdiServer, 14)} Overview
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "storage" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "storage"}
-            @click=${() => (this._activeTab = "storage")}
-          >
-            ${iconTemplate(mdiHarddisk, 14)} Storage
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "zfs" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "zfs"}
-            @click=${() => (this._activeTab = "zfs")}
-          >
-            ${iconTemplate(mdiDatabase, 14)} ZFS
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "shares" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "shares"}
-            @click=${() => (this._activeTab = "shares")}
-          >
-            ${iconTemplate(mdiFolder, 14)} Shares
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "remote-shares" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "remote-shares"}
-            @click=${() => (this._activeTab = "remote-shares")}
-          >
-            ${iconTemplate(mdiServerNetwork, 14)} Remote
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "unassigned" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "unassigned"}
-            @click=${() => (this._activeTab = "unassigned")}
-          >
-            ${iconTemplate(mdiHarddiskPlus, 14)} Unassigned
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "network" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "network"}
-            @click=${() => (this._activeTab = "network")}
-          >
-            ${iconTemplate(mdiLanConnect, 14)} Network
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "docker" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "docker"}
-            @click=${() => (this._activeTab = "docker")}
-          >
-            ${iconTemplate(mdiDocker, 14)} Docker
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "vms" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "vms"}
-            @click=${() => (this._activeTab = "vms")}
-          >
-            ${iconTemplate(mdiMonitor, 14)} VMs
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "fans" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "fans"}
-            @click=${() => (this._activeTab = "fans")}
-          >
-            ${iconTemplate(mdiFan, 14)} Fans
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "gpu" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "gpu"}
-            @click=${() => (this._activeTab = "gpu")}
-          >
-            ${iconTemplate(mdiExpansionCard, 14)} GPU
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "ups" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "ups"}
-            @click=${() => (this._activeTab = "ups")}
-          >
-            ${iconTemplate(mdiFlash, 14)} UPS
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "maintenance" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "maintenance"}
-            @click=${() => (this._activeTab = "maintenance")}
-          >
-            ${iconTemplate(mdiWrench, 14)} Maintenance
-          </button>
-          <button
-            class="tab-btn ${this._activeTab === "notifications" ? "active" : ""}"
-            aria-pressed=${this._activeTab === "notifications"}
-            @click=${() => (this._activeTab = "notifications")}
-          >
-            ${iconTemplate(mdiBell, 14)} Notifications
-          </button>
+        <div class="tab-strip" role="tablist" aria-label="Dashboard section" @keydown=${this._onTabKeydown}>
+          ${TABS.map(
+            ([id, icon, label]) => html`
+              <button
+                type="button"
+                role="tab"
+                id="tab-${id}"
+                class="tab-btn ${this._activeTab === id ? "active" : ""}"
+                aria-selected=${this._activeTab === id}
+                aria-controls="dashboard-panel"
+                tabindex=${this._activeTab === id ? 0 : -1}
+                @click=${(event: Event) => {
+                  this._activeTab = id;
+                  (event.currentTarget as HTMLElement).scrollIntoView?.({ block: "nearest", inline: "nearest" });
+                }}
+              >
+                ${iconTemplate(icon, 14)} ${label}
+              </button>
+            `
+          )}
         </div>
-        <div>
+        <div role="tabpanel" id="dashboard-panel" aria-labelledby="tab-${this._activeTab}">
           ${this._activeTab === "overview"
             ? html`<unraid-management-agent-server-card .hass=${this.hass} .config=${{ ...this.config, type: "custom:unraid-management-agent-server-card", embedded: true }}></unraid-management-agent-server-card>`
             : nothing}
@@ -229,6 +184,7 @@ export class UnraidDashboardCard extends BaseUnraidCard {
             ? html`<unraid-management-agent-notifications-card .hass=${this.hass} .config=${{ ...this.config, type: "custom:unraid-management-agent-notifications-card", embedded: true }}></unraid-management-agent-notifications-card>`
             : nothing}
         </div>
+      </div>
       </ha-card>
     `;
   }
