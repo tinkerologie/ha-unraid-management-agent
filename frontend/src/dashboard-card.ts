@@ -109,7 +109,7 @@ export class UnraidDashboardCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         <div class="header">
           <div class="header-main">
             <div class="header-icon">${iconTemplate(mdiServer, 22)}</div>

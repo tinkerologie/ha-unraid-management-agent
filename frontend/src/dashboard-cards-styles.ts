@@ -67,7 +67,7 @@ export const dashboardCardStyles = [
     }
 
     /* Keep containment inside the card so Sections can size the host normally. */
-    .card-content {
+    .uma-card-content {
       container: unraid-card / inline-size;
       display: flex;
       flex-direction: column;

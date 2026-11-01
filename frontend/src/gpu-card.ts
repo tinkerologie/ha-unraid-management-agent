@@ -172,7 +172,7 @@ export class UnraidGpuCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(
           serverName,
           "GPU Accelerators",

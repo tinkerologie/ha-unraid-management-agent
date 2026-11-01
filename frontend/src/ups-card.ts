@@ -118,7 +118,7 @@ export class UnraidUpsCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || "UPS Power & Battery",
           (statusState?.attributes?.model as string) || "Uninterruptible Power Supply",

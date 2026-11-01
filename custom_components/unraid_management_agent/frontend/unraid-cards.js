@@ -84,7 +84,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
     }
 
     /* Keep containment inside the card so Sections can size the host normally. */
-    .card-content {
+    .uma-card-content {
       container: unraid-card / inline-size;
       display: flex;
       flex-direction: column;
@@ -785,7 +785,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
           `:z}
     `;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(t,`${e?.model||`Unraid OS`} • Up ${this.formatUptime(l?.state)}`,vt,ie)}
         <div class="rings-grid">
           <button
@@ -916,7 +916,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </span>
     `,_;_=l===`running`?`Parity Check In Progress (${u}%)`:l===`paused`?`Parity Check Paused (${u}%)`:c===`valid`?`Parity Status: Valid`:c===`invalid`?`Parity Status: Check Needed`:`Parity Status: Unknown`;let v=c===`valid`||d?et:G,y=c===`valid`||d?`var(--unraid-online)`:`var(--unraid-warning)`,b=this.isUsable(n),x=Number(r?.state),S=this.isUsable(r)&&!isNaN(x)&&x>0,C=``;if(b){let e=n.attributes?.result&&n.attributes.result!==`Completed`?` (${n.attributes.result})`:``;C=`Last check: ${jt(n.state)}${e}`}else c===`valid`&&(C=`Parity healthy`);let w=S?` • ${r.state} errors`:``,T=!!(C||w);return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(this.config.title||`Storage Array & Disks`,`${a||`${i}%`} used of ${o||`Array`}${s?` (${s} Free)`:``}`,ut,g)}
         <div style="display: flex; flex-direction: column; gap: var(--ha-space-1, 4px);">
           <div style="display: flex; justify-content: space-between; font-size: var(--ha-font-size-s, 12px); font-weight: var(--ha-font-weight-bold, 600);">
@@ -1051,7 +1051,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </span>
     `;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(this.config.title||`User Shares`,`${e.length} configured shares`,lt,i)}
         ${e.length>4?L`
               <div style="margin-block-end: var(--ha-space-1, 4px);">
@@ -1139,7 +1139,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </span>
     `;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(this.config.title||`${t} Network`,`${e?.model||`Unraid`} • ${n.length} Interface${n.length===1?``:`s`}`,pt,c)}
         <div class="item-list">
           ${n.length>0?n.map(e=>{let t=e.link?.state===`on`||this.isValidIp(e.ip?.state),n=e.rx?.attributes?.network_ip,r=this.isValidIp(e.ip?.state)?e.ip.state:this.isValidIp(n)?n:`--`,i=e.ip?.attributes?.mac_address||e.link?.attributes?.mac_address||``,a=e.link?.attributes?.mtu||e.ip?.attributes?.mtu||void 0,o=e.speed?.state||e.link?.attributes?.speed_mbps||e.rx?.attributes?.network_speed,s=this.formatSpeed(o==null?void 0:String(o)),c=q(e.rx),l=q(e.tx),u=e.rx?.attributes?.total_received||``,d=e.tx?.attributes?.total_sent||``,f=e.ip?.entity_id||e.rx?.entity_id||e.link?.entity_id;return L`
@@ -1267,7 +1267,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
           `:z}
     `;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(this.config.title||`Docker Containers`,`Unraid Management Agent · ${t} running • ${n} stopped`,rt,o)}
         <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--ha-space-2, 8px); flex-wrap: wrap;">
           <div role="group" aria-label="Container status" style="display: flex; gap: var(--ha-space-1, 4px); overflow-x: auto;">
@@ -1413,7 +1413,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </span>
     `;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(this.config.title||`UPS Power & Battery`,e?.attributes?.model||`Uninterruptible Power Supply`,ct,E)}
         <div class="rings-grid ups-rings">
           <button
@@ -1501,7 +1501,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </span>
     `;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(this.config.title||`Virtual Machines`,`${t} running of ${e.length} VMs`,mt,n)}
 
         <div class="item-list">
@@ -1544,7 +1544,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </ha-card>
     `}},editor:zt,name:`Unraid Virtual Machines Card`,description:`Monitor and manage Unraid virtual machines.`}),X({tag:Ie,editorTag:Le,card:class extends J{static editorTag=Le;getArcData(){let e=this.getEntity(`zfs_arc_hit_ratio`),t=this.getEntity(`zfs_arc_configured_max`),n=e?.state!=null&&!isNaN(Number(e.state))?Math.round(Number(e.state)):void 0,r;if(t?.state!=null){let e=t.state;if(e===`0`||e===`Auto`)r=`Auto`;else{let n=Number(e);r=!isNaN(n)&&n>0?`${(n/1073741824).toFixed(1)} GB`:`${e} ${t.attributes?.unit_of_measurement||``}`.trim()}}return{hitRatio:n,hitRatioEntityId:e?.entity_id,configuredMax:r,configuredMaxEntityId:t?.entity_id,attributes:e?.attributes}}getPoolDeviceEntities(e){let t=this.getActiveDevice();if(!this.hass?.entities||!t)return[];let n=[];for(let r of Object.values(this.hass.entities))if(r.translation_key===e&&r.device_id&&r.device_id!==t.id&&this.isServerOrChildDevice(r.device_id,t.id)){let e=this.agentStates[r.entity_id];e&&n.push(e)}return n}getPools(){let e=this.getPoolDeviceEntities(`zfs_pool_device_usage`),t=[...this.getEntities(`zfs_pool_usage`),...e],n=[...this.getEntities(`zfs_pool_health`),...this.getPoolDeviceEntities(`zfs_pool_device_health`)],r=this.getEntities(`corrupted_files`),i=new Map;for(let t of e){let e=this.hass?.entities?.[t.entity_id]?.device_id,n=t.attributes?.pool_name;e&&n&&i.set(e,n)}let a=this.getPoolDeviceEntities(`zfs_pool_device_corrupted_files`),o=new Map,s=this.getActiveDevice()?.id;if(this.hass?.states)for(let[e,t]of Object.entries(this.agentStates)){if(s&&this.hass.entities){let t=this.hass.entities[e];if(t&&t.device_id&&t.device_id!==s)continue}let n=e.match(/_zfs_([a-zA-Z0-9_-]+)_usage$/i);if(n&&n[1]){let r=t.attributes?.pool_name||n[1];if(!o.has(r)){let n=parseFloat(t.state);o.set(r,{name:t.attributes?.pool_name||r,usagePct:isNaN(n)?0:Math.round(n),totalSize:t.attributes?.total_size,usedSize:t.attributes?.used_size,freeSize:t.attributes?.free_space||t.attributes?.free_size,health:`ONLINE`,usageEntityId:e})}}}for(let e of t){let t=e.attributes?.pool_name||e.entity_id.replace(/^.*?_zfs_/,``).replace(/_usage$/,``),n=parseFloat(e.state);o.has(t)||o.set(t,{name:t,usagePct:isNaN(n)?0:Math.round(n),totalSize:e.attributes?.total_size,usedSize:e.attributes?.used_size,freeSize:e.attributes?.free_space||e.attributes?.free_size,health:`ONLINE`,usageEntityId:e.entity_id})}for(let e of n){let t=e.attributes?.pool_name||e.entity_id.replace(/^.*?_zfs_/,``).replace(/_health$/,``),n=o.get(t);n&&(n.health=e.state||`ONLINE`,n.healthEntityId=e.entity_id,e.attributes?.errors!==void 0&&(n.errors=Number(e.attributes.errors)))}for(let e of[...r,...a]){let t=this.hass?.entities?.[e.entity_id]?.device_id,n=e.attributes?.pool_name||t&&i.get(t)||e.entity_id.replace(/^.*?_zfs_/,``).replace(/_corrupted_files$/,``),r=o.get(n);if(r){let t=parseInt(e.state,10);isNaN(t)||(r.corruptedFiles=t)}}return Array.from(o.values()).sort((e,t)=>e.name.localeCompare(t.name))}render(){let e=this.getActiveDevice(),t=this.config.title||e?.name_by_user||e?.name||`Unraid Server`,n=this.getArcData(),r=this.getPools(),i=n.hitRatio!==void 0||r.length>0;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(t,`ZFS Storage & Cache`,nt,L`
             <span class="badge ${r.some(e=>e.health!==`ONLINE`)?`badge-warning`:`badge-online`}">
               <span class="pulse-dot"></span>
@@ -1619,7 +1619,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </ha-card>
     `}},editor:Bt,name:`Unraid ZFS Card`,description:`Monitor ZFS pools, pool health, corrupted files, and ARC cache performance`}),X({tag:Re,editorTag:ze,card:class extends J{static editorTag=ze;getFans(){let e=[];if(!this.hass?.states)return e;let t=this.getActiveDevice()?.id,n=new Map;for(let[e,r]of Object.entries(this.agentStates))if(e.startsWith(`number.`)&&(e.includes(`_fan_`)||e.includes(`fan_control`))){if(t&&this.hass.entities){let n=this.hass.entities[e];if(n&&n.device_id&&!this.isServerOrChildDevice(n.device_id,t))continue}let i=this.hass.entities?.[e];if(i&&i.platform!==`unraid_management_agent`&&i.platform!==`unraid`)continue;let a=r.attributes?.fan_id;a!==void 0&&n.set(String(a),e)}for(let[r,i]of Object.entries(this.agentStates)){if(!r.startsWith(`sensor.`))continue;if(t&&this.hass.entities){let e=this.hass.entities[r];if(e&&e.device_id&&!this.isServerOrChildDevice(e.device_id,t))continue}let a=this.hass.entities?.[r];if(a&&a.platform!==`unraid_management_agent`&&a.platform!==`unraid`||!(i.attributes?.unit_of_measurement===`RPM`||i.attributes?.unit_of_measurement===`rpm`||r.includes(`_fan_`)||r.endsWith(`_fan`)))continue;let o=parseInt(i.state,10),s=i.attributes?.is_failed===!0||i.attributes?.status===`failed`,c=i.attributes?.fan_id,l=this.entityName(i,i.attributes?.original_name||i.attributes?.friendly_name||r.split(`.`)[1]||`Fan`).replace(/^(?:.*?\s+)?Fan\s+/i,`Fan `).replace(/\s+RPM$/i,``).replace(/\s+Speed$/i,``).trim();e.push({id:r,name:l,rpm:isNaN(o)?0:o,rpmText:isNaN(o)?i.state:`${o} RPM`,isFailed:s,fanId:c,controlEntityId:c===void 0?void 0:n.get(String(c)),rpmEntityId:r})}if(e.length===0)for(let[n,r]of Object.entries(this.agentStates)){if(!n.startsWith(`number.`))continue;if(t&&this.hass.entities){let e=this.hass.entities[n];if(e&&e.device_id&&!this.isServerOrChildDevice(e.device_id,t))continue}let i=this.hass.entities?.[n];if(i&&i.platform!==`unraid_management_agent`&&i.platform!==`unraid`||!n.includes(`_fan_`))continue;let a=r.attributes?.fan_id,o=r.attributes?.rpm==null?NaN:Number(r.attributes.rpm),s=parseFloat(r.state),c=isNaN(o)?0:o,l=isNaN(o)?isNaN(s)?r.state:`${Math.round(s)}%`:`${o} RPM`,u=this.entityName(r,r.attributes?.original_name||r.attributes?.friendly_name||n.split(`.`)[1]||`Fan`).replace(/^(?:.*?\s+)?Fan\s+/i,`Fan `).replace(/\s+RPM$/i,``).replace(/\s+Speed$/i,``).trim();e.push({id:n,name:u,rpm:c,rpmText:l,isFailed:!1,fanId:a,controlEntityId:n,rpmEntityId:n})}return e.sort((e,t)=>e.name.localeCompare(t.name,void 0,{numeric:!0}))}render(){let e=this.getActiveDevice(),t=this.config.title||e?.name_by_user||e?.name||`Unraid Server`,n=this.getFans();return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(t,`Cooling & Fans`,st,L`
             <span class="badge ${n.some(e=>e.isFailed)?`badge-error`:`badge-online`}">
               <span class="pulse-dot"></span>
@@ -1667,7 +1667,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </ha-card>
     `}},editor:Vt,name:`Unraid Fans Card`,description:`Monitor system cooling fans, RPM speeds, and control statuses`});var nn={gpu_device_utilization:`utilization`,gpu_device_temperature:`temperature`,gpu_device_power:`power`,gpu_device_energy:`energy`,gpu_device_vram_usage:`vram_usage`};X({tag:Be,editorTag:Ve,card:class extends J{static editorTag=Ve;getGpus(){let e=new Map;if(!this.hass?.states)return[];let t=this.getActiveDevice(),n=t?.id,r=t?.name?this.slugifyDeviceName(t.name):void 0;for(let[t,i]of Object.entries(this.agentStates)){if(!t.startsWith(`sensor.`))continue;let a=this.hass.entities?.[t],o=a?.device_id?this.hass.devices?.[a.device_id]:void 0,s=o?.parent_device_id?o:void 0;if(n&&a?.device_id){if(a.device_id!==n&&s?.parent_device_id!==n)continue}else if(r&&!t.includes(r))continue;let c=s?void 0:t.match(/_gpu_(?:(.+?)_)?(utilization|temperature|power|energy|memory_utilization|vram_usage)(?:_(\d+))?$/i),l=s?nn[a?.translation_key??``]:c?.[2]?.toLowerCase();if(!l)continue;let u=s?s.id:c?.[1]||`0`,d=s?`device:${s.id}`:`${u.toLowerCase()}${c?.[3]?`#${c[3]}`:``}`;if(!e.has(d)){let t=parseInt(u,10),n=isNaN(t)?e.size:t,r=typeof i.attributes?.friendly_name==`string`?i.attributes.friendly_name.replace(/^(?:.*?\s+)?(?:GPU\s+)?/i,``).replace(/\s+(?:Utilization|Temperature|Power|Energy|VRAM|Usage).*$/i,``):void 0,a=s?.name_by_user||s?.name?.replace(/^GPU\s*·\s*/i,``)||void 0,o=this.entityName(i,a||(typeof i.attributes?.gpu_name==`string`?i.attributes.gpu_name:void 0)||r||(u===`0`?`GPU ${n}`:u.replace(/_/g,` `).replace(/\b\w/g,e=>e.toUpperCase()))),c=i.attributes?.gpu_driver_version||i.attributes?.driver_version||void 0;e.set(d,{index:n,name:o,nameFromDevice:a!==void 0,driver:c})}let f=e.get(d);i.attributes?.gpu_name&&!f.nameFromDevice&&(!f.name||f.name.startsWith(`GPU `))&&(f.name=i.attributes.gpu_name),(i.attributes?.gpu_driver_version||i.attributes?.driver_version)&&!f.driver&&(f.driver=i.attributes.gpu_driver_version||i.attributes.driver_version);let p=parseFloat(i.state);l===`utilization`?(f.utilizationPct=isNaN(p)?void 0:Math.round(p),f.utilizationEntityId=t):l===`temperature`?(f.temp=isNaN(p)?void 0:Math.round(p),f.tempEntityId=t):l===`power`?(f.power=isNaN(p)?void 0:Math.round(p),f.powerEntityId=t):l===`energy`?(f.energy=isNaN(p)?void 0:Number(p.toFixed(2)),f.energyEntityId=t):(l===`memory_utilization`||l===`vram_usage`)&&(f.memUtilPct=isNaN(p)?void 0:Math.round(p),f.memUtilEntityId=t)}return Array.from(e.values()).sort((e,t)=>e.index-t.index)}render(){let e=this.getActiveDevice(),t=this.config.title||e?.name_by_user||e?.name||`Unraid Server`,n=this.getGpus();return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(t,`GPU Accelerators`,ot,L`
             <span class="badge ${n.length>0?`badge-online`:``}">
               <span class="pulse-dot"></span>
@@ -1769,7 +1769,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </ha-card>
     `}},editor:Ht,name:`Unraid GPU Card`,description:`Monitor graphics cards utilization, temperature, power draw, and VRAM`}),X({tag:He,editorTag:Ue,card:class extends J{static editorTag=Ue;render(){let e=this.getActiveDevice(),t=this.config.title||e?.name_by_user||e?.name||`Unraid Server`,n=this.getEntity(`notifications_unread_alert`),r=this.getEntity(`notifications_unread_warning`),i=this.getEntity(`notifications_unread_info`),a=this.getEntity(`notification_count`)||this.getEntity(`notifications`),o=this.getEntity(`notification_event`,`event`)||this.getEntity(`notification`,`event`),s=Number(n?.state)||0,c=Number(r?.state)||0,l=Number(i?.state)||0,u=Number(a?.state)||s+c+l,d=u>0,f=!!o?.state&&o?.state!==`unavailable`&&o?.state!==`unknown`,p=!!(o?.attributes?.subject||o?.attributes?.description||o?.attributes?.message),m=f&&p?o?.attributes:void 0;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(t,`Notifications Center`,$e,L`
             <span class="badge ${s>0?`badge-error`:c>0?`badge-warning`:`badge-online`}">
               <span class="pulse-dot"></span>
@@ -1862,7 +1862,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </ha-card>
     `}},editor:Ut,name:`Unraid Notifications Card`,description:`View Unraid notification counts, severity alerts, and latest messages`}),X({tag:We,editorTag:Ge,card:class extends J{static editorTag=Ge;render(){let e=this.getActiveDevice(),t=this.config.title||e?.name_by_user||e?.name||`Unraid Server`,n=this.getEntity(`last_parity_check`),r=this.getEntity(`next_parity_check`),i=this.getEntity(`parity_check_running`,`binary_sensor`),a=this.getEntity(`parity_valid`,`binary_sensor`),o=this.getEntity(`flash_usage`),s=this.getEntity(`flash_free_space`),c=this.getEntity(`plugins_with_updates`)||this.getEntity(`plugin_updates`),l=this.getEntity(`container_updates_available`),u=i?.state===`on`,d=a?.state===`on`,f=At(s),p=Math.round(Number(o?.state)||0),m=Number(c?.state)||0,h=Number(l?.state)||0,g=m+h,_=n?.attributes?.duration||n?.attributes?.last_duration,v=n?.attributes?.result||n?.state,y=n?.attributes?.errors;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(t,`Maintenance & Operations`,Dt,L`
             <span class="badge ${g>0?`badge-warning`:`badge-online`}">
               <span class="pulse-dot"></span>
@@ -2006,7 +2006,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </ha-card>
     `}},editor:Wt,name:`Unraid Maintenance Card`,description:`Parity verification history, flash drive health, and plugin/container update status`}),X({tag:Ke,editorTag:qe,card:class extends J{static editorTag=qe;getRemoteShares(){let e=new Map;if(!this.hass?.states)return[];let t=this.getActiveDevice()?.id;for(let[n,r]of Object.entries(this.agentStates)){if(t&&this.hass.entities){let e=this.hass.entities[n];if(e&&e.device_id&&e.device_id!==t)continue}let i=n.match(/_remote_share_([a-zA-Z0-9_-]+)_(usage|mounted|mount)$/i);if(!i||!i[1]||!i[2])continue;let a=i[1].toLowerCase(),o=this.entityName(r,r.attributes?.friendly_name||i[1]||`Remote Share`).replace(/^(?:.*?\s+)?Remote Share\s+/i,``).replace(/\s+(?:usage|mounted|mount)$/i,``).trim();e.has(a)||e.set(a,{name:o,isMounted:!0});let s=e.get(a),c=i[2].toLowerCase();if(c===`usage`){s.usageEntityId=n;let e=parseFloat(r.state);s.usagePct=isNaN(e)?void 0:Math.round(e),s.used=r.attributes?.used,s.total=r.attributes?.total,s.free=r.attributes?.free}else c===`mounted`?(s.mountedEntityId=n,s.isMounted=r.state===`on`||r.state===`true`):c===`mount`&&(s.mountSwitchEntityId=n,s.mountedEntityId||(s.isMounted=r.state===`on`))}return Array.from(e.values()).sort((e,t)=>e.name.localeCompare(t.name))}handleToggleMount(e){e.mountSwitchEntityId&&(!e.isMounted||confirm(`Are you sure you want to unmount remote share "${e.name}"?`))&&this.toggleEntity(e.mountSwitchEntityId)}render(){let e=this.getActiveDevice(),t=this.config.title||e?.name_by_user||e?.name||`Unraid Server`,n=this.getRemoteShares();return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(t,`Remote SMB & NFS Shares`,yt,L`
             <span class="badge ${n.some(e=>e.isMounted)?`badge-online`:``}">
               <span class="pulse-dot"></span>
@@ -2066,7 +2066,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </ha-card>
     `}},editor:Gt,name:`Unraid Remote Shares Card`,description:`Monitor and mount remote network SMB/NFS storage shares`}),X({tag:Je,editorTag:Ye,card:class extends J{static editorTag=Ye;getDevices(){let e=new Map;if(!this.hass?.states)return[];let t=this.getActiveDevice()?.id;for(let[n,r]of Object.entries(this.agentStates)){if(t&&this.hass.entities){let e=this.hass.entities[n];if(e&&e.device_id&&e.device_id!==t)continue}let i=n.match(/_unassigned_device_([a-zA-Z0-9_-]+)_(size|usage|mounted|temperature|temp)$/i);if(!i||!i[1]||!i[2])continue;let a=i[1].toLowerCase(),o=this.entityName(r,r.attributes?.friendly_name||i[1]||`Unassigned Device`).replace(/^(?:.*?\s+)?Unassigned Device\s+/i,``).replace(/\s+(?:size|usage|mounted|temperature|temp)$/i,``).trim();e.has(a)||e.set(a,{id:i[1],name:o,isMounted:!1});let s=e.get(a),c=i[2].toLowerCase();if(c===`size`)s.sizeEntityId=n,s.size=`${r.state} ${r.attributes?.unit_of_measurement||``}`.trim(),s.fsType=r.attributes?.filesystem;else if(c===`usage`){let e=parseFloat(r.state);s.usagePct=isNaN(e)?void 0:Math.round(e)}else c===`mounted`?(s.mountedEntityId=n,s.isMounted=r.state===`on`||r.state===`true`):(c===`temperature`||c===`temp`)&&(s.temp=`${r.state}°C`)}return Array.from(e.values()).sort((e,t)=>e.name.localeCompare(t.name))}render(){let e=this.getActiveDevice(),t=this.config.title||e?.name_by_user||e?.name||`Unraid Server`,n=this.getDevices();return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(t,`Unassigned Storage Devices`,dt,L`
             <span class="badge ${n.length>0?`badge-online`:``}">
               <span class="pulse-dot"></span>
@@ -2115,7 +2115,7 @@ var e=globalThis,t=e.ShadowRoot&&(e.ShadyCSS===void 0||e.ShadyCSS.nativeShadow)&
       </ha-card>
     `}},editor:Kt,name:`Unraid Unassigned Devices Card`,description:`Monitor unassigned storage drives, partitions, and external USB disks`});var $=[[`overview`,vt,`Overview`],[`storage`,ut,`Storage`],[`zfs`,nt,`ZFS`],[`shares`,lt,`Shares`],[`remote-shares`,yt,`Remote`],[`unassigned`,dt,`Unassigned`],[`network`,pt,`Network`],[`docker`,rt,`Docker`],[`vms`,mt,`VMs`],[`fans`,st,`Fans`],[`gpu`,ot,`GPU`],[`ups`,ct,`UPS`],[`maintenance`,Dt,`Maintenance`],[`notifications`,$e,`Notifications`]];X({tag:Xe,editorTag:Ze,card:class extends J{static editorTag=Ze;static properties={...J.properties,_activeTab:{state:!0}};constructor(){super(),this._activeTab=`overview`}_onTabKeydown=async e=>{let t=$.findIndex(([e])=>e===this._activeTab),n=getComputedStyle(this).direction===`rtl`,r={ArrowRight:t+(n?-1:1),ArrowLeft:t+(n?1:-1),Home:0,End:$.length-1}[e.key];r!==void 0&&(e.preventDefault(),this._activeTab=$[(r+$.length)%$.length][0],await this.updateComplete,this.shadowRoot?.querySelector(`#tab-${this._activeTab}`)?.focus())};render(){let e=this.getActiveDevice(),t=this.config.title||e?.name_by_user||e?.name||`Unraid Server`;return L`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         <div class="header">
           <div class="header-main">
             <div class="header-icon">${K(vt,22)}</div>

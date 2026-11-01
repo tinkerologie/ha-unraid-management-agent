@@ -386,7 +386,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || "Storage Array & Disks",
           `${usedStr || `${arrayPct}%`} used of ${totalStr || "Array"}${freeStr ? ` (${freeStr} Free)` : ""}`,

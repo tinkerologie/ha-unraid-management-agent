@@ -117,7 +117,7 @@ test("named containers live inside cards and reflow UPS at 320px", async ({ page
   await page.setViewportSize({ width: 1440, height: 1000 });
   const host = page.locator("#ups-card");
   await expect(host).toHaveCSS("container-type", "normal");
-  const content = host.locator(".card-content");
+  const content = host.locator(".uma-card-content");
   await expect(content).toHaveCSS("container-name", "unraid-card");
   await content.evaluate((el) => { (el as HTMLElement).style.width = "321px"; });
   const columns = () => host.locator(".ups-rings").evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);

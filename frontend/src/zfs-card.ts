@@ -199,7 +199,7 @@ export class UnraidZfsCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(
           serverName,
           "ZFS Storage & Cache",

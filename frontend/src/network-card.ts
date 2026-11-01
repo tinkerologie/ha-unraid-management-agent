@@ -82,7 +82,7 @@ export class UnraidNetworkCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || `${serverName} Network`,
           `${device?.model || "Unraid"} • ${ifaces.length} Interface${ifaces.length === 1 ? "" : "s"}`,

@@ -97,7 +97,7 @@ export class UnraidVmCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || "Virtual Machines",
           `${runningCount} running of ${vms.length} VMs`,

@@ -267,7 +267,7 @@ export class UnraidDockerCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(
           this.config.title || "Docker Containers",
           `Unraid Management Agent · ${runningCount} running • ${stoppedCount} stopped`,

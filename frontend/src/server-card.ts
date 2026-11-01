@@ -121,7 +121,7 @@ export class UnraidServerCard extends BaseUnraidCard {
 
     return html`
       <ha-card>
-        <div class="card-content">
+        <div class="uma-card-content">
         ${this.renderHeader(
           serverName,
           `${device?.model || "Unraid OS"} • Up ${this.formatUptime(uptimeState?.state)}`,
