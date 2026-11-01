@@ -3,7 +3,7 @@ import {
   MAINTENANCE_CARD_TAG,
   MAINTENANCE_EDITOR_TAG,
 } from "./config";
-import { BaseUnraidCard, formatFriendlyDateTime } from "./dashboard-cards-base";
+import { BaseUnraidCard, formatDataSize, formatFriendlyDateTime } from "./dashboard-cards-base";
 import { UnraidMaintenanceCardEditor } from "./dashboard-cards-editor";
 import {
   iconTemplate,
@@ -33,6 +33,7 @@ export class UnraidMaintenanceCard extends BaseUnraidCard {
     const isCheckRunning = parityRunning?.state === "on";
     const isParityInvalid = parityValid?.state === "on"; // parity_valid is Problem sensor: on means problem/invalid
 
+    const flashFreeText = formatDataSize(flashFree);
     const flashPct = Math.round(Number(flashUsage?.state) || 0);
     const numPluginUpdates = Number(pluginUpdates?.state) || 0;
     const numContainerUpdates = Number(containerUpdates?.state) || 0;
@@ -71,7 +72,7 @@ export class UnraidMaintenanceCard extends BaseUnraidCard {
               <span class="ring-content">${flashPct}%</span>
             </span>
             <span class="ring-label">Flash Boot Drive</span>
-            <span class="ring-subtext">${flashFree?.state ? `${flashFree.state} Free` : "USB Boot Drive"}</span>
+            <span class="ring-subtext">${flashFreeText ? `${flashFreeText} Free` : "USB Boot Drive"}</span>
           </button>
 
           <button

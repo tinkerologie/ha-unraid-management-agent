@@ -9,6 +9,60 @@ import {
 } from "./ha-types";
 import { iconTemplate } from "./icons";
 
+const UNAVAILABLE_STATES = ["unavailable", "unknown", "none", "--", ""];
+
+const RATE_UNITS: Record<string, [number, readonly string[]]> = {
+  "bit/s": [1, ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"]],
+  "kbit/s": [1e3, ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"]],
+  "Mbit/s": [1e6, ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"]],
+  "Gbit/s": [1e9, ["bit/s", "kbit/s", "Mbit/s", "Gbit/s"]],
+  "B/s": [1, ["B/s", "kB/s", "MB/s", "GB/s"]],
+  "kB/s": [1e3, ["B/s", "kB/s", "MB/s", "GB/s"]],
+  "MB/s": [1e6, ["B/s", "kB/s", "MB/s", "GB/s"]],
+  "GB/s": [1e9, ["B/s", "kB/s", "MB/s", "GB/s"]],
+};
+
+/**
+ * Format a data rate entity using the unit it reports, scaled to a readable
+ * size. Entities without a unit are treated as MB/s.
+ */
+export function formatDataRate(entity?: HassEntity): string {
+  const state = entity?.state?.toLowerCase().trim();
+  if (state === undefined || UNAVAILABLE_STATES.includes(state)) return "--";
+  const value = parseFloat(state);
+  if (isNaN(value)) return "--";
+  const unit = String(entity?.attributes?.unit_of_measurement ?? "MB/s");
+  const known = RATE_UNITS[unit];
+  if (!known) return `${value.toFixed(2)} ${unit}`;
+  const [factor, scale] = known;
+  if (value <= 0) return `0 ${scale[1]}`;
+  const base = value * factor;
+  const step = Math.max(1, Math.min(scale.length - 1, Math.floor(Math.log10(base) / 3)));
+  const scaled = base / 10 ** (step * 3);
+  return `${scaled.toFixed(step === 1 ? 1 : 2)} ${scale[step]}`;
+}
+
+/**
+ * Format a data size entity in its reported unit, moving up to GB or TB when
+ * the number would otherwise be hard to read.
+ */
+export function formatDataSize(entity?: HassEntity): string | undefined {
+  const state = entity?.state?.toLowerCase().trim();
+  if (state === undefined || UNAVAILABLE_STATES.includes(state)) return undefined;
+  const value = parseFloat(state);
+  if (isNaN(value)) return undefined;
+  const units = ["B", "kB", "MB", "GB", "TB", "PB"];
+  const unit = String(entity?.attributes?.unit_of_measurement ?? "");
+  let index = units.indexOf(unit);
+  if (index < 0) return unit ? `${value} ${unit}` : `${value}`;
+  let scaled = value;
+  while (scaled >= 1000 && index < units.length - 1) {
+    scaled /= 1000;
+    index += 1;
+  }
+  return `${scaled.toFixed(1)} ${units[index]}`;
+}
+
 /**
  * Format timestamp into human-friendly date string (e.g. "Jan 13, 2026, 15:16").
  */

@@ -46,6 +46,7 @@ async function overflowing(page: Page): Promise<string[]> {
       const box = host.getBoundingClientRect();
       const walk = (root: ShadowRoot): void => {
         for (const el of root.querySelectorAll<HTMLElement>("*")) {
+          if (el.closest(".tab-strip")) continue;
           const r = el.getBoundingClientRect();
           if (r.width > 0 && (r.right > box.right + 1 || r.left < box.left - 1)) {
             found.push(`${id}: ${el.tagName.toLowerCase()}.${el.className}`);
@@ -58,6 +59,20 @@ async function overflowing(page: Page): Promise<string[]> {
     return found;
   }, CARDS);
 }
+
+test("row content does not overlap at 300px", async ({ page }) => {
+  await setWidth(page, 300, "ltr");
+  const squeezed = await page.evaluate((cards) => {
+    const found: string[] = [];
+    for (const id of cards) {
+      for (const el of document.getElementById(id)!.shadowRoot!.querySelectorAll<HTMLElement>(".row-left")) {
+        if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1) found.push(id);
+      }
+    }
+    return found;
+  }, CARDS);
+  expect(squeezed).toEqual([]);
+});
 
 for (const dir of ["ltr", "rtl"]) {
   test(`every card fits a 300px ${dir} column`, async ({ page }) => {

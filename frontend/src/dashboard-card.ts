@@ -129,7 +129,10 @@ export class UnraidDashboardCard extends BaseUnraidCard {
                 aria-selected=${this._activeTab === id}
                 aria-controls="dashboard-panel"
                 tabindex=${this._activeTab === id ? 0 : -1}
-                @click=${() => (this._activeTab = id)}
+                @click=${(event: Event) => {
+                  this._activeTab = id;
+                  (event.currentTarget as HTMLElement).scrollIntoView?.({ block: "nearest", inline: "nearest" });
+                }}
               >
                 ${iconTemplate(icon, 14)} ${label}
               </button>

@@ -3,7 +3,7 @@ import {
   SERVER_CARD_TAG,
   SERVER_EDITOR_TAG,
 } from "./config";
-import { BaseUnraidCard } from "./dashboard-cards-base";
+import { BaseUnraidCard, formatDataRate } from "./dashboard-cards-base";
 import { UnraidServerCardEditor } from "./dashboard-cards-editor";
 import {
   iconTemplate,
@@ -77,7 +77,7 @@ export class UnraidServerCard extends BaseUnraidCard {
     // Network interfaces and primary interface
     const ifaces = this.getNetworkInterfaces();
     const primaryIface = ifaces.length > 0 ? ifaces[0] : undefined;
-    const speedRaw = primaryIface?.speed?.state || (primaryIface?.link?.attributes?.speed_mbps as string | number | undefined);
+    const speedRaw = primaryIface?.speed?.state || (primaryIface?.link?.attributes?.speed_mbps as string | number | undefined) || (primaryIface?.rx?.attributes?.network_speed as number | undefined);
     const netSpeedNum = speedRaw != null ? Number(speedRaw) : undefined;
     const netSpeedText = netSpeedNum
       ? netSpeedNum >= 1000
@@ -85,18 +85,10 @@ export class UnraidServerCard extends BaseUnraidCard {
         : `${netSpeedNum} Mbps`
       : "";
 
-    const rxVal = primaryIface?.rx?.state ? parseFloat(primaryIface.rx.state) : NaN;
-    const txVal = primaryIface?.tx?.state ? parseFloat(primaryIface.tx.state) : NaN;
-    const rxText = !isNaN(rxVal)
-      ? rxVal < 0.1
-        ? `${(rxVal * 1000).toFixed(1)} kB/s`
-        : `${rxVal.toFixed(2)} MB/s`
-      : "";
-    const txText = !isNaN(txVal)
-      ? txVal < 0.1
-        ? `${(txVal * 1000).toFixed(1)} kB/s`
-        : `${txVal.toFixed(2)} MB/s`
-      : "";
+    const rxRate = formatDataRate(primaryIface?.rx);
+    const txRate = formatDataRate(primaryIface?.tx);
+    const rxText = rxRate === "--" ? "" : rxRate;
+    const txText = txRate === "--" ? "" : txRate;
     const netTrafficText = rxText && txText ? `↓ ${rxText} • ↑ ${txText}` : netSpeedText || "Active";
 
     // Boot / Flash device

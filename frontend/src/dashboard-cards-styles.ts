@@ -247,7 +247,7 @@ export const dashboardCardStyles = [
       font-size: var(--ha-font-size-s, 12px);
       color: var(--unraid-subtext);
       line-height: 1.1;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
     }
 
     /* Progress Bars */
@@ -511,7 +511,7 @@ export const dashboardCardStyles = [
 
     @container (max-width: 450px) {
       .list-row, .disk-row, .row-left, .row-right, .disk-meta, .container-tile { flex-wrap: wrap; }
-      .row-left { min-width: 0; }
+      .row-left { min-width: 0; flex-basis: 100%; }
       .row-right, .disk-meta { margin-inline-start: auto; }
     }
 
@@ -620,12 +620,15 @@ export const dashboardCardStyles = [
     .tab-strip {
       display: flex;
       gap: var(--ha-space-2, 8px);
-      flex-wrap: wrap;
+      overflow-x: auto;
+      scrollbar-width: thin;
       border-block-end: 1px solid var(--unraid-border);
       padding-block-end: var(--ha-space-2, 8px);
     }
 
     .tab-btn {
+      flex-shrink: 0;
+      white-space: nowrap;
       padding: var(--ha-space-1, 4px) var(--ha-space-2, 8px);
       border-radius: var(--ha-border-radius-md, 8px);
       font-size: var(--ha-font-size-s, 12px);

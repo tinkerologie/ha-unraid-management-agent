@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Align dashboard cards with Home Assistant 2026.10+ UI patterns (#253): design tokens, theme colour fallbacks for light and dark, container queries and RTL fit at 300px, native keyboard-operable controls, accessible dashboard tabs and card picker previews. Card types, config and service calls are unchanged.
 
+### Fixed
+
+- Dashboard cards now show live data correctly: network rates use the sensor's unit (kbit/s was labelled MB/s), interface IP and speed come from the rate sensor's attributes, disks read `spin_state`, a failed SMART status shows Error and an unknown one shows Unknown rather than Healthy, flash free space is scaled with its unit, and empty disk slots are no longer listed.
+
 ## [2026.10.1] — 2026-10-25
 
 ### Fixed

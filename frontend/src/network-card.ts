@@ -3,7 +3,7 @@ import {
   NETWORK_CARD_TAG,
   NETWORK_EDITOR_TAG,
 } from "./config";
-import { BaseUnraidCard } from "./dashboard-cards-base";
+import { BaseUnraidCard, formatDataRate } from "./dashboard-cards-base";
 import { UnraidNetworkCardEditor } from "./dashboard-cards-editor";
 import { fireEvent } from "./ha-types";
 import {
@@ -17,17 +17,6 @@ import { registerDashboardCard } from "./register-dashboard-card";
 
 export class UnraidNetworkCard extends BaseUnraidCard {
   static override editorTag = NETWORK_EDITOR_TAG;
-
-  private formatDataRate(valStr?: string, unit = "MB/s"): string {
-    if (!valStr) return "--";
-    const clean = valStr.toLowerCase().trim();
-    if (["unavailable", "unknown", "none", "--"].includes(clean)) return "--";
-    const num = parseFloat(valStr);
-    if (isNaN(num)) return "--";
-    if (num <= 0) return "0 kB/s";
-    if (num < 0.1) return `${(num * 1000).toFixed(1)} kB/s`;
-    return `${num.toFixed(2)} ${unit}`;
-  }
 
   private isValidIp(s?: string): boolean {
     return (
@@ -104,14 +93,15 @@ export class UnraidNetworkCard extends BaseUnraidCard {
             ? ifaces.map((iface) => {
                 const isConnected =
                   iface.link?.state === "on" || this.isValidIp(iface.ip?.state);
-                const ipStr = this.isValidIp(iface.ip?.state) ? iface.ip!.state : "--";
+                const attrIp = iface.rx?.attributes?.network_ip as string | undefined;
+                const ipStr = this.isValidIp(iface.ip?.state) ? iface.ip!.state : this.isValidIp(attrIp) ? attrIp! : "--";
                 const macStr = (iface.ip?.attributes?.mac_address as string) || (iface.link?.attributes?.mac_address as string) || "";
                 const mtu = (iface.link?.attributes?.mtu as number) || (iface.ip?.attributes?.mtu as number) || undefined;
-                const speedVal = iface.speed?.state || (iface.link?.attributes?.speed_mbps as string | number | undefined);
+                const speedVal = iface.speed?.state || (iface.link?.attributes?.speed_mbps as string | number | undefined) || (iface.rx?.attributes?.network_speed as number | undefined);
                 const speedText = this.formatSpeed(speedVal != null ? String(speedVal) : undefined);
 
-                const rxRate = this.formatDataRate(iface.rx?.state);
-                const txRate = this.formatDataRate(iface.tx?.state);
+                const rxRate = formatDataRate(iface.rx);
+                const txRate = formatDataRate(iface.tx);
                 const totalRx = (iface.rx?.attributes?.total_received as string) || "";
                 const totalTx = (iface.tx?.attributes?.total_sent as string) || "";
 

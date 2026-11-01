@@ -18,7 +18,7 @@ import {
 } from "./icons";
 import { registerDashboardCard } from "./register-dashboard-card";
 
-export type DiskHealthLevel = "healthy" | "warning" | "error";
+export type DiskHealthLevel = "healthy" | "warning" | "error" | "unknown";
 
 export interface DiskItem {
   id: string;
@@ -36,6 +36,28 @@ export interface DiskItem {
   spinEntityId?: string;
   freeSpace?: string;
   totalSpace?: string;
+}
+
+/** Read a disk's spin state from whichever attribute its entity exposes. */
+function spinningFromAttributes(attrs: Record<string, unknown>): boolean | undefined {
+  if (attrs.spin_state !== undefined) return attrs.spin_state === "active";
+  if (attrs.spinning !== undefined) return Boolean(attrs.spinning);
+  if (attrs.standby !== undefined) return !attrs.standby;
+  return undefined;
+}
+
+/** Read a temperature that may be a number or text such as "41 °C". */
+function parseTemperature(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : parseFloat(String(value));
+  return isNaN(parsed) ? undefined : parsed;
+}
+
+/** Map a disk health entity state (SMART text or binary sensor) to a level. */
+function healthFromState(state: string): DiskHealthLevel {
+  const clean = state.toLowerCase().trim();
+  if (clean === "on" || clean.startsWith("fail")) return "error";
+  if (["unknown", "unavailable", "none", ""].includes(clean)) return "unknown";
+  return "healthy";
 }
 
 export function formatDiskName(rawName: string, id: string): string {
@@ -89,7 +111,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
       const isCache = cleanName.toLowerCase().includes("cache") || cleanName.toLowerCase().includes("pool");
       const isBoot = cleanName.toLowerCase().includes("boot") || cleanName.toLowerCase().includes("flash");
 
-      const attrSpin = u.attributes.spin_state === "active" || u.attributes.spinning === true;
+      const attrSpin = spinningFromAttributes(u.attributes) ?? false;
       const attrTemp = u.attributes.temperature_celsius ?? u.attributes.temperature;
       const attrErrors = Number(u.attributes.num_errors ?? 0);
       const attrStatus = (u.attributes.status as string) || "DISK_OK";
@@ -116,14 +138,16 @@ export class UnraidStorageCard extends BaseUnraidCard {
     for (const h of healthEntities) {
       const diskKey = extractDiskToken(h.entity_id);
       if (diskMap.has(diskKey)) continue;
+      // Unraid reports an empty slot as DISK_NP or DISK_NP_DSBL.
+      if (/^disk_np/i.test(h.state)) continue;
       if (diskKey.includes("disabled") || diskKey.includes("missing") || diskKey.includes("invalid")) continue;
 
       const cleanName = formatDiskName((h.attributes.friendly_name as string) || diskKey, diskKey);
       const isParity = cleanName.toLowerCase().includes("parity");
       const isCache = cleanName.toLowerCase().includes("cache");
       const isBoot = cleanName.toLowerCase().includes("boot");
-      const attrSpin = h.attributes.spinning === true || (h.attributes.standby !== undefined ? !h.attributes.standby : false);
-      const attrTemp = h.attributes.temperature;
+      const attrSpin = spinningFromAttributes(h.attributes) ?? false;
+      const attrTemp = parseTemperature(h.attributes.temperature);
       const attrStatus = (h.attributes.status as string) || "DISK_OK";
 
       diskMap.set(diskKey, {
@@ -136,7 +160,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
         temp: attrTemp !== undefined && attrTemp !== null ? `${attrTemp}°C` : "*",
         tempNum: typeof attrTemp === "number" ? attrTemp : undefined,
         errors: 0,
-        health: h.state === "on" ? "error" : "healthy",
+        health: healthFromState(h.state),
         statusText: attrStatus,
         isSpinning: attrSpin,
       });
@@ -180,18 +204,13 @@ export class UnraidStorageCard extends BaseUnraidCard {
         if (h.attributes.status) {
           disk.statusText = h.attributes.status as string;
         }
-        if (h.attributes.spinning !== undefined) {
-          disk.isSpinning = Boolean(h.attributes.spinning);
-        } else if (h.attributes.standby !== undefined) {
-          disk.isSpinning = !h.attributes.standby;
+        disk.isSpinning = spinningFromAttributes(h.attributes) ?? disk.isSpinning;
+        const healthTemp = parseTemperature(h.attributes.temperature);
+        if (healthTemp !== undefined && disk.temp === "*") {
+          disk.temp = `${healthTemp}°C`;
+          disk.tempNum = healthTemp;
         }
-        if (h.attributes.temperature !== undefined && disk.temp === "*") {
-          disk.temp = `${h.attributes.temperature}°C`;
-          disk.tempNum = Number(h.attributes.temperature);
-        }
-        if (h.state === "on") {
-          disk.health = "error";
-        }
+        disk.health = healthFromState(h.state);
       }
     }
 
@@ -204,7 +223,7 @@ export class UnraidStorageCard extends BaseUnraidCard {
         disk.health = "error";
       } else if (disk.errors > 0 || (disk.tempNum !== undefined && disk.tempNum > 45)) {
         disk.health = "warning";
-      } else {
+      } else if (disk.health !== "unknown") {
         disk.health = "healthy";
       }
     }
@@ -429,7 +448,17 @@ export class UnraidStorageCard extends BaseUnraidCard {
 
                 const tempDisplay = hasValidTemp ? `${Math.round(tempNum)}°C` : "--";
 
-                const healthBadge = disk.health === "healthy"
+                const healthBadge = disk.health === "unknown"
+                  ? html`
+                      <span
+                        class="badge badge-standby"
+                        style="font-size: var(--ha-font-size-s, 12px);"
+                        title="SMART status can't be read, usually because the disk is spun down"
+                      >
+                        <span>Unknown</span>
+                      </span>
+                    `
+                  : disk.health === "healthy"
                   ? html`
                       <span class="badge badge-online" style="font-size: var(--ha-font-size-s, 12px); gap: var(--ha-space-1, 4px);">
                         ${iconTemplate(mdiCheckCircle, 11)}
