@@ -2,19 +2,29 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.unraid_management_agent.api.models import ArrayStatus, DiskInfo
+from custom_components.unraid_management_agent.const import (
+    CONF_ACKNOWLEDGED_DISK_IO_ERRORS,
+    DOMAIN,
+)
 from custom_components.unraid_management_agent.coordinator import UnraidData
 from custom_components.unraid_management_agent.repairs import (
     ArrayIssueRepairFlow,
     ConnectionIssueRepairFlow,
     DiskHealthRepairFlow,
+    DiskIOErrorRepairFlow,
     ParityCheckRepairFlow,
     async_check_and_create_issues,
     async_create_fix_flow,
+    async_delete_disk_issues,
 )
 
 
@@ -175,6 +185,7 @@ async def test_check_and_create_issues_connection_failed(
     """Test issue creation when connection fails."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = False
     coordinator.last_exception = Exception("Connection timeout")
@@ -198,6 +209,7 @@ async def test_check_and_create_issues_connection_success(
     """Test issue deletion when connection succeeds."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.data = UnraidData(disks=[], array=None)
@@ -216,47 +228,13 @@ async def test_check_and_create_issues_connection_success(
     assert any("connection_" in str(call) for call in mock_delete.call_args_list)
 
 
-async def test_check_and_create_issues_disk_smart_errors(
-    hass: HomeAssistant,
-) -> None:
-    """Test issue creation for disk SMART errors."""
-    coordinator = MagicMock()
-    coordinator.config_entry.entry_id = "test_entry"
-    coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
-    coordinator.last_update_success = True
-    coordinator.data = UnraidData(
-        disks=[
-            DiskInfo(
-                id="disk1",
-                name="disk1",
-                smart_errors=5,
-                smart_status="FAILING",
-                temperature_celsius=35,
-            )
-        ],
-        array=None,
-    )
-
-    with (
-        patch(
-            "custom_components.unraid_management_agent.repairs.ir.async_create_issue"
-        ) as mock_create,
-        patch(
-            "custom_components.unraid_management_agent.repairs.ir.async_delete_issue"
-        ),
-    ):
-        await async_check_and_create_issues(hass, coordinator)
-
-    # Check SMART error issue was created
-    assert any("smart_errors" in str(call) for call in mock_create.call_args_list)
-
-
 async def test_check_and_create_issues_disk_high_temp(
     hass: HomeAssistant,
 ) -> None:
     """Test issue creation for high disk temperature."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
 
@@ -301,6 +279,7 @@ async def test_check_and_create_issues_disk_critical_temp(
     """Test issue creation for critical disk temperature."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
 
@@ -344,6 +323,7 @@ async def test_check_and_create_issues_parity_invalid(
     """Test issue creation for invalid parity."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.data = UnraidData(
@@ -371,6 +351,7 @@ async def test_check_and_create_issues_parity_check_stuck(
     """Test issue creation for stuck parity check."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.data = UnraidData(
@@ -402,6 +383,7 @@ async def test_check_and_create_issues_no_data(
     """Test no additional issues created when coordinator has no data."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.data = None
@@ -427,6 +409,7 @@ async def test_check_and_create_issues_parity_invalid_no_state(
     """Test parity invalid issue is created."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.data = UnraidData(
@@ -459,6 +442,7 @@ async def test_check_and_create_issues_parity_valid(
     """Test parity valid removes existing issue."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.data = UnraidData(
@@ -490,6 +474,7 @@ async def test_check_and_create_issues_no_parity_disks(
     """Test no parity issue created when server has no parity disks (pools only)."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.data = UnraidData(
@@ -520,6 +505,7 @@ async def test_check_and_create_issues_temp_warning(
     """Test temperature warning issue is created when disk is above warning threshold."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.last_exception = None
@@ -565,6 +551,7 @@ async def test_check_and_create_issues_temp_critical(
     """Test temperature critical issue is created when disk is above critical threshold."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.last_exception = None
@@ -610,6 +597,7 @@ async def test_check_and_create_issues_temp_normal_clears(
     """Test normal temperature clears existing issues."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.last_exception = None
@@ -657,6 +645,7 @@ async def test_check_and_create_issues_no_temp_clears(
     """Test missing temperature clears existing issues."""
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "test_entry"
+    coordinator.config_entry.options = {}
     coordinator.config_entry.data = {"host": "192.168.1.100", "port": 8043}
     coordinator.last_update_success = True
     coordinator.last_exception = None
@@ -691,3 +680,241 @@ async def test_check_and_create_issues_no_temp_clears(
     # Should delete both warning and critical temp issues when no temp reading
     assert any("high_temp" in str(call) for call in delete_calls)
     assert any("critical_temp" in str(call) for call in delete_calls)
+
+
+def _disk(**kwargs: Any) -> DiskInfo:
+    """Return disk1 with a serial and a passing SMART status by default."""
+    defaults: dict[str, Any] = {
+        "id": "disk1",
+        "name": "disk1",
+        "serial_number": "SER1",
+        "smart_status": "PASSED",
+        "smart_errors": 0,
+        "temperature_celsius": 35,
+    }
+    return DiskInfo(**{**defaults, **kwargs})
+
+
+async def _check(
+    hass: HomeAssistant, entry: MockConfigEntry, disks: list[DiskInfo] | None
+) -> None:
+    """Run the issue check against the real registry and config entry."""
+    coordinator = MagicMock()
+    coordinator.config_entry = entry
+    coordinator.last_update_success = True
+    await async_check_and_create_issues(
+        hass, coordinator, UnraidData(disks=disks, array=None)
+    )
+
+
+def _issue(
+    hass: HomeAssistant, entry: MockConfigEntry, kind: str
+) -> ir.IssueEntry | None:
+    """Return a disk1 issue of the entry from the real registry."""
+    return ir.async_get(hass).async_get_issue(
+        DOMAIN, f"disk_health_{entry.entry_id}_disk1_{kind}"
+    )
+
+
+async def _acknowledge(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """Complete the repair flow of disk1's current I/O error issue."""
+    issue = _issue(hass, entry, "io_errors")
+    assert issue is not None
+    flow = await async_create_fix_flow(hass, issue.issue_id, issue.data)
+    assert isinstance(flow, DiskIOErrorRepairFlow)
+    form = await flow.async_step_init()
+    assert form["type"] == "form"
+    assert form["description_placeholders"]["io_errors"] == str(issue.data["io_errors"])
+    result = await flow.async_step_init(user_input={})
+    assert result["type"] == "create_entry"
+
+
+@pytest.fixture
+def entry(hass: HomeAssistant) -> MockConfigEntry:
+    """Return a config entry registered with Home Assistant."""
+    config_entry = MockConfigEntry(domain=DOMAIN, options={"keep": True})
+    config_entry.add_to_hass(hass)
+    return config_entry
+
+
+async def test_io_errors_with_smart_passed_are_not_a_smart_failure(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """The reported case: PASSED with 72 I/O errors raises only an I/O issue."""
+    await _check(hass, entry, [_disk(smart_errors=72)])
+
+    issue = _issue(hass, entry, "io_errors")
+    assert issue is not None
+    assert issue.translation_key == "disk_io_errors"
+    assert issue.severity == ir.IssueSeverity.WARNING
+    assert issue.is_fixable is True
+    assert _issue(hass, entry, "smart_failure") is None
+
+
+async def test_acknowledgement_persists_until_count_increases(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """An acknowledged count stays quiet, and a higher count warns again."""
+    await _check(hass, entry, [_disk(smart_errors=72)])
+    await _acknowledge(hass, entry)
+
+    assert _issue(hass, entry, "io_errors") is None
+    assert entry.options[CONF_ACKNOWLEDGED_DISK_IO_ERRORS] == {"SER1": 72}
+    assert entry.options["keep"] is True
+
+    await _check(hass, entry, [_disk(smart_errors=72)])
+    assert _issue(hass, entry, "io_errors") is None
+
+    await _check(hass, entry, [_disk(smart_errors=73)])
+    issue = _issue(hass, entry, "io_errors")
+    assert issue is not None
+    assert issue.translation_placeholders["acknowledged"] == "72"
+
+
+async def test_acknowledges_displayed_count_not_latest(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Errors counted after the issue was shown are not acknowledged."""
+    await _check(hass, entry, [_disk(smart_errors=72)])
+    issue = _issue(hass, entry, "io_errors")
+    assert issue is not None
+    await _check(hass, entry, [_disk(smart_errors=75)])
+
+    flow = await async_create_fix_flow(hass, issue.issue_id, issue.data)
+    await flow.async_step_init(user_input={})
+
+    assert entry.options[CONF_ACKNOWLEDGED_DISK_IO_ERRORS] == {"SER1": 72}
+    await _check(hass, entry, [_disk(smart_errors=75)])
+    assert _issue(hass, entry, "io_errors") is not None
+
+
+async def test_counter_reset_removes_acknowledgement(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Errors after a counter reset are new errors."""
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_ACKNOWLEDGED_DISK_IO_ERRORS: {"SER1": 72, "SER2": 3}}
+    )
+    await _check(hass, entry, [_disk(smart_errors=5)])
+
+    assert entry.options[CONF_ACKNOWLEDGED_DISK_IO_ERRORS] == {"SER2": 3}
+    issue = _issue(hass, entry, "io_errors")
+    assert issue is not None
+    assert issue.translation_placeholders["acknowledged"] == "0"
+
+
+async def test_unavailable_data_changes_nothing(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """A missing count or disk list keeps issues and acknowledgements."""
+    stored = {CONF_ACKNOWLEDGED_DISK_IO_ERRORS: {"SER1": 5, "GONE": 1}}
+    hass.config_entries.async_update_entry(entry, options=stored)
+    await _check(hass, entry, [_disk(smart_errors=9)])
+    assert _issue(hass, entry, "io_errors") is not None
+
+    await _check(hass, entry, [_disk(smart_errors=None)])
+    await _check(hass, entry, None)
+    await _check(hass, entry, [])
+
+    assert _issue(hass, entry, "io_errors") is not None
+    assert entry.options == stored
+
+
+async def test_replacement_disk_is_not_acknowledged(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """An acknowledgement follows the serial, not the slot."""
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_ACKNOWLEDGED_DISK_IO_ERRORS: {"SER1": 72}}
+    )
+    await _check(hass, entry, [_disk(serial_number="SER2", smart_errors=1)])
+    assert _issue(hass, entry, "io_errors") is not None
+
+
+async def test_disk_without_identity_cannot_be_acknowledged(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Without a serial or ID nothing can bind an acknowledgement to the disk."""
+    await _check(
+        hass, entry, [_disk(id=None, name="disk1", serial_number=None, smart_errors=4)]
+    )
+    issue = _issue(hass, entry, "io_errors")
+    assert issue is not None
+    assert issue.is_fixable is False
+
+
+async def test_smart_failure_is_independent_of_acknowledgement(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """SMART FAILED raises its issue even when the I/O count is acknowledged."""
+    hass.config_entries.async_update_entry(
+        entry, options={CONF_ACKNOWLEDGED_DISK_IO_ERRORS: {"SER1": 72}}
+    )
+    await _check(hass, entry, [_disk(smart_status="FAILED", smart_errors=72)])
+
+    issue = _issue(hass, entry, "smart_failure")
+    assert issue is not None
+    assert issue.severity == ir.IssueSeverity.ERROR
+    assert issue.is_fixable is False
+    assert _issue(hass, entry, "io_errors") is None
+
+
+@pytest.mark.parametrize("status", [None, "UNKNOWN"])
+async def test_smart_failure_survives_unknown_status(
+    hass: HomeAssistant, entry: MockConfigEntry, status: str | None
+) -> None:
+    """A spun-down disk does not clear a failure; a healthy status does."""
+    await _check(hass, entry, [_disk(smart_status="FAILED")])
+    await _check(hass, entry, [_disk(smart_status=status)])
+    assert _issue(hass, entry, "smart_failure") is not None
+
+    await _check(hass, entry, [_disk(smart_status="PASSED")])
+    assert _issue(hass, entry, "smart_failure") is None
+
+
+async def test_legacy_smart_errors_issue_is_removed(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """The combined issue from older versions does not survive an update."""
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        "disk_health_disk1_smart_errors",
+        is_fixable=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="disk_smart_errors",
+    )
+    await _check(hass, entry, [_disk()])
+    assert (
+        ir.async_get(hass).async_get_issue(DOMAIN, "disk_health_disk1_smart_errors")
+        is None
+    )
+
+
+async def test_acknowledge_flow_without_entry_only_clears_issue(
+    hass: HomeAssistant,
+) -> None:
+    """A stale payload finishes the flow without writing anything."""
+    flow = DiskIOErrorRepairFlow(hass, "disk_health_x_io_errors", {"entry_id": "gone"})
+    result = await flow.async_step_init(user_input={})
+    assert result["type"] == "create_entry"
+
+
+async def test_delete_disk_issues_keeps_other_entries(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Removing an entry deletes only that entry's disk issues."""
+    await _check(hass, entry, [_disk(smart_errors=1)])
+    other_id = "disk_health_other_disk1_io_errors"
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        other_id,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="disk_io_errors",
+    )
+    async_delete_disk_issues(hass, entry.entry_id)
+
+    assert _issue(hass, entry, "io_errors") is None
+    assert ir.async_get(hass).async_get_issue(DOMAIN, other_id) is not None

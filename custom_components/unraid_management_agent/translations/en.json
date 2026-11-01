@@ -287,7 +287,7 @@
         "name": "Disk {disk_name} Temperature"
       },
       "disk_smart_errors": {
-        "name": "Disk {disk_name} SMART Errors"
+        "name": "Disk {disk_name} I/O Errors"
       },
       "disk_read_bytes": {
         "name": "Disk {disk_name} Read"
@@ -1186,9 +1186,21 @@
       "title": "Connection to Unraid Server Failed",
       "description": "Failed to connect to Unraid server at {host}:{port}.\n\nError: {error}\n\n**Troubleshooting Steps:**\n1. Verify the Unraid server is running\n2. Check the host and port are correct\n3. Ensure the Unraid Management Agent daemon is running\n4. Check firewall settings\n5. Verify network connectivity\n\nClick Submit to acknowledge this issue."
     },
-    "disk_smart_errors": {
-      "title": "Disk SMART Errors Detected",
-      "description": "Disk **{disk_name}** has {smart_errors} SMART errors.\n\nSMART Status: {smart_status}\n\n**Recommended Actions:**\n1. Back up important data immediately\n2. Run a full SMART test\n3. Consider replacing the disk\n4. Monitor disk health closely\n\nClick Submit to acknowledge this issue."
+    "disk_smart_failure": {
+      "title": "Disk SMART Failure",
+      "description": "Disk **{disk_name}** reports SMART health status {smart_status}.\n\n**Recommended Actions:**\n1. Back up important data immediately\n2. Review the disk's SMART attributes\n3. Plan to replace the disk\n\nThis issue clears when the disk reports a healthy SMART status."
+    },
+    "disk_io_errors": {
+      "title": "Disk I/O Errors Detected",
+      "description": "Unraid has counted {io_errors} read/write errors on disk **{disk_name}** ({acknowledged} acknowledged). This count accumulates until Unraid's statistics are cleared and is separate from the disk's SMART health.\n\n**Recommended Actions:**\n1. Check the disk's cables and connections\n2. Run a SMART extended self-test\n3. Review the system log for disk errors",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Acknowledge Disk I/O Errors",
+            "description": "Acknowledge {io_errors} I/O errors on disk **{disk_name}**? Unraid's statistics are not changed. You will be warned again if the count increases or the disk's SMART status fails."
+          }
+        }
+      }
     },
     "disk_high_temperature": {
       "title": "Disk High Temperature Warning",

@@ -9,10 +9,12 @@ from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
-from .const import DOMAIN
+from .const import CONF_ACKNOWLEDGED_DISK_IO_ERRORS, DOMAIN
 
 if TYPE_CHECKING:
-    from .api.models import ShareInfo
+    from homeassistant.config_entries import ConfigEntry
+
+    from .api.models import DiskInfo, ShareInfo
     from .coordinator import UnraidData, UnraidDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,6 +28,8 @@ async def async_create_fix_flow(
     """Create a fix flow for an issue."""
     if issue_id.startswith("connection_"):
         return ConnectionIssueRepairFlow(hass, issue_id, data)
+    if issue_id.startswith("disk_health_") and issue_id.endswith("_io_errors"):
+        return DiskIOErrorRepairFlow(hass, issue_id, data)
     if issue_id.startswith("disk_health_"):
         return DiskHealthRepairFlow(hass, issue_id, data)
     if issue_id.startswith("array_"):
@@ -104,6 +108,52 @@ class DiskHealthRepairFlow(RepairsFlow):
                 "temperature": str(data.get("temperature", "Unknown")),
             },
         )
+
+
+class DiskIOErrorRepairFlow(RepairsFlow):
+    """Acknowledge a disk's I/O error count without touching Unraid's statistics."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        issue_id: str,
+        data: dict[str, str | int | float | None] | None,
+    ) -> None:
+        """Initialize the repair flow."""
+        super().__init__()
+        self.hass = hass
+        self.issue_id = issue_id
+        self.data = data or {}
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> RepairsFlowResult:
+        """Acknowledge the count shown in the issue, so a later increase warns."""
+        data = self.data or {}
+        if user_input is None:
+            return self.async_show_form(
+                step_id="init",
+                description_placeholders={
+                    "disk_name": str(data.get("disk_name", "Unknown")),
+                    "io_errors": str(data.get("io_errors", "?")),
+                },
+            )
+
+        entry = self.hass.config_entries.async_get_entry(str(data.get("entry_id")))
+        physical_key = data.get("physical_key")
+        count = data.get("io_errors")
+        if entry is not None and isinstance(physical_key, str) and count is not None:
+            acknowledged = dict(entry.options.get(CONF_ACKNOWLEDGED_DISK_IO_ERRORS, {}))
+            acknowledged[physical_key] = count
+            self.hass.config_entries.async_update_entry(
+                entry,
+                options={
+                    **entry.options,
+                    CONF_ACKNOWLEDGED_DISK_IO_ERRORS: acknowledged,
+                },
+            )
+        ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
+        return self.async_create_entry(title="", data={})
 
 
 class ArrayIssueRepairFlow(RepairsFlow):
@@ -224,30 +274,17 @@ async def async_check_and_create_issues(
 
     # Check for disk health issues
     disks = data.disks or []
+    stored_acknowledged = coordinator.config_entry.options.get(
+        CONF_ACKNOWLEDGED_DISK_IO_ERRORS, {}
+    )
+    acknowledged = dict(stored_acknowledged)
     for disk in disks:
         disk_id = getattr(disk, "id", None) or getattr(disk, "name", None) or "unknown"
 
-        # Check for SMART errors using library property
-        smart_issue_id = f"disk_health_{disk_id}_smart_errors"
-        if getattr(disk, "has_smart_errors", False):
-            smart_errors = getattr(disk, "smart_errors", 0) or 0
-            smart_status = getattr(disk, "smart_status", None) or "UNKNOWN"
-            ir.async_create_issue(
-                hass,
-                DOMAIN,
-                smart_issue_id,
-                is_fixable=True,
-                severity=ir.IssueSeverity.WARNING,
-                translation_key="disk_smart_errors",
-                translation_placeholders={
-                    "disk_name": getattr(disk, "name", None) or disk_id,
-                    "smart_errors": str(int(smart_errors)),
-                    "smart_status": smart_status,
-                },
-            )
-        else:
-            # No SMART errors, remove any existing issue
-            ir.async_delete_issue(hass, DOMAIN, smart_issue_id)
+        # Issues from before SMART failures and I/O errors were separated
+        ir.async_delete_issue(hass, DOMAIN, f"disk_health_{disk_id}_smart_errors")
+        _check_disk_smart_failure(hass, entry_id, disk, disk_id)
+        _check_disk_io_errors(hass, entry_id, disk, disk_id, acknowledged)
 
         # Get temperature status using library method
         temp_warning_issue_id = f"disk_health_{disk_id}_high_temp"
@@ -298,6 +335,9 @@ async def async_check_and_create_issues(
             # Temperature is normal, remove any existing issues
             ir.async_delete_issue(hass, DOMAIN, temp_warning_issue_id)
             ir.async_delete_issue(hass, DOMAIN, temp_critical_issue_id)
+
+    if acknowledged != stored_acknowledged:
+        _store_acknowledged_io_errors(hass, coordinator.config_entry, acknowledged)
 
     # Check for array issues (only if parity disks are configured)
     array_data = data.array
@@ -351,6 +391,92 @@ async def async_check_and_create_issues(
         ir.async_delete_issue(hass, DOMAIN, stuck_issue_id)
 
     _check_share_fuse_fallback(hass, coordinator.config_entry.entry_id, data.shares)
+
+
+def _check_disk_smart_failure(
+    hass: HomeAssistant, entry_id: str, disk: DiskInfo, disk_id: str
+) -> None:
+    """Raise an issue while a disk's SMART health status is FAILED."""
+    issue_id = f"disk_health_{entry_id}_{disk_id}_smart_failure"
+    if disk.has_smart_failure:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="disk_smart_failure",
+            translation_placeholders={
+                "disk_name": disk.name or disk_id,
+                "smart_status": str(disk.smart_status),
+            },
+        )
+    elif disk.smart_status and disk.smart_status.upper() != "UNKNOWN":
+        # A spun-down disk reports no status: that does not clear a failure
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+
+def _check_disk_io_errors(
+    hass: HomeAssistant,
+    entry_id: str,
+    disk: DiskInfo,
+    disk_id: str,
+    acknowledged: dict[str, int],
+) -> None:
+    """
+    Raise an issue while a disk's I/O error count exceeds its acknowledged count.
+
+    A count below the acknowledged one means the counter was reset, so the
+    acknowledgement is removed from ``acknowledged``. The agent reports a missing
+    numErrors as 0, which looks like a reset too; the next positive count then
+    warns again, which is the safe outcome.
+    """
+    current = disk.smart_errors
+    if not isinstance(current, int):
+        return  # Unavailable: keep the current state
+
+    # A serial stays with the disk, so a replacement disk starts unacknowledged
+    physical_key = disk.serial_number or disk.id
+    issue_id = f"disk_health_{entry_id}_{disk_id}_io_errors"
+    acknowledged_count = acknowledged.get(physical_key, 0) if physical_key else 0
+    if current < acknowledged_count:
+        acknowledged.pop(str(physical_key), None)
+        acknowledged_count = 0
+
+    if current <= acknowledged_count:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+        return
+
+    disk_name = disk.name or disk_id
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        data={
+            "entry_id": entry_id,
+            "physical_key": physical_key,
+            "disk_name": disk_name,
+            "io_errors": current,
+        },
+        is_fixable=physical_key is not None and physical_key != "",
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="disk_io_errors",
+        translation_placeholders={
+            "disk_name": disk_name,
+            "io_errors": str(current),
+            "acknowledged": str(acknowledged_count),
+        },
+    )
+
+
+def _store_acknowledged_io_errors(
+    hass: HomeAssistant, entry: ConfigEntry, acknowledged: dict[str, int]
+) -> None:
+    """Persist the acknowledged counts in the config entry's options."""
+    hass.config_entries.async_update_entry(
+        entry,
+        options={**entry.options, CONF_ACKNOWLEDGED_DISK_IO_ERRORS: acknowledged},
+    )
 
 
 def _check_share_fuse_fallback(
@@ -427,4 +553,13 @@ def async_delete_share_issues(
             and issue_id.startswith(prefix)
             and issue_id not in (keep or ())
         ):
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+
+@callback
+def async_delete_disk_issues(hass: HomeAssistant, entry_id: str) -> None:
+    """Delete a config entry's SMART failure and I/O error issues."""
+    prefix = f"disk_health_{entry_id}_"
+    for domain, issue_id in list(ir.async_get(hass).issues):
+        if domain == DOMAIN and issue_id.startswith(prefix):
             ir.async_delete_issue(hass, DOMAIN, issue_id)
