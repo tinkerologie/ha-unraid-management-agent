@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import calendar
 import logging
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -264,7 +265,13 @@ class UnraidEnergySensorExtraStoredData(SensorExtraStoredData):
                 if restored.get("last_uptime_seconds") is not None
                 else None
             )
-        except (TypeError, ValueError):  # fmt: skip
+        except (TypeError, ValueError, OverflowError):  # fmt: skip
+            return None
+
+        if any(
+            value is not None and not math.isfinite(value)
+            for value in (last_power_watts, last_timestamp)
+        ):
             return None
 
         return cls(
@@ -308,6 +315,11 @@ class UnraidGPUEnergySensorExtraStoredData(UnraidEnergySensorExtraStoredData):
         )
 
 
+# Uptime drops smaller than this, without a gap this long in the samples, are
+# stale samples, not host reboots
+_ENERGY_REBOOT_TOLERANCE_SECONDS = 300
+
+
 def _get_system_uptime_seconds(data: UnraidData | None) -> int | None:
     """Get the current system uptime in seconds from coordinator data."""
     if not data or not data.system:
@@ -333,6 +345,45 @@ def _did_system_reboot(
         and previous_uptime_seconds is not None
         and current_uptime_seconds < previous_uptime_seconds
     )
+
+
+def _track_energy_uptime(
+    current_uptime_seconds: int | None,
+    remembered_uptime_seconds: int | None,
+    seconds_since_last_sample: float,
+) -> tuple[bool, int | None]:
+    """
+    Return whether the host rebooted and the uptime to remember for energy.
+
+    A coordinator poll can publish a system snapshot older than a WebSocket
+    event that arrived during the poll, so a small decrease is not a reboot.
+    The remembered uptime is a high-water mark, so a stale sample can't lower it.
+    Stale samples arrive between regular updates, so any decrease after a long
+    silence is a reboot, even one soon after the previous boot.
+    """
+    if current_uptime_seconds is None:
+        return False, remembered_uptime_seconds
+    if remembered_uptime_seconds is None:
+        return False, current_uptime_seconds
+    drop = remembered_uptime_seconds - current_uptime_seconds
+    if drop > _ENERGY_REBOOT_TOLERANCE_SECONDS or (
+        drop > 0 and seconds_since_last_sample > _ENERGY_REBOOT_TOLERANCE_SECONDS
+    ):
+        return True, current_uptime_seconds
+    return False, max(current_uptime_seconds, remembered_uptime_seconds)
+
+
+def _restored_energy_total(*candidates: Any) -> float:
+    """Return the largest finite restored total, or 0.0 if there is none."""
+    totals: list[float] = []
+    for candidate in candidates:
+        try:
+            total = float(candidate)
+        except (TypeError, ValueError):  # fmt: skip
+            continue
+        if math.isfinite(total):
+            totals.append(total)
+    return max(totals, default=0.0)
 
 
 # =============================================================================
@@ -3685,31 +3736,26 @@ class UnraidUPSEnergySensor(UnraidBaseEntity, RestoreEntity, SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """Restore previous state when added to hass."""
-        await super().async_added_to_hass()
+        # Restore first: the coordinator listener attaches in super()
         await self._async_restore_energy_state()
+        await super().async_added_to_hass()
 
     async def _async_restore_energy_state(self) -> None:
         """Restore the accumulated energy total and integration baseline."""
-        if (
-            last_state := await self.async_get_last_state()
-        ) is not None and last_state.state not in (None, "unknown", "unavailable"):
-            try:
-                self._total_energy = float(last_state.state)
-            except (TypeError, ValueError):  # fmt: skip
-                self._total_energy = 0.0
+        last_state = await self.async_get_last_state()
+        extra_data = await self.async_get_last_extra_data()
+        restored = (
+            UnraidEnergySensorExtraStoredData.from_dict(extra_data.as_dict())
+            if extra_data is not None
+            else None
+        )
+        self._total_energy = _restored_energy_total(
+            last_state.state if last_state is not None else None,
+            restored.native_value if restored is not None else None,
+        )
 
-        if (extra_data := await self.async_get_last_extra_data()) is None:
-            return
-
-        restored = UnraidEnergySensorExtraStoredData.from_dict(extra_data.as_dict())
         if restored is None:
             return
-
-        if self._total_energy == 0.0:
-            try:
-                self._total_energy = float(restored.native_value)
-            except (TypeError, ValueError):  # fmt: skip
-                pass
 
         self._last_power = restored.last_power_watts
         self._last_uptime_seconds = restored.last_uptime_seconds
@@ -3755,16 +3801,19 @@ class UnraidUPSEnergySensor(UnraidBaseEntity, RestoreEntity, SensorEntity):
             self._last_power = None
             return
 
-        current_uptime_seconds = _get_system_uptime_seconds(self.coordinator.data)
-        if _did_system_reboot(
-            current_uptime_seconds,
+        now = dt_util.utcnow().timestamp()
+        last_sample = self._energy_integrator.last_timestamp
+        rebooted, self._last_uptime_seconds = _track_energy_uptime(
+            _get_system_uptime_seconds(self.coordinator.data),
             self._last_uptime_seconds,
-        ):
-            self._energy_integrator.reset()
+            now - last_sample if last_sample is not None else 0.0,
+        )
+        if rebooted:
+            # The gap isn't interpolated, and the accumulated total is kept
+            self._energy_integrator.break_series()
 
-        self._energy_integrator.add_sample(current_power, dt_util.utcnow().timestamp())
+        self._energy_integrator.add_sample(current_power, now)
         self._last_power = current_power
-        self._last_uptime_seconds = current_uptime_seconds
 
     def _total_kwh(self) -> float:
         """Return the accumulated energy in kWh, including the current series."""
@@ -4010,8 +4059,9 @@ class UnraidGPUEnergySensor(UnraidGPUEntity, RestoreEntity, SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """Restore previous state when added to hass."""
-        await super().async_added_to_hass()
+        # Restore first: the coordinator listener attaches in super()
         await self._async_restore_energy_state()
+        await super().async_added_to_hass()
 
     async def _async_restore_energy_state(self) -> None:
         """
@@ -4035,22 +4085,14 @@ class UnraidGPUEnergySensor(UnraidGPUEntity, RestoreEntity, SensorEntity):
         ):
             return
 
-        if (
-            last_state := await self.async_get_last_state()
-        ) is not None and last_state.state not in (None, "unknown", "unavailable"):
-            try:
-                self._total_energy = float(last_state.state)
-            except (TypeError, ValueError):  # fmt: skip
-                self._total_energy = 0.0
+        last_state = await self.async_get_last_state()
+        self._total_energy = _restored_energy_total(
+            last_state.state if last_state is not None else None,
+            restored.native_value if restored is not None else None,
+        )
 
         if restored is None:
             return
-
-        if self._total_energy == 0.0:
-            try:
-                self._total_energy = float(restored.native_value)
-            except (TypeError, ValueError):  # fmt: skip
-                pass
 
         self._last_power = restored.last_power_watts
         self._last_uptime_seconds = restored.last_uptime_seconds
@@ -4097,16 +4139,19 @@ class UnraidGPUEnergySensor(UnraidGPUEntity, RestoreEntity, SensorEntity):
         if current_power is None or current_power < 0:
             return
 
-        current_uptime_seconds = _get_system_uptime_seconds(self.coordinator.data)
-        if _did_system_reboot(
-            current_uptime_seconds,
+        now = dt_util.utcnow().timestamp()
+        last_sample = self._energy_integrator.last_timestamp
+        rebooted, self._last_uptime_seconds = _track_energy_uptime(
+            _get_system_uptime_seconds(self.coordinator.data),
             self._last_uptime_seconds,
-        ):
-            self._energy_integrator.reset()
+            now - last_sample if last_sample is not None else 0.0,
+        )
+        if rebooted:
+            # The gap isn't interpolated, and the accumulated total is kept
+            self._energy_integrator.break_series()
 
-        self._energy_integrator.add_sample(current_power, dt_util.utcnow().timestamp())
+        self._energy_integrator.add_sample(current_power, now)
         self._last_power = current_power
-        self._last_uptime_seconds = current_uptime_seconds
 
     @property
     def native_value(self) -> float:
