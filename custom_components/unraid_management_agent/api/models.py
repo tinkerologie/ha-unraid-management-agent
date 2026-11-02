@@ -3248,32 +3248,6 @@ class PluginUpdatesResult(BaseModel):
         return 0
 
 
-class PluginUpdateResult(BaseModel):
-    """Result of updating a single plugin."""
-
-    name: str | None = Field(None, description="Plugin name")
-    success: bool | None = Field(None, description="Whether the update succeeded")
-    message: str | None = Field(None, description="Result message")
-    previous_version: str | None = Field(None, description="Previous version")
-    new_version: str | None = Field(None, description="New version installed")
-    timestamp: str | None = Field(None, description="Data collection timestamp")
-
-    model_config = ConfigDict(frozen=True, extra="allow")
-
-
-class PluginBulkUpdateResult(BaseModel):
-    """Results of updating multiple plugins."""
-
-    results: list[PluginUpdateResult] | None = Field(
-        None, description="Individual update results"
-    )
-    succeeded: int | None = Field(None, description="Number of successful updates")
-    failed: int | None = Field(None, description="Number of failed updates")
-    timestamp: str | None = Field(None, description="Data collection timestamp")
-
-    model_config = ConfigDict(frozen=True, extra="allow")
-
-
 # Issue #44: MQTT support
 class MQTTStatus(BaseModel):
     """MQTT connection status and configuration."""
