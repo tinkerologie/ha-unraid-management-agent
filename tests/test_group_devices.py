@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from homeassistant.const import __version__ as HA_VERSION
+from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import area_registry as ar
@@ -244,7 +244,11 @@ async def test_upgrade_moves_devices_keeping_entities_and_settings(
     # before, and a VM entity's full name has the VMs device in front
     plex_cpu = hass.states.get("sensor.unraid_test_plex_cpu")
     # HA 2026.11 prefixes the device name to a user-set entity name; 2026.10 did not
-    expected = "Plex Media Server Plex CPU" if HA_VERSION >= "2026.11" else "Plex CPU"
+    expected = (
+        "Plex Media Server Plex CPU"
+        if tuple(map(int, ha_version.split(".")[:2])) >= (2026, 11)
+        else "Plex CPU"
+    )
     assert plex_cpu.attributes["friendly_name"] == expected
     docker_cpu = hass.states.get("sensor.unraid_test_docker_cpu_usage")
     assert docker_cpu.attributes["friendly_name"] == "unraid-test Docker CPU Usage"

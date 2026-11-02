@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Make the group-device naming test version-aware so it passes on Home Assistant 2026.11, which prefixes the device name to user-set entity names (test-only change).
 - Stop computed UPS, NUT and GPU energy totals jumping back to their restore baseline and stalling (#260): a stale uptime sample is no longer treated as a reboot, a detected reboot keeps the accumulated total, and restore keeps the larger valid total
 - Keep unavailable disk I/O readings from changing repair state while making the optional-value guard compatible with the pre-commit mypy configuration.
 
