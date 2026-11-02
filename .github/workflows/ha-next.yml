@@ -1,0 +1,236 @@
+name: HA Next
+
+on:
+  schedule:
+    - cron: 0 1 * * 1
+      timezone: Australia/Brisbane
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Check (${{ matrix.channel }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [pypi, dev]
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: 0.12.22
+          enable-cache: true
+
+      - name: Resolve versions
+        id: resolve
+        env:
+          CHANNEL: ${{ matrix.channel }}
+        run: |
+          uv python install 3.14.2
+          if [ "$CHANNEL" = pypi ]; then
+            uv run --no-project --python 3.14.2 --with packaging script/ha_next/resolve_versions.py
+          else
+            echo 'ha_version=dev' >> "$GITHUB_OUTPUT"
+            echo 'harness_version=' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create environment
+        id: venv
+        run: |
+          uv venv --python 3.14.2 "$VIRTUAL_ENV"
+          echo "$VIRTUAL_ENV/bin" >> "$GITHUB_PATH"
+
+      - name: Install Home Assistant
+        id: install
+        continue-on-error: true
+        env:
+          CHANNEL: ${{ matrix.channel }}
+          HA_VERSION: ${{ steps.resolve.outputs.ha_version }}
+          HARNESS_VERSION: ${{ steps.resolve.outputs.harness_version }}
+        run: |
+          if [ "$CHANNEL" = dev ]; then
+            uv pip install -e . 'homeassistant @ https://github.com/home-assistant/core/archive/refs/heads/dev.tar.gz'
+          elif [ -n "$HARNESS_VERSION" ]; then
+            uv pip install -e '.[test]' "homeassistant==$HA_VERSION" "pytest-homeassistant-custom-component==$HARNESS_VERSION"
+          else
+            uv pip install -e . "homeassistant==$HA_VERSION"
+          fi
+
+      - name: Record installed version
+        id: version
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python3 -c "from homeassistant.const import __version__; print('installed=' + __version__)" >> "$GITHUB_OUTPUT"
+
+      - name: Import every module
+        id: imports
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python3 script/ha_next/import_check.py | tee "$RUNNER_TEMP/ha-next-imports.md"
+
+      - name: Run tests
+        id: pytest
+        if: steps.install.outcome == 'success' && matrix.channel == 'pypi' && steps.resolve.outputs.harness_version != ''
+        continue-on-error: true
+        run: pytest --no-cov
+
+      - name: Run Hassfest from the same Core
+        id: hassfest
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        env:
+          HA_VERSION: ${{ steps.resolve.outputs.ha_version }}
+        run: script/hassfest --update
+
+      - name: Record channel result
+        if: always()
+        env:
+          CHANNEL: ${{ matrix.channel }}
+          HA_VERSION: ${{ steps.resolve.outputs.ha_version }}
+          INSTALLED: ${{ steps.version.outputs.installed }}
+          HARNESS_VERSION: ${{ steps.resolve.outputs.harness_version }}
+          RESOLVE: ${{ steps.resolve.outcome }}
+          VENV: ${{ steps.venv.outcome }}
+          INSTALL: ${{ steps.install.outcome }}
+          VERSION: ${{ steps.version.outcome }}
+          IMPORTS: ${{ steps.imports.outcome }}
+          PYTEST: ${{ steps.pytest.outcome }}
+          HASSFEST: ${{ steps.hassfest.outcome }}
+        run: |
+          RESULT=pass
+          for stage in "$RESOLVE" "$VENV" "$INSTALL" "$VERSION" "$IMPORTS" "$HASSFEST"; do
+            if [ "$stage" != success ]; then RESULT=fail; fi
+          done
+          if [ -n "$HARNESS_VERSION" ] && [ "$PYTEST" != success ]; then RESULT=fail; fi
+          if [ "$RESOLVE" != success ]; then RESULT=unresolved; fi
+          jq -n --arg channel "$CHANNEL" --arg result "$RESULT" \
+            --arg ha_version "$HA_VERSION" --arg installed "$INSTALLED" \
+            --arg harness_version "$HARNESS_VERSION" \
+            --arg resolve "$RESOLVE" --arg venv "$VENV" --arg install "$INSTALL" \
+            --arg version "$VERSION" --arg imports "$IMPORTS" --arg pytest "$PYTEST" --arg hassfest "$HASSFEST" \
+            '{channel: $channel, result: $result, ha_version: $ha_version,
+              installed: $installed, harness_version: $harness_version,
+              outcomes: {resolve: $resolve, venv: $venv, install: $install, version: $version,
+                         imports: $imports, pytest: $pytest, hassfest: $hassfest}}' > "$RUNNER_TEMP/result.json"
+          {
+            echo "## HA Next: $CHANNEL ($RESULT)"
+            echo "Selected Home Assistant: ${HA_VERSION:-unresolved}; installed: ${INSTALLED:-none}"
+            echo "Harness: ${HARNESS_VERSION:-none}; Python: 3.14.2; commit: $GITHUB_SHA"
+            echo
+            jq -r '.outcomes | to_entries[] | "- \(.key): \(.value)"' "$RUNNER_TEMP/result.json"
+            if [ -z "$HARNESS_VERSION" ] && [ "$RESOLVE" = success ]; then
+              if [ "$CHANNEL" = dev ]; then
+                echo 'No pytest-homeassistant-custom-component release matches Core dev; pytest was skipped.'
+              else
+                echo "No pytest-homeassistant-custom-component release pins homeassistant==$HA_VERSION; pytest was skipped."
+              fi
+            fi
+            if [ -f "$RUNNER_TEMP/ha-next-imports.md" ]; then cat "$RUNNER_TEMP/ha-next-imports.md"; fi
+          } > "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ha-next-${{ matrix.channel }}
+          path: |
+            ${{ runner.temp }}/result.json
+            ${{ runner.temp }}/report.md
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail on findings
+        if: always()
+        run: test "$(jq -r .result "$RUNNER_TEMP/result.json")" = pass
+
+  report:
+    name: Report (${{ matrix.channel }})
+    needs: test
+    # Branch dispatches check compatibility without changing repository issues.
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    concurrency:
+      group: ha-next-report-${{ matrix.channel }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [pypi, dev]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      CHANNEL: ${{ matrix.channel }}
+    steps:
+      - name: Download result
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ha-next-${{ matrix.channel }}
+          path: result
+
+      - name: Open, update or close channel issue
+        if: always()
+        env:
+          DOWNLOAD: ${{ steps.download.outcome }}
+        run: |
+          if [ "$DOWNLOAD" != success ] || [ ! -f result/result.json ]; then
+            echo '::warning::Missing result; repository issues were left unchanged.'
+            exit 0
+          fi
+          RESULT=$(jq -r .result result/result.json)
+          if [ "$RESULT" = unresolved ]; then
+            echo '::warning::Versions unresolved; repository issues were left unchanged.'
+            exit 0
+          fi
+          MARKER="<!-- ha-next-channel: $CHANNEL -->"
+          gh api --paginate "repos/$GH_REPO/issues?labels=ha-next&state=open&per_page=100" > issues.json
+          ISSUE=$(jq -s --arg marker "$MARKER" '[.[][] | select(.pull_request == null) | select((.body // "") | contains($marker))] | sort_by(.number) | .[0].number // empty' issues.json)
+          RUN_URL="$GITHUB_SERVER_URL/$GH_REPO/actions/runs/$GITHUB_RUN_ID"
+          if [ "$RESULT" = pass ]; then
+            if [ -n "$ISSUE" ]; then
+              gh issue comment "$ISSUE" --body "Checks pass again on $CHANNEL. $RUN_URL"
+              gh issue close "$ISSUE"
+            fi
+            exit 0
+          fi
+          HA_VERSION=$(jq -r .ha_version result/result.json)
+          LABEL=PyPI
+          if [ "$CHANNEL" = dev ]; then LABEL='Core dev'; fi
+          TITLE="HA Next ($LABEL): checks fail on Home Assistant $HA_VERSION"
+          {
+            echo "$MARKER"
+            cat result/report.md
+            echo
+            echo "Run: $RUN_URL"
+          } > body.md
+          if [ -n "$ISSUE" ]; then
+            gh issue edit "$ISSUE" --title "$TITLE" --body-file body.md
+            gh issue comment "$ISSUE" --body "Latest check: $RUN_URL"
+          else
+            # GITHUB_TOKEN-created issues do not trigger the issue labeler.
+            gh label create ha-next --color fbca04 --description 'Upcoming Home Assistant compatibility' || gh api "repos/$GH_REPO/labels/ha-next" >/dev/null
+            gh label create bug --color d73a4a --description 'Something is not working' || gh api "repos/$GH_REPO/labels/bug" >/dev/null
+            gh issue create --title "$TITLE" --body-file body.md --label ha-next --label bug
+          fi

@@ -79,3 +79,11 @@ max-complexity = 25
     "TC002", # allow test imports outside type-checking blocks
     "SLF001", # allow private member access in tests
 ]
+
+"script/**/*.py" = [
+    "INP001", # Standalone CLI scripts, not packages
+    "N999", # Hyphenated CLI filename
+    "T201", # CLI output
+    "S603", # Fixed git argument arrays, without a shell
+    "S607", # Git from PATH, as in CI
+]

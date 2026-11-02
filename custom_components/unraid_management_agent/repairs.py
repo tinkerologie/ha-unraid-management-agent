@@ -431,7 +431,7 @@ def _check_disk_io_errors(
     numErrors as 0, which looks like a reset too; the next positive count then
     warns again, which is the safe outcome.
     """
-    current = disk.smart_errors
+    current: object = disk.smart_errors
     if not isinstance(current, int):
         return  # Unavailable: keep the current state
 

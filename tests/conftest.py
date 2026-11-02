@@ -3,18 +3,56 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import re
 from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.core import HomeAssistant
 
-from custom_components.unraid_management_agent.const import DOMAIN
-from custom_components.unraid_management_agent.coordinator import UnraidData
+# Install before importing Home Assistant or the integration: deprecated entity
+# properties are reported when a class is defined, before fixtures run.
+# Keep these patterns aligned with script/ha_next/import_check.py.
+DEPRECATION_REPORT_PATTERNS = (
+    re.compile(r"Detected that custom integration 'unraid_management_agent'"),
+    re.compile(r"The deprecated .+ was used from unraid_management_agent\b"),
+    re.compile(
+        r"custom_components\.unraid_management_agent(?:\.\w+)*::[\w.]+ "
+        r"provides the deprecated .+, this will stop working in Home Assistant"
+    ),
+)
 
-from .const import (
+
+class UnraidDeprecationCollector(logging.Handler):
+    """Record Home Assistant deprecation reports independently of caplog."""
+
+    def __init__(self) -> None:
+        """Start recording with no severity or logger-name filter."""
+        super().__init__()
+        self.reports: list[str] = []
+        self.checked = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Keep the logger name and each matching message."""
+        message = record.getMessage()
+        if any(pattern.search(message) for pattern in DEPRECATION_REPORT_PATTERNS):
+            self.reports.append(f"{record.name}: {message}")
+
+
+_DEPRECATION_COLLECTOR = UnraidDeprecationCollector()
+logging.getLogger().addHandler(_DEPRECATION_COLLECTOR)
+
+
+from homeassistant.config_entries import ConfigEntry  # noqa: E402
+from homeassistant.const import CONF_HOST, CONF_PORT  # noqa: E402
+from homeassistant.core import HomeAssistant  # noqa: E402
+
+from custom_components.unraid_management_agent.const import DOMAIN  # noqa: E402
+from custom_components.unraid_management_agent.coordinator import (  # noqa: E402
+    UnraidData,
+)
+
+from .const import (  # noqa: E402
     MOCK_CONFIG,
     MOCK_OPTIONS,
     mock_array_status,
@@ -32,6 +70,38 @@ from .const import (
 )
 
 pytest_plugins = "pytest_homeassistant_custom_component"
+
+
+def pytest_collection_finish(session: pytest.Session) -> None:
+    """Fail collection for reports emitted by import-time class definitions."""
+    if _DEPRECATION_COLLECTOR.reports:
+        pytest.exit(
+            "Home Assistant deprecation reports during collection:\n"
+            + "\n".join(_DEPRECATION_COLLECTOR.reports),
+            returncode=pytest.ExitCode.TESTS_FAILED,
+        )
+
+
+@pytest.fixture(autouse=True)
+def deprecation_report_guard() -> Generator[None]:
+    """
+    Fail after test and hass cleanup when Home Assistant reports deprecations.
+
+    Higher-scoped fixture teardown between tests is reported on the next test.
+    Reports after the last test teardown are not checked. Python warning filters,
+    rather than this guard, cover Python DeprecationWarning.
+    """
+    yield
+    collector = _DEPRECATION_COLLECTOR
+    new_reports = collector.reports[collector.checked :]
+    collector.checked = len(collector.reports)
+    if new_reports:
+        pytest.fail("Home Assistant deprecation reports:\n" + "\n".join(new_reports))
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Remove the recording handler when this pytest session ends."""
+    logging.getLogger().removeHandler(_DEPRECATION_COLLECTOR)
 
 
 @pytest.fixture

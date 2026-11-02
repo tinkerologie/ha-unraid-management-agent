@@ -214,9 +214,23 @@ A healthy agent responds with JSON status `{"status":"ok",...}`.
 
 ### Method 2: Manual Installation
 
-1. Download the latest release archive from the [GitHub Releases](https://github.com/tinkerologie/ha-unraid-management-agent/releases) page.
-2. Extract the `custom_components/unraid_management_agent` folder into your Home Assistant `<config>/custom_components/` directory.
+1. Download `unraid_management_agent.zip` from the [latest GitHub release](https://github.com/tinkerologie/ha-unraid-management-agent/releases/latest).
+2. Create `<config>/custom_components/unraid_management_agent/` and extract the ZIP into it. `manifest.json` must be directly inside this folder.
 3. Restart Home Assistant.
+
+#### Verify the download
+
+Download `SHA256SUMS` from the same release into the directory containing the ZIP.
+Using the [GitHub CLI](https://cli.github.com/), replace `<tag>` with the release tag:
+
+```bash
+sha256sum -c SHA256SUMS
+gh attestation verify unraid_management_agent.zip --repo tinkerologie/ha-unraid-management-agent --signer-workflow tinkerologie/ha-unraid-management-agent/.github/workflows/release.yml
+gh release verify-asset <tag> unraid_management_agent.zip --repo tinkerologie/ha-unraid-management-agent
+```
+
+HACS and the Marketplace count downloads of this fixed-name release asset. After
+the first ZIP release, selecting an older release without this asset may fail.
 
 ---
 
