@@ -986,9 +986,6 @@
     "auth_failed": {
       "message": "The Unraid Management Agent rejected the API token. Re-authenticate the integration with the agent's current token."
     },
-    "plugin_update_failed": {
-      "message": "Failed to update plugin {name}"
-    },
     "container_update_failed": {
       "message": "Failed to update container {name}"
     }

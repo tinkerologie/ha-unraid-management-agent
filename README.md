@@ -21,7 +21,7 @@ This custom integration connects Home Assistant to the [Unraid Management Agent]
 - **Hybrid Real-Time Updates**: Local push via WebSocket event stream with automatic reconnect and 30-second REST polling fallback.
 - **Dynamic Entity Discovery**: Automatically creates, tracks, and cleans up entities for Docker containers, virtual machines, disks, fans, network interfaces, ZFS pools, remote shares, unassigned devices, and SAS storage topology.
 - **Modular Device Organization**: Docker-wide and VM-wide entities live on `<server> Docker` and `<server> VMs` devices linked to the server, and optional settings give each Docker container and virtual machine its own child device under them, with clean, short entity names.
-- **Update Management Platform**: Monitor Unraid OS versions, track plugin updates (with one-click install), and detect Docker container image updates via image digest tracking.
+- **Update Management Platform**: Monitor Unraid OS versions, track plugin updates, and detect Docker container image updates via image digest tracking.
 - **Agent Alert Rules Engine**: Monitor custom and built-in UMA alert rules as problem binary sensors, track firing counts, and trigger automations from alert events.
 - **Enterprise SAS Storage Topology**: Discovers RAID/HBA controllers, SAS disk shelves/backplanes, power supplies, I/O modules, cabling maps, and path redundancy.
 - **Flexible Control Surfaces**: Switches for containers, VMs, and disk spin; buttons for array operations, parity checks, power commands, and user scripts; numbers for PWM fan control.
@@ -160,7 +160,7 @@ When the agent's `storage_topology` collector is active (`storcli` or `sg3_utils
 ### Updates (Update Platform)
 
 - **Unraid OS**: Displays installed version and latest available version (read-only; upgrades remain safely handled via Unraid UI).
-- **Plugins**: Displays installed and available versions with one-click update installation.
+- **Plugins**: Displays installed and available versions (read-only; apply updates from the Unraid Plugins page).
 - **Containers**: Digest-based image update detection with one-click pull and restart.
 
 ### Alerts & Notifications

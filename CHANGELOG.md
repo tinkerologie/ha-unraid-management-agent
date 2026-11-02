@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Plugin update entities are now display-only (#250): the agent no longer installs or updates plugins, so Home Assistant no longer offers an Install action that always failed. Apply plugin updates from Unraid's Plugins page
 - Align dashboard cards with Home Assistant 2026.10+ UI patterns (#253): design tokens, theme colour fallbacks for light and dark, container queries and RTL fit at 300px, native keyboard-operable controls, accessible dashboard tabs and card picker previews. Card types, config and service calls are unchanged.
 
 ### Fixed

@@ -4,7 +4,8 @@ Update platform for Unraid Management Agent.
 Exposes available updates as Home Assistant update entities:
 
 - Unraid OS: display only. The OS is never installed from Home Assistant.
-- Plugins: one per installed plugin, installable through the agent.
+- Plugins: one per installed plugin, display only. The agent never installs or
+  updates plugins; updates are applied from Unraid's Plugins page.
 - Docker containers: one per container when the "container update checks"
   option is on, installable through the agent. Versions are shown as short
   image digests, because the registry only provides a digest for the latest
@@ -46,11 +47,6 @@ PARALLEL_UPDATES = 0
 # The Unraid OS itself is shipped as these plugins. It is covered by the
 # display-only OS entity and must never be installable as a plugin.
 _OS_PLUGIN_NAMES: frozenset[str] = frozenset({"unRAIDServer", "unRAIDServer-"})
-
-# Updating the agent's own plugin restarts the agent while it is serving the
-# request, so the update would be reported as failed even when it worked. It
-# is shown but not installable from Home Assistant.
-_AGENT_PLUGIN_NAME = "unraid-management-agent"
 
 # Length of the digest shown as a container "version" (like `docker images`)
 _SHORT_DIGEST_LENGTH = 12
@@ -170,7 +166,7 @@ async def async_setup_entry(
 
 
 class _UnraidUpdateBase(UnraidBaseEntity, UpdateEntity):
-    """Common behaviour of the installable (plugin and container) update entities."""
+    """Common behaviour of the installable (container) update entities."""
 
     _failed_translation_key: str
 
@@ -179,13 +175,11 @@ class _UnraidUpdateBase(UnraidBaseEntity, UpdateEntity):
         coordinator: UnraidDataUpdateCoordinator,
         key: str,
         name: str,
-        *,
-        installable: bool = True,
     ) -> None:
         """Initialize the entity; INSTALL is never offered in read-only mode."""
         super().__init__(coordinator, key)
         self._update_name = name
-        if installable and not read_only_enabled(coordinator):
+        if not read_only_enabled(coordinator):
             # PROGRESS lets Home Assistant reject a second install request
             # while one is still running
             self._attr_supported_features = (
@@ -264,23 +258,22 @@ class UnraidOSUpdate(UnraidBaseEntity, UpdateEntity):
         return status.latest_version
 
 
-class UnraidPluginUpdate(_UnraidUpdateBase):
-    """Update entity for an Unraid plugin."""
+class UnraidPluginUpdate(UnraidBaseEntity, UpdateEntity):
+    """
+    Update entity for an Unraid plugin (display only).
+
+    The agent reports plugin updates but never applies them, so this entity
+    never supports install.
+    """
 
     _attr_translation_key = "plugin"
-    _failed_translation_key = "plugin_update_failed"
 
     def __init__(
         self, coordinator: UnraidDataUpdateCoordinator, plugin_name: str
     ) -> None:
         """Initialize the entity."""
         self._plugin_name = plugin_name
-        super().__init__(
-            coordinator,
-            plugin_update_key(plugin_name),
-            plugin_name,
-            installable=plugin_name != _AGENT_PLUGIN_NAME,
-        )
+        super().__init__(coordinator, plugin_update_key(plugin_name))
         self._attr_translation_placeholders = {"name": plugin_name}
         self._attr_title = plugin_name
 
@@ -316,11 +309,6 @@ class UnraidPluginUpdate(_UnraidUpdateBase):
         if plugin.update_available is False:
             return plugin.version or None
         return None
-
-    async def _async_install_update(self) -> None:
-        """Update the plugin through the agent."""
-        await self.coordinator.client.update_plugin(self._plugin_name)
-        _LOGGER.info("Updated plugin: %s", self._plugin_name)
 
 
 class UnraidContainerUpdate(_UnraidUpdateBase):

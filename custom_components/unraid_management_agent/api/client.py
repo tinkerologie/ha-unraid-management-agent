@@ -71,9 +71,7 @@ from .models import (
     NUTInfo,
     ParityHistory,
     ParitySchedule,
-    PluginBulkUpdateResult,
     PluginList,
-    PluginUpdateResult,
     PluginUpdatesResult,
     ProcessList,
     RegistrationInfo,
@@ -110,7 +108,7 @@ _LOGGER = logging.getLogger(__name__)
 _MAX_RETRIES: int = 3
 _RETRY_BASE_DELAY: float = 1.0  # seconds, doubles each retry
 _DEFAULT_CONCURRENCY: int = 10  # max simultaneous API requests
-# Container and plugin updates download images or packages before returning;
+# Container updates download images before returning;
 # the agent allows a container update up to 10 minutes.
 _UPDATE_TIMEOUT: float = 1200.0  # seconds
 
@@ -2209,33 +2207,6 @@ class UnraidClient:
         """
         data = await self._request("GET", "/plugins/check-updates")
         return PluginUpdatesResult.model_validate(data)
-
-    async def update_plugin(self, plugin_name: str) -> PluginUpdateResult:
-        """
-        Update a specific plugin to its latest version.
-
-        Args:
-            plugin_name: Plugin name
-
-        Returns:
-            Update result with status and message
-
-        """
-        data = await self._request(
-            "POST", f"/plugins/{plugin_name}/update", timeout_seconds=_UPDATE_TIMEOUT
-        )
-        return PluginUpdateResult.model_validate(data)
-
-    async def update_all_plugins(self) -> PluginBulkUpdateResult:
-        """
-        Update all plugins that have available updates.
-
-        Returns:
-            Bulk update results with succeeded/failed counts
-
-        """
-        data = await self._request("POST", "/plugins/update-all")
-        return PluginBulkUpdateResult.model_validate(data)
 
     # MQTT endpoints (Issue #44)
 

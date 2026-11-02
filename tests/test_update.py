@@ -30,7 +30,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.unraid_management_agent.api import UnraidAPIError
+from custom_components.unraid_management_agent.api import UnraidAPIError, UnraidClient
 from custom_components.unraid_management_agent.api.models import (
     ContainerUpdateInfo,
     ContainerUpdatesResult,
@@ -240,13 +240,13 @@ async def test_plugin_updates(
     assert ca.attributes[ATTR_INSTALLED_VERSION] == "2026.10.01"
     assert ca.attributes[ATTR_LATEST_VERSION] == "2026.10.06"
     assert ca.attributes[ATTR_TITLE] == "community.applications"
-    assert ca.attributes[ATTR_SUPPORTED_FEATURES] == INSTALL_PROGRESS
+    assert ca.attributes[ATTR_SUPPORTED_FEATURES] == 0
 
     scripts = hass.states.get("update.unraid_test_plugin_user_scripts")
     assert scripts.state == STATE_OFF
     assert scripts.attributes[ATTR_LATEST_VERSION] == "2026.09.01"
 
-    # The agent's own plugin is shown but cannot be installed from here
+    # The agent's own plugin is shown like any other
     agent = hass.states.get("update.unraid_test_plugin_unraid_management_agent")
     assert agent.state == STATE_ON
     assert agent.attributes[ATTR_SUPPORTED_FEATURES] == 0
@@ -277,62 +277,23 @@ async def test_plugin_updates(
 
 
 @pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_plugin_install(
+async def test_plugin_updates_are_display_only(
     hass: HomeAssistant,
     mock_unraid_client_class: MagicMock,
     mock_async_unraid_client: MagicMock,
 ) -> None:
-    """Installing a plugin update asks the agent to update that plugin."""
+    """A plugin update can't be installed from Home Assistant."""
     mock_async_unraid_client.list_plugins.return_value = _default_plugins()
     await _setup(hass)
     entity_id = "update.unraid_test_plugin_community_applications"
 
-    async def _update_plugin(name: str) -> None:
-        # In progress while the agent works on it
-        assert hass.states.get(entity_id).attributes[ATTR_IN_PROGRESS] is True
-        mock_async_unraid_client.list_plugins.return_value = _plugins(
-            PluginInfo(
-                name="community.applications",
-                version="2026.10.06",
-                update_available=False,
-            )
-        )
-
-    mock_async_unraid_client.update_plugin.side_effect = _update_plugin
-    await _install(hass, entity_id)
-    await hass.async_block_till_done()
-
-    mock_async_unraid_client.update_plugin.assert_awaited_once_with(
-        "community.applications"
-    )
     state = hass.states.get(entity_id)
-    assert state.attributes[ATTR_IN_PROGRESS] is False
-    assert state.state == STATE_OFF
-    assert state.attributes[ATTR_INSTALLED_VERSION] == "2026.10.06"
-
-
-@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_plugin_install_failure(
-    hass: HomeAssistant,
-    mock_unraid_client_class: MagicMock,
-    mock_async_unraid_client: MagicMock,
-) -> None:
-    """A failed plugin update raises a translated error and clears progress."""
-    mock_async_unraid_client.list_plugins.return_value = _default_plugins()
-    mock_async_unraid_client.update_plugin.side_effect = UnraidAPIError(
-        "Failed to update plugin", status_code=500
-    )
-    await _setup(hass)
-    entity_id = "update.unraid_test_plugin_community_applications"
-
-    with pytest.raises(HomeAssistantError) as err:
-        await _install(hass, entity_id)
-    assert err.value.translation_domain == DOMAIN
-    assert err.value.translation_key == "plugin_update_failed"
-    assert err.value.translation_placeholders == {"name": "community.applications"}
-    state = hass.states.get(entity_id)
-    assert state.attributes[ATTR_IN_PROGRESS] is False
     assert state.state == STATE_ON
+    assert state.attributes[ATTR_SUPPORTED_FEATURES] == 0
+    with pytest.raises(HomeAssistantError):
+        await _install(hass, entity_id)
+    assert not hasattr(UnraidClient, "update_plugin")
+    assert not hasattr(UnraidClient, "update_all_plugins")
 
 
 @pytest.mark.usefixtures("mock_unraid_websocket_client_class")
@@ -668,12 +629,11 @@ async def test_read_only_shows_updates_without_install(
             await _install(hass, entity_id)
 
     # Called directly anyway, install refuses with the read-only error
-    entity = _entity(hass, plugin_update_key("community.applications"))
+    entity = _entity(hass, container_update_key("plex"))
     with pytest.raises(ServiceValidationError) as err:
         await entity.async_install(None, backup=False)
     assert err.value.translation_key == "read_only_mode"
     assert err.value.translation_placeholders == {"title": "Unraid (unraid-test)"}
-    mock_async_unraid_client.update_plugin.assert_not_called()
     mock_async_unraid_client.update_container.assert_not_called()
 
 
@@ -684,9 +644,11 @@ async def test_install_refused_after_switching_to_read_only(
     mock_async_unraid_client: MagicMock,
 ) -> None:
     """An entity created before read-only was turned on still refuses to install."""
-    mock_async_unraid_client.list_plugins.return_value = _default_plugins()
-    entry = await _setup(hass)
-    entity = _entity(hass, plugin_update_key("community.applications"))
+    mock_async_unraid_client.check_all_container_updates.return_value = (
+        _container_updates()
+    )
+    entry = await _setup(hass, **{CONF_ENABLE_CONTAINER_UPDATES: True})
+    entity = _entity(hass, container_update_key("plex"))
     assert entity.supported_features == INSTALL_PROGRESS
 
     hass.config_entries.async_update_entry(
@@ -695,7 +657,7 @@ async def test_install_refused_after_switching_to_read_only(
     with pytest.raises(ServiceValidationError) as err:
         await entity.async_install(None, backup=False)
     assert err.value.translation_key == "read_only_mode"
-    mock_async_unraid_client.update_plugin.assert_not_called()
+    mock_async_unraid_client.update_container.assert_not_called()
 
 
 # ── Stale entity cleanup ──────────────────────────────────────────────────────
