@@ -97,6 +97,8 @@ if [ ! -d "$HA_CORE_DIR" ]; then
     # Only checkout script/ and homeassistant/ directories (needed for hassfest)
     echo "script/" > .git/info/sparse-checkout
     echo "homeassistant/" >> .git/info/sparse-checkout
+    echo "packages/hassfest/" >> .git/info/sparse-checkout
+    echo "/pyproject.toml" >> .git/info/sparse-checkout
 
     # Fetch the specific version (shallow clone + blobless for minimal size)
     if [ "$HA_VERSION_TAG" = "dev" ]; then
@@ -119,7 +121,7 @@ else
         cd "$HA_CORE_DIR"
         if [ "$HA_VERSION_TAG" = "dev" ]; then
             git fetch --depth 1 --filter=blob:none origin dev >/dev/null 2>&1
-            git checkout dev >/dev/null 2>&1
+            git checkout -B dev FETCH_HEAD >/dev/null 2>&1
         else
             git fetch --depth 1 --filter=blob:none origin tag "$HA_VERSION_TAG" >/dev/null 2>&1
             git checkout "$HA_VERSION_TAG" >/dev/null 2>&1
@@ -130,12 +132,16 @@ else
     fi
 fi
 
+# Refresh cached sparse checkouts, including Core metadata read by the package build.
+printf 'script/\nhomeassistant/\npackages/hassfest/\n/pyproject.toml\n' > "$HA_CORE_DIR/.git/info/sparse-checkout"
+git -C "$HA_CORE_DIR" sparse-checkout reapply
+
 # Check if we have required dependencies
 log_info "Checking dependencies..."
 if ! python3 -c "import tqdm" >/dev/null 2>&1; then
     log_info "Installing hassfest helper dependency: tqdm"
     if command -v uv >/dev/null 2>&1; then
-        uv pip install tqdm
+        uv pip install --python "$(command -v python3)" tqdm
     else
         python3 -m pip install tqdm
     fi
@@ -147,11 +153,35 @@ if ! python3 -c "import voluptuous, awesomeversion, homeassistant.helpers.config
     exit 1
 fi
 
+# The device-class validator imports the infrared platform, whose optional
+# dependency is not installed with bare Home Assistant. Use the selected Core's
+# exact requirement so clean environments work on both validator layouts.
+if [ -f "$HA_CORE_DIR/homeassistant/components/infrared/manifest.json" ] && \
+    ! python3 -c "import infrared_protocols" >/dev/null 2>&1; then
+    INFRARED_REQUIREMENT=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1]))['requirements'][0])" \
+        "$HA_CORE_DIR/homeassistant/components/infrared/manifest.json")
+    if command -v uv >/dev/null 2>&1; then
+        uv pip install --python "$(command -v python3)" "$INFRARED_REQUIREMENT"
+    else
+        python3 -m pip install "$INFRARED_REQUIREMENT"
+    fi
+fi
+
 # Export PYTHONPATH to include HA Core
 export PYTHONPATH="$PWD/$HA_CORE_DIR:${PYTHONPATH:-}"
 
 # Build hassfest command
-HASSFEST_CMD=(
+HASSFEST_CMD=()
+# Editable builds can leave untracked metadata directories after switching back
+# to older Core tags; detect the tracked project file rather than the directory.
+if [ -f "$HA_CORE_DIR/packages/hassfest/pyproject.toml" ]; then
+    if ! command -v uv >/dev/null 2>&1; then
+        log_error "uv is required for packaged Hassfest. Run: ./script/setup/bootstrap"
+        exit 1
+    fi
+    HASSFEST_CMD+=(uv run --no-project --python "$(command -v python3)" --with-editable "$PWD/$HA_CORE_DIR/packages/hassfest")
+fi
+HASSFEST_CMD+=(
     python3 -m script.hassfest
     --action validate
     --integration-path "$PWD/$INTEGRATION_PATH"

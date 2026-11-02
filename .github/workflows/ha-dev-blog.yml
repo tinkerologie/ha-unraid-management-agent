@@ -1,0 +1,72 @@
+name: HA dev blog watch
+
+on:
+  schedule:
+    - cron: 0 2 * * 1
+      timezone: Australia/Brisbane
+  workflow_dispatch:
+    inputs:
+      days:
+        description: Look-back window in days
+        type: number
+        default: 8
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: Watch developer blog
+    # Branch dispatches can scan but must not create repository issues.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DAYS: ${{ inputs.days || 8 }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: 0.12.22
+
+      - name: List existing issues without the search index
+        run: |
+          gh api --paginate "repos/$GH_REPO/issues?state=all&per_page=100" \
+            | jq -c '.[] | select(.pull_request == null) | {number, body}' > "$RUNNER_TEMP/existing.jsonl"
+
+      - name: Find posts that name integration code
+        run: |
+          uv python install 3.14.2
+          uv run --no-project --python 3.14.2 script/ha_dev_blog/watch.py \
+            --days "$DAYS" --existing "$RUNNER_TEMP/existing.jsonl" --out "$RUNNER_TEMP/blog"
+
+      - name: Open an issue per new matching post
+        if: github.ref == 'refs/heads/main'
+        run: |
+          if [ ! -s "$RUNNER_TEMP/blog/new_issues.jsonl" ]; then exit 0; fi
+          gh label create ha-dev-blog --color fbca04 --description 'Home Assistant developer blog change' || gh api "repos/$GH_REPO/labels/ha-dev-blog" >/dev/null
+          gh label create enhancement --color a2eeef --description 'New feature or improvement' || gh api "repos/$GH_REPO/labels/enhancement" >/dev/null
+          while IFS= read -r issue; do
+            TITLE=$(jq -r .title <<< "$issue")
+            jq -r .body <<< "$issue" > "$RUNNER_TEMP/blog/body.md"
+            URL=$(gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/blog/body.md" --label ha-dev-blog --label enhancement)
+            echo "- Created: $URL" >> "$RUNNER_TEMP/blog/summary.md"
+          done < "$RUNNER_TEMP/blog/new_issues.jsonl"
+
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/blog/summary.md" ]; then
+            cat "$RUNNER_TEMP/blog/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fi

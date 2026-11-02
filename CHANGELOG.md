@@ -7,14 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Fail current-release tests on integration deprecation warnings and all three Home Assistant deprecation report formats, including collection and teardown reports (#249).
+- Add advisory weekly HA Next checks for the newest PyPI release (including betas) and Core `dev`, with one managed compatibility issue per channel, plus a developer blog watcher that reports changes naming code used by the integration (#249).
+
+- Ship a reproducible, root-layout `unraid_management_agent.zip` for HACS and the Marketplace, with `SHA256SUMS` replacing `SHA256SUM`, build provenance attestations, verified draft-to-publish releases and a CI reproducibility check (#248).
+
 ### Changed
 
 - Plugin update entities are now display-only (#250): the agent no longer installs or updates plugins, so Home Assistant no longer offers an Install action that always failed. Apply plugin updates from Unraid's Plugins page
+- Support both legacy and `packages/hassfest` Core validator layouts, refreshing cached sparse checkouts and running the packaged validator through uv (#249).
+
 - Align dashboard cards with Home Assistant 2026.10+ UI patterns (#253): design tokens, theme colour fallbacks for light and dark, container queries and RTL fit at 300px, native keyboard-operable controls, accessible dashboard tabs and card picker previews. Card types, config and service calls are unchanged.
 
 ### Fixed
 
 - Stop computed UPS, NUT and GPU energy totals jumping back to their restore baseline and stalling (#260): a stale uptime sample is no longer treated as a reboot, a detected reboot keeps the accumulated total, and restore keeps the larger valid total
+- Keep unavailable disk I/O readings from changing repair state while making the optional-value guard compatible with the pre-commit mypy configuration.
+
 - Complete dashboard card UX safeguards (#253): guarded Home Assistant entity labels, content-level named container queries, narrow UPS/GPU/VM and row layouts, and isolated technical values in RTL.
 - Distinguish measured share content from backing pool or array usage (#255). Share storage usage sensors keep their unique IDs, accept both old and new agent counters, and expose `storage_used`, `storage_free` and `storage_total`; `used_size` is present only for measured share data. The Shares card labels storage figures separately from share data.
 

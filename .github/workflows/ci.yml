@@ -113,3 +113,26 @@ jobs:
           name: browser-test-results
           path: frontend/test-results/
           retention-days: 7
+
+  release-zip:
+    name: Reproducible release ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: 0.12.22
+
+      - name: Build twice with different file mtimes
+        run: |
+          uv python install 3.14.2
+          uv run --no-project --python 3.14.2 script/build-release.py --output-dir build/a
+          git ls-files -z -- custom_components/unraid_management_agent/ | xargs -0 touch
+          uv run --no-project --python 3.14.2 script/build-release.py --output-dir build/b
+          cmp build/a/unraid_management_agent.zip build/b/unraid_management_agent.zip
+          cmp build/a/SHA256SUMS build/b/SHA256SUMS
