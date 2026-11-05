@@ -42,7 +42,6 @@ Generate code that passes these checks on first run. As an AI agent, you should 
 - `sensor.py`, `binary_sensor.py`, `switch.py`, `button.py` -- Entity platforms
 - `__init__.py` -- Integration setup, service registration
 - `diagnostics.py` -- Diagnostic data collection
-- `repairs.py` -- Repair issue flows
 - `const.py` -- Constants and defaults
 
 **Key patterns:**

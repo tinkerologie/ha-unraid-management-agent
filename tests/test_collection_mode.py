@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Iterator
 from datetime import timedelta
 from types import SimpleNamespace
 from typing import Any
@@ -469,16 +468,6 @@ def _entry(
     )
     entry.add_to_hass(hass)
     return entry
-
-
-@pytest.fixture(autouse=True)
-def _no_repairs() -> Iterator[None]:
-    """Skip repair checks during updates."""
-    with patch(
-        "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-        new_callable=AsyncMock,
-    ):
-        yield
 
 
 @pytest.fixture

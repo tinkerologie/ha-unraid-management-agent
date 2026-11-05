@@ -21,7 +21,6 @@ tests/
   test_binary_sensor.py   # Binary sensor tests
   test_switch.py          # Switch tests
   test_button.py          # Button tests
-  test_repairs.py         # Repair flow tests
   test_diagnostics.py     # Diagnostic tests
 ```
 

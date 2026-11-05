@@ -8,6 +8,7 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 
 from custom_components.unraid_management_agent import (
     _async_migrate_legacy_entity_unique_ids,
@@ -528,3 +529,54 @@ async def test_services_error_handling(
             {"container_id": "test_container"},
             blocking=True,
         )
+
+
+@pytest.mark.usefixtures(
+    "mock_unraid_client_class", "mock_unraid_websocket_client_class"
+)
+async def test_setup_removes_legacy_repair_issues(
+    hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Repair issues and I/O error acknowledgements of older versions are removed."""
+    for issue_id in (
+        "disk_health_disk1_high_temp",
+        f"disk_health_{mock_config_entry.entry_id}_disk1_io_errors",
+        f"connection_{mock_config_entry.entry_id}",
+    ):
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=True,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="disk_high_temperature",
+        )
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        "future_notice",
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="future_notice",
+    )
+    ir.async_create_issue(
+        hass,
+        "other_domain",
+        "disk_health_disk1_high_temp",
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="other",
+    )
+    hass.config_entries.async_update_entry(
+        mock_config_entry,
+        options={**mock_config_entry.options, "acknowledged_disk_io_errors": {"S": 3}},
+    )
+
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    issues = ir.async_get(hass).issues
+    # Only the legacy repairs are removed, not other issues of the integration
+    assert [key for key in issues if key[0] == DOMAIN] == [(DOMAIN, "future_notice")]
+    assert ("other_domain", "disk_health_disk1_high_temp") in issues
+    assert "acknowledged_disk_io_errors" not in mock_config_entry.options

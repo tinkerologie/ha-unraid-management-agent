@@ -20,6 +20,7 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import slugify
@@ -37,6 +38,7 @@ from .const import (
     DEFAULT_ENABLE_WEBSOCKET,
     DEFAULT_READ_ONLY,
     DOMAIN,
+    LEGACY_ACKNOWLEDGED_DISK_IO_ERRORS,
     MANUFACTURER,
 )
 from .coordinator import (
@@ -607,8 +609,37 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+# Issue ID prefixes of the repair issues earlier versions raised
+_LEGACY_REPAIR_ISSUE_PREFIXES: Final = (
+    "array_parity_invalid_",
+    "connection_",
+    "disk_health_",
+    "parity_check_stuck_",
+    "share_fuse_fallback_",
+)
+
+
+@callback
+def _async_remove_legacy_repairs(hass: HomeAssistant, entry: UnraidConfigEntry) -> None:
+    """
+    Delete repair issues and the I/O error acknowledgements of older versions.
+
+    Server health (disk temperature, SMART, I/O errors, parity, share FUSE
+    fallback, connection) is reported by entities, not repair issues (#268).
+    """
+    registry = ir.async_get(hass)
+    for domain, issue_id in list(registry.issues):
+        if domain == DOMAIN and issue_id.startswith(_LEGACY_REPAIR_ISSUE_PREFIXES):
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
+    if LEGACY_ACKNOWLEDGED_DISK_IO_ERRORS in entry.options:
+        options = dict(entry.options)
+        options.pop(LEGACY_ACKNOWLEDGED_DISK_IO_ERRORS)
+        hass.config_entries.async_update_entry(entry, options=options)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> bool:
     """Set up Unraid Management Agent from a config entry."""
+    _async_remove_legacy_repairs(hass, entry)
     host = entry.data[CONF_HOST]
     port = entry.data[CONF_PORT]
     enable_websocket = entry.options.get(
@@ -820,14 +851,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> b
         await entry.runtime_data.client.close()
 
     return unload_ok
-
-
-async def async_remove_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> None:
-    """Delete the disk and share repair issues of a removed config entry."""
-    from .repairs import async_delete_disk_issues, async_delete_share_issues
-
-    async_delete_disk_issues(hass, entry.entry_id)
-    async_delete_share_issues(hass, entry.entry_id)
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> None:

@@ -991,11 +991,6 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                 self._last_full_poll = dt_util.utcnow()
             await self._async_sync_topics(data)
 
-            # Check for issues and create repair flows
-            from . import repairs
-
-            await repairs.async_check_and_create_issues(self.hass, self, data)
-
             # WebSocket events may have updated kept fields while this poll
             # awaited: return their newest values
             if self.data is not None:

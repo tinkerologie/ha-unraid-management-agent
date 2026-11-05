@@ -100,7 +100,7 @@ rules:
     comment: >
       pytest suite enforces an 85% coverage floor (currently 87%) for the integration package,
       excluding the vendored api/models and api/client code. Config flow, coordinator, entities,
-      cleanup, repairs, and diagnostics are all covered. Remaining gaps are in fan-speed number
+      cleanup, and diagnostics are all covered. Remaining gaps are in fan-speed number
       entities, event platform, and button edge cases.
 
   # Gold
@@ -181,8 +181,12 @@ rules:
     status: done
     comment: async_step_reconfigure implemented to change host/port
   repair-issues:
-    status: done
-    comment: repairs.py implemented for disk health and temperature issues
+    status: exempt
+    comment: >
+      Nothing for the user to fix in Home Assistant: authentication failures use the
+      reauth flow and connection failures retry setup. Server health (disk temperature,
+      SMART, I/O errors, parity, share FUSE fallback) is reported by entities, which
+      automations can act on, rather than as repair issues (#268).
   stale-devices:
     status: done
     comment: >
