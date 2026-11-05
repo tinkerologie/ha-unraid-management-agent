@@ -553,6 +553,14 @@ async def test_setup_removes_legacy_repair_issues(
         )
     ir.async_create_issue(
         hass,
+        DOMAIN,
+        "future_notice",
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="future_notice",
+    )
+    ir.async_create_issue(
+        hass,
         "other_domain",
         "disk_health_disk1_high_temp",
         is_fixable=False,
@@ -568,6 +576,7 @@ async def test_setup_removes_legacy_repair_issues(
     await hass.async_block_till_done()
 
     issues = ir.async_get(hass).issues
-    assert [key for key in issues if key[0] == DOMAIN] == []
+    # Only the legacy repairs are removed, not other issues of the integration
+    assert [key for key in issues if key[0] == DOMAIN] == [(DOMAIN, "future_notice")]
     assert ("other_domain", "disk_health_disk1_high_temp") in issues
     assert "acknowledged_disk_io_errors" not in mock_config_entry.options

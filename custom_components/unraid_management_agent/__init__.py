@@ -609,6 +609,16 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+# Issue ID prefixes of the repair issues earlier versions raised
+_LEGACY_REPAIR_ISSUE_PREFIXES: Final = (
+    "array_parity_invalid_",
+    "connection_",
+    "disk_health_",
+    "parity_check_stuck_",
+    "share_fuse_fallback_",
+)
+
+
 @callback
 def _async_remove_legacy_repairs(hass: HomeAssistant, entry: UnraidConfigEntry) -> None:
     """
@@ -619,7 +629,7 @@ def _async_remove_legacy_repairs(hass: HomeAssistant, entry: UnraidConfigEntry) 
     """
     registry = ir.async_get(hass)
     for domain, issue_id in list(registry.issues):
-        if domain == DOMAIN:
+        if domain == DOMAIN and issue_id.startswith(_LEGACY_REPAIR_ISSUE_PREFIXES):
             ir.async_delete_issue(hass, DOMAIN, issue_id)
     if LEGACY_ACKNOWLEDGED_DISK_IO_ERRORS in entry.options:
         options = dict(entry.options)
