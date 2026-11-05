@@ -6,7 +6,7 @@ import logging
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
-import voluptuous as vol
+import probatio
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigEntryState,
@@ -76,14 +76,14 @@ class InvalidAuthError(Exception):
     """The agent rejected the API token."""
 
 
-STEP_USER_DATA_SCHEMA = vol.Schema(
+STEP_USER_DATA_SCHEMA = probatio.Schema(
     {
-        vol.Required(CONF_HOST): cv.string,
-        vol.Required(CONF_PORT, default=DEFAULT_PORT): vol.All(
-            vol.Coerce(int), vol.Range(min=1, max=65535)
+        probatio.Required(CONF_HOST): cv.string,
+        probatio.Required(CONF_PORT, default=DEFAULT_PORT): probatio.All(
+            probatio.Coerce(int), probatio.Range(min=1, max=65535)
         ),
-        vol.Optional(CONF_API_TOKEN): TOKEN_SELECTOR,
-        vol.Optional(
+        probatio.Optional(CONF_API_TOKEN): TOKEN_SELECTOR,
+        probatio.Optional(
             CONF_ENABLE_WEBSOCKET, default=DEFAULT_ENABLE_WEBSOCKET
         ): cv.boolean,
     }
@@ -168,19 +168,19 @@ class UnraidConfigFlow(ConfigFlow, domain=DOMAIN):
                     data=user_input,
                 )
 
-        schema = vol.Schema(
+        schema = probatio.Schema(
             {
-                vol.Required(
-                    CONF_HOST, default=self._discovered_host or vol.UNDEFINED
+                probatio.Required(
+                    CONF_HOST, default=self._discovered_host or probatio.UNDEFINED
                 ): cv.string,
-                vol.Required(
+                probatio.Required(
                     CONF_PORT,
                     default=self._discovered_port
                     if self._discovered_host
                     else DEFAULT_PORT,
-                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-                vol.Optional(CONF_API_TOKEN): TOKEN_SELECTOR,
-                vol.Optional(
+                ): probatio.All(probatio.Coerce(int), probatio.Range(min=1, max=65535)),
+                probatio.Optional(CONF_API_TOKEN): TOKEN_SELECTOR,
+                probatio.Optional(
                     CONF_ENABLE_WEBSOCKET, default=DEFAULT_ENABLE_WEBSOCKET
                 ): cv.boolean,
             }
@@ -241,16 +241,18 @@ class UnraidConfigFlow(ConfigFlow, domain=DOMAIN):
         # Pre-fill with current values
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required(
+                    probatio.Required(
                         CONF_HOST, default=reconfigure_entry.data.get(CONF_HOST, "")
                     ): cv.string,
-                    vol.Required(
+                    probatio.Required(
                         CONF_PORT,
                         default=reconfigure_entry.data.get(CONF_PORT, DEFAULT_PORT),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
-                    vol.Optional(
+                    ): probatio.All(
+                        probatio.Coerce(int), probatio.Range(min=1, max=65535)
+                    ),
+                    probatio.Optional(
                         CONF_API_TOKEN,
                         description={
                             "suggested_value": reconfigure_entry.data.get(
@@ -258,7 +260,7 @@ class UnraidConfigFlow(ConfigFlow, domain=DOMAIN):
                             )
                         },
                     ): TOKEN_SELECTOR,
-                    vol.Optional(
+                    probatio.Optional(
                         CONF_ENABLE_WEBSOCKET,
                         default=reconfigure_entry.data.get(
                             CONF_ENABLE_WEBSOCKET, DEFAULT_ENABLE_WEBSOCKET
@@ -304,7 +306,9 @@ class UnraidConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_API_TOKEN): TOKEN_SELECTOR}),
+            data_schema=probatio.Schema(
+                {probatio.Required(CONF_API_TOKEN): TOKEN_SELECTOR}
+            ),
             description_placeholders={"host": reauth_entry.data[CONF_HOST]},
             errors=errors,
         )
@@ -481,7 +485,7 @@ class UnraidOptionsFlowHandler(OptionsFlowWithReload):
                 visible |= group
 
         schema: dict[Any, Any] = {
-            vol.Optional(key, default=options.get(key, default)): cv.boolean
+            probatio.Optional(key, default=options.get(key, default)): cv.boolean
             for key, default in _BOOLEAN_OPTIONS
             if key in visible
         }
@@ -491,14 +495,14 @@ class UnraidOptionsFlowHandler(OptionsFlowWithReload):
         )
         cpu_choices = _cpu_temperature_choices(data, cpu_source)
         if data is None or len(cpu_choices) > 1:
-            schema[vol.Optional(CONF_CPU_TEMPERATURE_SOURCE, default=cpu_source)] = (
-                SelectSelector(
-                    SelectSelectorConfig(
-                        options=cpu_choices,
-                        mode=SelectSelectorMode.DROPDOWN,
-                        translation_key=CONF_CPU_TEMPERATURE_SOURCE,
-                    )
+            schema[
+                probatio.Optional(CONF_CPU_TEMPERATURE_SOURCE, default=cpu_source)
+            ] = SelectSelector(
+                SelectSelectorConfig(
+                    options=cpu_choices,
+                    mode=SelectSelectorMode.DROPDOWN,
+                    translation_key=CONF_CPU_TEMPERATURE_SOURCE,
                 )
             )
 
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))
+        return self.async_show_form(step_id="init", data_schema=probatio.Schema(schema))

@@ -26,7 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "homeassistant>=2026.4.0",
+    "homeassistant>=2026.11.0b6",
     "ruff>=0.15.10",
     "mypy>=1.20.1",
     "pyright>=1.1.408",

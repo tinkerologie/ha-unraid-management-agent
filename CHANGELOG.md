@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Requires Home Assistant 2026.11 or newer** (was 2026.9). Adopt the Home Assistant 2026.11 integration APIs (#264): device info is set through `DeviceInfo` attributes rather than dict keys, schemas import `probatio` directly as Core does, percentage units use `UnitOfRatio.PERCENTAGE`, and the restore-state sensors (network rates, disk health, UPS, NUT and GPU energy) opt in to in-place entity ID changes, so renaming one keeps its accumulated totals in memory instead of removing and re-adding it.
 - Run the tests on Home Assistant's official `pytest-homeassistant` plugin, which replaces the retired `pytest-homeassistant-custom-component` (#264). `script/test`, CI and the HA Next check install the plugin release that pins the matching Home Assistant version, and the HA Next Core `dev` check now runs the tests too. The group-device friendly-name test expects Home Assistant 2026.11's device-name prefix on user-set entity names (#267).
 - Plugin update entities are now display-only (#250): the agent no longer installs or updates plugins, so Home Assistant no longer offers an Install action that always failed. Apply plugin updates from Unraid's Plugins page
 - Support both legacy and `packages/hassfest` Core validator layouts, refreshing cached sparse checkouts and running the packaged validator through uv (#249).

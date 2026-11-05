@@ -25,13 +25,13 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     EntityCategory,
     UnitOfDataRate,
     UnitOfEnergy,
     UnitOfFrequency,
     UnitOfInformation,
     UnitOfPower,
+    UnitOfRatio,
     UnitOfTemperature,
     UnitOfTime,
 )
@@ -1398,7 +1398,7 @@ SYSTEM_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="cpu_usage",
         translation_key="cpu_usage",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:cpu-64-bit",
         suggested_display_precision=1,
@@ -1408,7 +1408,7 @@ SYSTEM_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="ram_usage",
         translation_key="ram_usage",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:memory",
         suggested_display_precision=1,
@@ -1521,7 +1521,7 @@ SYSTEM_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="swap_usage",
         translation_key="swap_usage",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:memory",
         suggested_display_precision=1,
@@ -1559,7 +1559,7 @@ ARRAY_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="array_usage",
         translation_key="array_usage",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:harddisk",
         suggested_display_precision=1,
@@ -1569,7 +1569,7 @@ ARRAY_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="parity_progress",
         translation_key="parity_progress",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:sync",
         suggested_display_precision=1,
@@ -1589,7 +1589,7 @@ UPS_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="ups_battery",
         translation_key="ups_battery",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=_get_ups_battery,
@@ -1598,7 +1598,7 @@ UPS_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="ups_load",
         translation_key="ups_load",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:battery",
         value_fn=_get_ups_load,
@@ -1640,7 +1640,7 @@ FLASH_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="flash_usage",
         translation_key="flash_usage",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:usb-flash-drive",
         suggested_display_precision=1,
@@ -1765,7 +1765,7 @@ VIRTUAL_DISK_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
         key="docker_vdisk_usage",
         translation_key="docker_vdisk_usage",
         device_group=DOCKER_DEVICE,
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:docker",
         suggested_display_precision=1,
@@ -1780,7 +1780,7 @@ VIRTUAL_DISK_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="log_filesystem_usage",
         translation_key="log_filesystem_usage",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:file-document",
         suggested_display_precision=1,
@@ -1803,7 +1803,7 @@ ZFS_ARC_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] = (
     UnraidSensorEntityDescription(
         key="zfs_arc_hit_ratio",
         translation_key="zfs_arc_hit_ratio",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:memory",
         suggested_display_precision=1,
@@ -2360,6 +2360,11 @@ class UnraidNetworkSensorBase(UnraidBaseEntity, RestoreEntity, SensorEntity):
         await super().async_added_to_hass()
         await self._async_restore_rate_state()
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the restored state when the entity ID changes in place."""
+        super().async_entity_id_changed(old_entity_id)
+
     async def _async_restore_rate_state(self) -> None:
         """Restore the previously persisted rate calculator context."""
         if (extra_data := await self.async_get_last_extra_data()) is None:
@@ -2526,7 +2531,7 @@ class UnraidDiskSensorBase(UnraidBaseEntity, SensorEntity):
 class UnraidDiskUsageSensor(UnraidDiskSensorBase):
     """Disk usage sensor."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:harddisk"
     _attr_suggested_display_precision = 1
@@ -2605,6 +2610,11 @@ class UnraidDiskHealthSensor(UnraidDiskSensorBase, RestoreEntity):
         """Restore the cached SMART health value when added to hass."""
         await super().async_added_to_hass()
         await self._async_restore_last_known_health()
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the restored state when the entity ID changes in place."""
+        super().async_entity_id_changed(old_entity_id)
 
     async def _async_restore_last_known_health(self) -> None:
         """Restore the last known SMART health value."""
@@ -2882,7 +2892,7 @@ class UnraidDiskWriteBytesSensor(UnraidDiskSensorBase):
 class UnraidShareUsageSensor(UnraidBaseEntity, SensorEntity):
     """Share backing storage usage sensor."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:folder-network"
     _attr_suggested_display_precision = 1
@@ -3001,7 +3011,7 @@ class UnraidZFSPoolSensorBase(UnraidZFSPoolEntity, SensorEntity):
 class UnraidZFSPoolUsageSensor(UnraidZFSPoolSensorBase):
     """ZFS pool usage sensor."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:database"
     _attr_suggested_display_precision = 1
@@ -3265,7 +3275,7 @@ ZFS_POOL_SENSOR_DESCRIPTIONS: tuple[UnraidZFSPoolSensorEntityDescription, ...] =
     UnraidZFSPoolSensorEntityDescription(
         key="fragmentation",
         translation_key="zfs_pool_fragmentation",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         entity_category=EntityCategory.DIAGNOSTIC,
@@ -3328,7 +3338,7 @@ ZFS_POOL_DRIVE_SENSOR_DESCRIPTIONS: tuple[
     ),
     UnraidZFSPoolDriveSensorEntityDescription(
         key="drive_max_wear",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=worst_wear,
     ),
@@ -3504,7 +3514,7 @@ class UnraidGPUSensorBase(UnraidGPUEntity, SensorEntity):
 class UnraidGPUUtilizationSensor(UnraidGPUSensorBase):
     """Per-GPU utilization sensor."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:expansion-card"
     _attr_suggested_display_precision = 1
@@ -3671,7 +3681,7 @@ class UnraidGPUVramTotalSensor(UnraidGPUSensorBase):
 class UnraidGPUVramUsageSensor(UnraidGPUSensorBase):
     """Per-GPU VRAM usage percentage sensor (used / total)."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 1
 
@@ -3739,6 +3749,11 @@ class UnraidUPSEnergySensor(UnraidBaseEntity, RestoreEntity, SensorEntity):
         # Restore first: the coordinator listener attaches in super()
         await self._async_restore_energy_state()
         await super().async_added_to_hass()
+
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the restored state when the entity ID changes in place."""
+        super().async_entity_id_changed(old_entity_id)
 
     async def _async_restore_energy_state(self) -> None:
         """Restore the accumulated energy total and integration baseline."""
@@ -3870,7 +3885,7 @@ NUT_DEVICE_SENSOR_DESCRIPTIONS: tuple[UnraidNUTSensorEntityDescription, ...] = (
     UnraidNUTSensorEntityDescription(
         key="battery",
         translation_key="nut_ups_battery",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda status: status.battery_charge_percent,
@@ -3878,7 +3893,7 @@ NUT_DEVICE_SENSOR_DESCRIPTIONS: tuple[UnraidNUTSensorEntityDescription, ...] = (
     UnraidNUTSensorEntityDescription(
         key="load",
         translation_key="nut_ups_load",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda status: status.load_percent,
     ),
@@ -4063,6 +4078,11 @@ class UnraidGPUEnergySensor(UnraidGPUEntity, RestoreEntity, SensorEntity):
         await self._async_restore_energy_state()
         await super().async_added_to_hass()
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the restored state when the entity ID changes in place."""
+        super().async_entity_id_changed(old_entity_id)
+
     async def _async_restore_energy_state(self) -> None:
         """
         Restore the accumulated energy total and integration baseline.
@@ -4224,7 +4244,7 @@ class UnraidContainerSensorBase(UnraidBaseEntity, SensorEntity):
 class UnraidContainerCPUSensor(UnraidContainerSensorBase):
     """Container CPU usage sensor."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:chip"
     _attr_suggested_display_precision = 1
@@ -4306,7 +4326,7 @@ class UnraidContainerMemorySensor(UnraidContainerSensorBase):
 class UnraidContainerMemoryPercentSensor(UnraidContainerSensorBase):
     """Container memory usage percentage sensor."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:memory"
     _attr_suggested_display_precision = 1
@@ -4422,7 +4442,7 @@ DOCKER_AGGREGATE_SENSOR_DESCRIPTIONS: tuple[UnraidSensorEntityDescription, ...] 
         key="docker_cpu_usage",
         translation_key="docker_cpu_usage",
         device_group=DOCKER_DEVICE,
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:docker",
         suggested_display_precision=1,
@@ -4654,7 +4674,7 @@ VM_SENSOR_DESCRIPTIONS: tuple[UnraidVMSensorEntityDescription, ...] = (
     UnraidVMSensorEntityDescription(
         key="cpu_usage",
         translation_key="vm_cpu_usage",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value_fn=lambda vm: getattr(vm, "guest_cpu_percent", None),
@@ -5726,7 +5746,7 @@ class UnraidUnassignedDeviceSensor(UnraidBaseEntity, SensorEntity):
 class UnraidRemoteShareSensor(UnraidBaseEntity, SensorEntity):
     """Usage sensor for a remote (SMB/NFS) share mounted on Unraid."""
 
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:folder-network"
     _attr_suggested_display_precision = 1
