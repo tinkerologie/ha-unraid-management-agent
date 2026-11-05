@@ -221,7 +221,6 @@ custom_components/unraid_management_agent/
 ├── button.py             # Button platform (array start/stop, parity check)
 ├── update.py             # Update platform (Unraid OS, plugins, containers)
 ├── diagnostics.py        # Diagnostic data collection
-├── repairs.py            # Repair issue flows
 ├── services.yaml         # Service action definitions
 ├── strings.json          # User-facing strings and translations
 ├── icons.json            # Entity and service icons
@@ -336,9 +335,7 @@ All entities provide consistent device info via the base entity class (manufactu
 
 **Repairs:**
 
-- Use `async_create_issue()` with severity levels
-- Implement `RepairsFlow` for guided user fixes
-- Delete issues after successful repair
+- The integration raises no repair issues. Report server health (disk temperature, SMART, I/O errors, parity, share FUSE fallback) with entities, not repairs. Repairs are only for a problem the user must fix in Home Assistant that reauth or reconfigure cannot handle.
 
 **Entity availability:**
 

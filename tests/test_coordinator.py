@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -2725,18 +2724,9 @@ class TestCoordinatorAPIErrorHandling:
             enable_websocket=False,
         )
 
-    @pytest.fixture
-    def mock_repairs(self):
-        """Mock the repairs module to prevent import issues."""
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ) as mock_check:
-            yield mock_check
-
     @pytest.mark.asyncio
-    async def test_api_error_logs_warning_once(self, coordinator, mock_repairs) -> None:
-        """Test API error logs warning only once when repairs module fails."""
+    async def test_api_error_logs_warning_once(self, coordinator) -> None:
+        """Test an unexpected error during the update logs a warning once."""
         from homeassistant.helpers.update_coordinator import UpdateFailed
 
         # Setup valid API responses
@@ -2773,20 +2763,22 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        # Make repairs module throw an error
-        mock_repairs.side_effect = Exception("Repairs error")
-
-        # First error should raise UpdateFailed
-        with pytest.raises(UpdateFailed):
+        # Fail after every fetch, while syncing WebSocket topics
+        with (
+            patch.object(
+                coordinator,
+                "_async_sync_topics",
+                AsyncMock(side_effect=Exception("Unexpected error")),
+            ),
+            pytest.raises(UpdateFailed),
+        ):
             await coordinator._async_update_data()
 
         assert coordinator._unavailable_logged is True
         assert coordinator.update_success is False
 
     @pytest.mark.asyncio
-    async def test_disk_settings_error_continues(
-        self, coordinator, mock_repairs
-    ) -> None:
+    async def test_disk_settings_error_continues(self, coordinator) -> None:
         """Test disk_settings error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -2824,20 +2816,14 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite disk_settings error
         assert data is not None
         assert data.disk_settings is None
 
     @pytest.mark.asyncio
-    async def test_mover_settings_error_continues(
-        self, coordinator, mock_repairs
-    ) -> None:
+    async def test_mover_settings_error_continues(self, coordinator) -> None:
         """Test mover_settings error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -2875,20 +2861,14 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite mover_settings error
         assert data is not None
         assert data.mover_settings is None
 
     @pytest.mark.asyncio
-    async def test_parity_schedule_error_continues(
-        self, coordinator, mock_repairs
-    ) -> None:
+    async def test_parity_schedule_error_continues(self, coordinator) -> None:
         """Test parity_schedule error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -2926,20 +2906,14 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite parity_schedule error
         assert data is not None
         assert data.parity_schedule is None
 
     @pytest.mark.asyncio
-    async def test_parity_history_error_continues(
-        self, coordinator, mock_repairs
-    ) -> None:
+    async def test_parity_history_error_continues(self, coordinator) -> None:
         """Test parity_history error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -2977,18 +2951,14 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite parity_history error
         assert data is not None
         assert data.parity_history is None
 
     @pytest.mark.asyncio
-    async def test_flash_info_error_continues(self, coordinator, mock_repairs) -> None:
+    async def test_flash_info_error_continues(self, coordinator) -> None:
         """Test flash_info error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -3026,18 +2996,14 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite flash_info error
         assert data is not None
         assert data.flash_info is None
 
     @pytest.mark.asyncio
-    async def test_plugins_error_continues(self, coordinator, mock_repairs) -> None:
+    async def test_plugins_error_continues(self, coordinator) -> None:
         """Test plugins error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -3075,20 +3041,14 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite plugins error
         assert data is not None
         assert data.plugins is None
 
     @pytest.mark.asyncio
-    async def test_update_status_error_continues(
-        self, coordinator, mock_repairs
-    ) -> None:
+    async def test_update_status_error_continues(self, coordinator) -> None:
         """Test update_status error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -3126,20 +3086,14 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite update_status error
         assert data is not None
         assert data.update_status is None
 
     @pytest.mark.asyncio
-    async def test_docker_settings_error_continues(
-        self, coordinator, mock_repairs
-    ) -> None:
+    async def test_docker_settings_error_continues(self, coordinator) -> None:
         """Test docker_settings error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -3177,18 +3131,14 @@ class TestCoordinatorAPIErrorHandling:
         )
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite docker_settings error
         assert data is not None
         assert data.docker_settings is None
 
     @pytest.mark.asyncio
-    async def test_vm_settings_error_continues(self, coordinator, mock_repairs) -> None:
+    async def test_vm_settings_error_continues(self, coordinator) -> None:
         """Test vm_settings error is logged but update continues."""
         coordinator.client.get_system_info = AsyncMock(
             return_value=SystemInfo(hostname="tower", uptime_seconds=1000)
@@ -3226,20 +3176,14 @@ class TestCoordinatorAPIErrorHandling:
             side_effect=Exception("VM settings error")
         )
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Update should succeed despite vm_settings error
         assert data is not None
         assert data.vm_settings is None
 
     @pytest.mark.asyncio
-    async def test_connection_restored_logs_info(
-        self, coordinator, mock_repairs
-    ) -> None:
+    async def test_connection_restored_logs_info(self, coordinator) -> None:
         """Test connection restore logs info when previously unavailable."""
         # Set unavailable flag to True first
         coordinator._unavailable_logged = True
@@ -3277,11 +3221,7 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            data = await coordinator._async_update_data()
+        data = await coordinator._async_update_data()
 
         # Unavailable flag should be reset
         assert coordinator._unavailable_logged is False
@@ -3366,15 +3306,6 @@ class TestCoordinatorPollCadence:
         return UnraidDataUpdateCoordinator(
             hass, entry=entry, client=mock_client, enable_websocket=False
         )
-
-    @pytest.fixture(autouse=True)
-    def mock_repairs(self) -> Iterator[None]:
-        """Skip repair checks during updates."""
-        with patch(
-            "custom_components.unraid_management_agent.repairs.async_check_and_create_issues",
-            new_callable=AsyncMock,
-        ):
-            yield
 
     async def _poll(self, coordinator: UnraidDataUpdateCoordinator) -> UnraidData:
         """Run one update and store it as the coordinator data."""

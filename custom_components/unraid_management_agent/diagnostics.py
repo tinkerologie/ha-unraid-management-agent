@@ -10,10 +10,10 @@ from homeassistant.core import HomeAssistant
 from pydantic import BaseModel
 
 from . import UnraidConfigEntry
-from .const import CONF_ACKNOWLEDGED_DISK_IO_ERRORS
+from .const import LEGACY_ACKNOWLEDGED_DISK_IO_ERRORS
 
 TO_REDACT = {
-    CONF_ACKNOWLEDGED_DISK_IO_ERRORS,  # keyed by disk serial
+    LEGACY_ACKNOWLEDGED_DISK_IO_ERRORS,  # keyed by disk serial
     CONF_API_TOKEN,
     CONF_HOST,
     CONF_PORT,

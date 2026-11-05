@@ -40,11 +40,6 @@ diagnostics:
       - any-glob-to-any-file:
           - custom_components/unraid_management_agent/diagnostics.py
 
-repairs:
-  - changed-files:
-      - any-glob-to-any-file:
-          - custom_components/unraid_management_agent/repairs.py
-
 translations:
   - changed-files:
       - any-glob-to-any-file:

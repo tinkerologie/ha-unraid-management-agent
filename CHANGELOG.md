@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Align dashboard cards with Home Assistant 2026.10+ UI patterns (#253): design tokens, theme colour fallbacks for light and dark, container queries and RTL fit at 300px, native keyboard-operable controls, accessible dashboard tabs and card picker previews. Card types, config and service calls are unchanged.
 
+### Removed
+
+- **Repair issues are removed** (#268). The integration no longer raises repairs for disk temperature, SMART failures, disk I/O errors, invalid parity, stuck parity checks, share FUSE fallback or connection failures; these duplicated Unraid's own notifications and could not be fixed from Home Assistant. The same information stays available as entities (disk health, temperature and I/O error sensors, parity binary sensors, share FUSE fallback binary sensors, and entity availability), so build automations on those instead. Existing repairs from earlier versions, and the stored I/O error acknowledgements, are removed when the integration starts.
+
 ### Fixed
 
 - Stop computed UPS, NUT and GPU energy totals jumping back to their restore baseline and stalling (#260): a stale uptime sample is no longer treated as a reboot, a detected reboot keeps the accumulated total, and restore keeps the larger valid total

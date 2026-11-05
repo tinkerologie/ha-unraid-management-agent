@@ -432,7 +432,6 @@ custom_components/unraid_management_agent/
 ├── frontend.py           # Lovelace custom cards resource registration & static asset serving
 ├── frontend/             # Compiled custom cards bundle (unraid-cards.js)
 ├── number.py             # Number platform (PWM fan duty cycle control)
-├── repairs.py            # Guided repair flows
 ├── sensor.py             # Sensor platform (system, array, disks, GPUs, UPS, ZFS, rates)
 ├── services.yaml         # Action schemas and translation descriptions
 ├── switch.py             # Switch platform (containers, VMs, disk spin, remote shares)

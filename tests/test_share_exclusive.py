@@ -1,4 +1,4 @@
-"""Test the exclusive share (FUSE fallback) binary sensors and repair issues."""
+"""Test the exclusive share (FUSE fallback) binary sensors."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ import pytest
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.unraid_management_agent.api.models import ShareInfo
@@ -25,7 +24,6 @@ from custom_components.unraid_management_agent.coordinator import UnraidData
 from .const import MOCK_CONFIG, MOCK_OPTIONS
 
 ENTRY_ID = "test_entry_id"
-ISSUE_PREFIX = f"share_fuse_fallback_{ENTRY_ID}_"
 
 
 def _share(name: str, **fields: Any) -> ShareInfo:
@@ -90,14 +88,6 @@ def _fallback_entities(registry: er.EntityRegistry) -> set[str]:
         e.unique_id
         for e in er.async_entries_for_config_entry(registry, ENTRY_ID)
         if e.unique_id.endswith("_fuse_fallback")
-    }
-
-
-def _issues(hass: HomeAssistant) -> dict[str, ir.IssueEntry]:
-    return {
-        issue_id: issue
-        for (domain, issue_id), issue in ir.async_get(hass).issues.items()
-        if domain == DOMAIN and issue_id.startswith(ISSUE_PREFIX)
     }
 
 
@@ -295,202 +285,6 @@ async def test_no_sensors_when_share_collector_disabled(
     assert _fallback_entities(entity_registry) == {
         f"{ENTRY_ID}_share_appdata_fuse_fallback",
         f"{ENTRY_ID}_share_domains_fuse_fallback",
-    }
-
-
-@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_repair_issue_lifecycle(
-    hass: HomeAssistant, mock_async_unraid_client: MagicMock
-) -> None:
-    """An issue names the stray folders and clears itself once fixed."""
-    entry = await _setup(
-        hass,
-        mock_async_unraid_client,
-        [EXCLUSIVE, FALLBACK, INELIGIBLE, OLD_AGENT, _share("")],
-    )
-    issues = _issues(hass)
-    assert set(issues) == {f"{ISSUE_PREFIX}domains"}
-    issue = issues[f"{ISSUE_PREFIX}domains"]
-    assert issue.translation_key == "share_fuse_fallback"
-    assert issue.translation_placeholders == {
-        "share_name": "domains",
-        "pool": "cache",
-        "locations": "disk1, nvme",
-    }
-    assert issue.severity is ir.IssueSeverity.WARNING
-    assert issue.is_fixable is False
-
-    # Stray folder removed, array not yet restarted
-    await _refresh(
-        hass,
-        entry,
-        mock_async_unraid_client,
-        [FALLBACK_NO_STRAY, FALLBACK.model_copy(update={"locations": ["cache"]})],
-    )
-    issues = _issues(hass)
-    assert set(issues) == {f"{ISSUE_PREFIX}system", f"{ISSUE_PREFIX}domains"}
-    assert issues[f"{ISSUE_PREFIX}domains"].translation_key == (
-        "share_fuse_fallback_restart"
-    )
-    assert issues[f"{ISSUE_PREFIX}domains"].translation_placeholders == {
-        "share_name": "domains",
-        "pool": "cache",
-    }
-
-    # Share fetch failed: issues stay
-    await _refresh(hass, entry, mock_async_unraid_client, None)
-    assert set(_issues(hass)) == {f"{ISSUE_PREFIX}system", f"{ISSUE_PREFIX}domains"}
-
-    # Eligibility unknown keeps both issues
-    await _refresh(
-        hass,
-        entry,
-        mock_async_unraid_client,
-        [_share("domains", exclusive=False), _share("system", exclusive=False)],
-    )
-    assert set(_issues(hass)) == {f"{ISSUE_PREFIX}system", f"{ISSUE_PREFIX}domains"}
-
-    # Array stopped (state unknown) keeps domains; system was deleted
-    await _refresh(
-        hass,
-        entry,
-        mock_async_unraid_client,
-        [_share("domains")],
-    )
-    assert set(_issues(hass)) == {f"{ISSUE_PREFIX}domains"}
-
-    # Exclusive again
-    await _refresh(
-        hass,
-        entry,
-        mock_async_unraid_client,
-        [_share("domains", exclusive=True, exclusive_eligible=True)],
-    )
-    assert _issues(hass) == {}
-
-
-@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_issues_removed_with_config_entry(
-    hass: HomeAssistant, mock_async_unraid_client: MagicMock
-) -> None:
-    """Removing the integration entry deletes its share issues only."""
-    entry = await _setup(hass, mock_async_unraid_client, [FALLBACK])
-    ir.async_create_issue(
-        hass,
-        DOMAIN,
-        "share_fuse_fallback_other_entry_media",
-        is_fixable=False,
-        severity=ir.IssueSeverity.WARNING,
-        translation_key="share_fuse_fallback_restart",
-    )
-    ir.async_create_issue(
-        hass,
-        "other_domain",
-        f"{ISSUE_PREFIX}media",
-        is_fixable=False,
-        severity=ir.IssueSeverity.WARNING,
-        translation_key="share_fuse_fallback_restart",
-    )
-    assert set(_issues(hass)) == {f"{ISSUE_PREFIX}domains"}
-
-    await hass.config_entries.async_remove(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert _issues(hass) == {}
-    issues = ir.async_get(hass).issues
-    assert (DOMAIN, "share_fuse_fallback_other_entry_media") in issues
-    assert ("other_domain", f"{ISSUE_PREFIX}media") in issues
-
-
-@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_spun_down_disks_left_unchecked(
-    hass: HomeAssistant, mock_async_unraid_client: MagicMock
-) -> None:
-    """Without a stray folder found, the issue names the unchecked disks."""
-    share = FALLBACK_NO_STRAY.model_copy(
-        update={"locations_unchecked": ["disk3", "disk4"]}
-    )
-    await _setup(hass, mock_async_unraid_client, [share])
-
-    issue = _issues(hass)[f"{ISSUE_PREFIX}system"]
-    assert issue.translation_key == "share_fuse_fallback_unchecked"
-    assert issue.translation_placeholders == {
-        "share_name": "system",
-        "pool": "cache",
-        "unchecked": "disk3, disk4",
-    }
-    state = hass.states.get("binary_sensor.unraid_test_share_system_fuse_fallback")
-    assert state is not None
-    assert state.state == STATE_ON
-    assert state.attributes["locations_unchecked"] == ["disk3", "disk4"]
-    assert state.attributes["stray_locations"] == []
-
-
-@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_stray_folder_with_unchecked_disks(
-    hass: HomeAssistant, mock_async_unraid_client: MagicMock
-) -> None:
-    """With a stray folder found, the issue also names the unchecked disks."""
-    share = FALLBACK.model_copy(update={"locations_unchecked": ["disk3"]})
-    await _setup(hass, mock_async_unraid_client, [share])
-
-    issue = _issues(hass)[f"{ISSUE_PREFIX}domains"]
-    assert issue.translation_key == "share_fuse_fallback_stray_unchecked"
-    assert issue.translation_placeholders == {
-        "share_name": "domains",
-        "pool": "cache",
-        "locations": "disk1, nvme",
-        "unchecked": "disk3",
-    }
-
-
-@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_repair_issue_locations_unknown(
-    hass: HomeAssistant, mock_async_unraid_client: MagicMock
-) -> None:
-    """Without a location scan, the issue does not claim nothing was found."""
-    share = _share(
-        "downloads",
-        exclusive=False,
-        exclusive_eligible=True,
-        exclusive_pool="cache",
-    )
-    await _setup(hass, mock_async_unraid_client, [share])
-
-    issue = _issues(hass)[f"{ISSUE_PREFIX}downloads"]
-    assert issue.translation_key == "share_fuse_fallback_unknown"
-    state = hass.states.get("binary_sensor.unraid_test_share_downloads_fuse_fallback")
-    assert state is not None
-    assert state.state == STATE_ON
-    assert state.attributes["exclusive_pool"] == "cache"
-    assert "locations" not in state.attributes
-    assert "stray_locations" not in state.attributes
-    assert issue.translation_placeholders == {
-        "share_name": "downloads",
-        "pool": "cache",
-    }
-
-
-@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
-async def test_repair_issue_unknown_pool(
-    hass: HomeAssistant, mock_async_unraid_client: MagicMock
-) -> None:
-    """A share without a reported pool still gets a readable issue."""
-    share = ShareInfo.model_validate(
-        {
-            "name": "scratch",
-            "exclusive": False,
-            "exclusive_eligible": True,
-            "locations": ["disk2"],
-        }
-    )
-    await _setup(hass, mock_async_unraid_client, [share])
-
-    issue = _issues(hass)[f"{ISSUE_PREFIX}scratch"]
-    assert issue.translation_placeholders == {
-        "share_name": "scratch",
-        "pool": "?",
-        "locations": "disk2",
     }
 
 
