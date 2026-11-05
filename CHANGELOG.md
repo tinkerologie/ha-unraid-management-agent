@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.11.0] — 2026-11-05
+
 ### Added
 
 - Fail current-release tests on integration deprecation warnings and all three Home Assistant deprecation report formats, including collection and teardown reports (#249).
