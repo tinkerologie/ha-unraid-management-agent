@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Run the tests on Home Assistant's official `pytest-homeassistant` plugin, which replaces the retired `pytest-homeassistant-custom-component` (#264). `script/test`, CI and the HA Next check install the plugin release that pins the matching Home Assistant version, and the HA Next Core `dev` check now runs the tests too. The group-device friendly-name test expects Home Assistant 2026.11's device-name prefix on user-set entity names (#267).
 - Plugin update entities are now display-only (#250): the agent no longer installs or updates plugins, so Home Assistant no longer offers an Install action that always failed. Apply plugin updates from Unraid's Plugins page
 - Support both legacy and `packages/hassfest` Core validator layouts, refreshing cached sparse checkouts and running the packaged validator through uv (#249).
 

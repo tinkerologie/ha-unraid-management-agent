@@ -446,6 +446,7 @@ Coverage target: **95%+** (current: ~94-95%). Config flow coverage target: **100
 - **Use `is` for enum comparisons:** `assert result["type"] is FlowResultType.FORM`
 - **Mock data factories** are in `tests/const.py` and return Pydantic model instances.
 - **`asyncio_mode = "auto"`** in pytest config, so no `@pytest.mark.asyncio` needed.
+- **Test plugin:** Home Assistant's official `pytest-homeassistant` plugin, which loads automatically and enables custom integrations. Import helpers from `pytest_homeassistant` (for example `pytest_homeassistant.common.MockConfigEntry`). Never install the retired `pytest-homeassistant-custom-component` alongside it; `script/test` removes it.
 
 **Example test patterns:**
 

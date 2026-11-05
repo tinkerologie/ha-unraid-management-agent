@@ -12,7 +12,7 @@ from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE, EntityCa
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.unraid_management_agent.api.exceptions import (
     UnraidNotFoundError,

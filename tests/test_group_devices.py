@@ -12,7 +12,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import label_registry as lr
 from homeassistant.helpers.translation import async_get_translations
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 
 from custom_components.unraid_management_agent import (
     _async_move_child_devices_to_groups,
@@ -239,10 +239,11 @@ async def test_upgrade_moves_devices_keeping_entities_and_settings(
     assert entities.async_get(before["docker_cpu"].entity_id).device_id == docker.id
     assert not entities.deleted_entities
 
-    # Friendly names: the user's name is kept, the Docker sensors read as
-    # before, and a VM entity's full name has the VMs device in front
+    # Friendly names: the user's name is kept (Home Assistant 2026.11+ puts
+    # the device name in front of it), the Docker sensors read as before, and
+    # a VM entity's full name has the VMs device in front
     plex_cpu = hass.states.get("sensor.unraid_test_plex_cpu")
-    assert plex_cpu.attributes["friendly_name"] == "Plex CPU"
+    assert plex_cpu.attributes["friendly_name"] == "Plex Media Server Plex CPU"
     docker_cpu = hass.states.get("sensor.unraid_test_docker_cpu_usage")
     assert docker_cpu.attributes["friendly_name"] == "unraid-test Docker CPU Usage"
     win10_power = hass.states.get("switch.unraid_test_vm_windows_10_power")

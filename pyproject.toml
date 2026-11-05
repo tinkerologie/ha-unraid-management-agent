@@ -37,7 +37,9 @@ dev = [
 test = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
-    "pytest-homeassistant-custom-component>=0.13.323",
+    # Home Assistant's official test plugin pins the matching homeassistant
+    # release; upgrade both together.
+    "pytest-homeassistant==2026.11.0b6",
     "pytest-cov>=7.1.0",
     "pytest-timeout>=2.4.0",
 ]
@@ -191,10 +193,13 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 norecursedirs = [".git", "testing_config"]
+pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 timeout = 30
 addopts = [
+    # Let Home Assistant install its httpx alias before respx is imported.
+    "-p", "no:respx",
     "-v", "--tb=short", "--strict-markers",
     "--cov=custom_components.unraid_management_agent",
     "--cov-report=term-missing", "--cov-report=html", "--cov-report=xml",

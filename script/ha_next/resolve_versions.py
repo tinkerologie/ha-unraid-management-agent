@@ -15,7 +15,7 @@ from packaging.requirements import Requirement
 from packaging.version import InvalidVersion, Version
 
 PYPI = "https://pypi.org/pypi"
-HARNESS = "pytest-homeassistant-custom-component"
+HARNESS = "pytest-homeassistant"
 
 
 def fetch_json(project: str, version: str = "") -> dict[str, Any]:

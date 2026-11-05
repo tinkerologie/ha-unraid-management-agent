@@ -27,9 +27,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
 TEST_PYTHON_VERSION="3.14.2"
-# Fallback versions used when PyPI is unreachable
-TEST_HOME_ASSISTANT_VERSION="2026.6.1"
-TEST_PLUGIN_VERSION="0.13.333"
+# Fallback versions used when PyPI is unreachable. pytest-homeassistant is
+# released with every Home Assistant version and pins that exact release.
+TEST_HOME_ASSISTANT_VERSION="2026.11.0b6"
+TEST_PLUGIN_VERSION="2026.11.0b6"
 
 # shellcheck source=script/.lib/output.sh
 source "$SCRIPT_DIR/.lib/output.sh"
@@ -47,31 +48,38 @@ else
 fi
 
 log_header "Detecting latest compatible test versions"
+# Prefer the newest final pytest-homeassistant release; use the newest
+# pre-release only while no final release exists.
 DETECTED_VERSIONS=$(python3 - <<'PYEOF' 2>/dev/null
-import urllib.request, json, re, sys
+import json, re, sys, urllib.request
+
+def key(version):
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:(a|b|rc)(\d+))?", version)
+    if not match:
+        return None
+    major, minor, patch, tag, num = match.groups()
+    rank = {"a": 0, "b": 1, "rc": 2, None: 3}[tag]
+    return (int(major), int(minor), int(patch), rank, int(num or 0))
+
 try:
-    data = json.loads(urllib.request.urlopen(
-        "https://pypi.org/pypi/pytest-homeassistant-custom-component/json", timeout=10
-    ).read())
-    versions = sorted(
-        data["releases"].keys(),
-        key=lambda v: tuple(int(x) for x in re.findall(r"\d+", v)),
-        reverse=True,
-    )
-    for ver in versions[:15]:
-        try:
-            pdata = json.loads(urllib.request.urlopen(
-                f"https://pypi.org/pypi/pytest-homeassistant-custom-component/{ver}/json",
-                timeout=5,
-            ).read())
-            for req in pdata["info"].get("requires_dist") or []:
-                if req.startswith("homeassistant=="):
-                    ha_ver = req.split("==")[1]
-                    if re.match(r"^\d+\.\d+\.\d+$", ha_ver):
-                        print(f"{ver}:{ha_ver}")
-                        sys.exit(0)
-        except Exception:
-            continue
+    url = "https://pypi.org/pypi/pytest-homeassistant/json"
+    data = json.loads(urllib.request.urlopen(url, timeout=10).read())
+    candidates = [
+        version
+        for version, files in data["releases"].items()
+        if key(version) and key(version) >= (2026, 11, 0, 0, 0)
+        and any(not item.get("yanked") for item in files)
+    ]
+    finals = [version for version in candidates if key(version)[3] == 3]
+    for version in sorted(finals or candidates, key=key, reverse=True)[:5]:
+        meta = json.loads(urllib.request.urlopen(
+            f"https://pypi.org/pypi/pytest-homeassistant/{version}/json", timeout=5
+        ).read())
+        for req in meta["info"].get("requires_dist") or []:
+            pin = re.fullmatch(r"homeassistant==(\S+)", req.strip())
+            if pin:
+                print(f"{version}:{pin.group(1)}")
+                sys.exit(0)
 except Exception:
     pass
 sys.exit(1)
@@ -79,7 +87,7 @@ PYEOF
 ) && {
     TEST_PLUGIN_VERSION="${DETECTED_VERSIONS%%:*}"
     TEST_HOME_ASSISTANT_VERSION="${DETECTED_VERSIONS##*:}"
-    log_info "Latest stable test pair: pytest-hacs-custom-component==${TEST_PLUGIN_VERSION}, HA==${TEST_HOME_ASSISTANT_VERSION}"
+    log_info "Latest test pair: pytest-homeassistant==${TEST_PLUGIN_VERSION}, HA==${TEST_HOME_ASSISTANT_VERSION}"
 } || log_warning "PyPI unreachable, using fallbacks: HA ${TEST_HOME_ASSISTANT_VERSION}, plugin ${TEST_PLUGIN_VERSION}"
 
 log_header "Preparing isolated test environment"
@@ -106,16 +114,18 @@ elif [[ "$CURRENT_TEST_HA" != "$TEST_HOME_ASSISTANT_VERSION" ]]; then
     uv venv --seed --python "$TEST_PYTHON_VERSION" "$TEST_VENV_PATH"
 fi
 
-# Tests run in a dedicated environment pinned to the version required by
-# pytest-homeassistant-custom-component to ensure compatibility.
+# Tests run in a dedicated environment pinned to the Home Assistant release
+# that pytest-homeassistant requires.
 # shellcheck source=/dev/null
 source "$TEST_VENV_PATH/bin/activate"
 
 log_info "Installing compatible Home Assistant test dependencies"
+# The old plugin supplies overlapping fixtures; never install both.
+uv pip uninstall pytest-homeassistant-custom-component >/dev/null 2>&1 || true
 uv pip install \
     -e . \
     "homeassistant==${TEST_HOME_ASSISTANT_VERSION}" \
-    "pytest-homeassistant-custom-component==${TEST_PLUGIN_VERSION}" \
+    "pytest-homeassistant==${TEST_PLUGIN_VERSION}" \
     "pytest>=8.0.0" \
     "pytest-asyncio>=0.23.0" \
     "pytest-cov>=4.0.0" \
