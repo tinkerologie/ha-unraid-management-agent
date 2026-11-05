@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
-from homeassistant.const import PERCENTAGE, EntityCategory
+from homeassistant.const import EntityCategory, UnitOfRatio
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -56,7 +56,7 @@ class UnraidFanSpeedNumber(UnraidBaseEntity, NumberEntity):
     _attr_native_min_value = 0
     _attr_native_max_value = 100
     _attr_native_step = 1
-    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_native_unit_of_measurement = UnitOfRatio.PERCENTAGE
     _attr_mode = NumberMode.SLIDER
     _attr_icon = "mdi:fan"
     _attr_entity_category = EntityCategory.CONFIG

@@ -39,11 +39,11 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     EntityCategory,
     UnitOfFrequency,
     UnitOfInformation,
     UnitOfPower,
+    UnitOfRatio,
     UnitOfTemperature,
 )
 from homeassistant.util import slugify
@@ -123,7 +123,10 @@ _GPU_SENSORS: Final[tuple[tuple[str, str, str, dict[str, Any]], ...]] = (
         "utilization",
         "utilization",
         "utilization_percent",
-        {"native_unit_of_measurement": PERCENTAGE, "suggested_display_precision": 0},
+        {
+            "native_unit_of_measurement": UnitOfRatio.PERCENTAGE,
+            "suggested_display_precision": 0,
+        },
     ),
     (
         "memory_used",
@@ -150,7 +153,10 @@ _GPU_SENSORS: Final[tuple[tuple[str, str, str, dict[str, Any]], ...]] = (
         "fan",
         "fan speed",
         "fan_percent",
-        {"native_unit_of_measurement": PERCENTAGE, "suggested_display_precision": 0},
+        {
+            "native_unit_of_measurement": UnitOfRatio.PERCENTAGE,
+            "suggested_display_precision": 0,
+        },
     ),
     (
         "clock",
@@ -233,7 +239,7 @@ def _disk_descriptions(
         UnraidVMGuestSensorEntityDescription(
             key=f"{base}_wear",
             name=f"Disk {label} wear",
-            native_unit_of_measurement=PERCENTAGE,
+            native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=0,
             vm_identifier=vm_identifier,
@@ -272,7 +278,7 @@ def _filesystem_description(
     return UnraidVMGuestSensorEntityDescription(
         key=f"{_prefix(vm_identifier)}fs_{_ident(mountpoint)}_used",
         name=f"Filesystem {mountpoint} used",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         vm_identifier=vm_identifier,

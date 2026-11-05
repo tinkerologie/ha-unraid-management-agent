@@ -45,12 +45,12 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     REVOLUTIONS_PER_MINUTE,
     EntityCategory,
     UnitOfDataRate,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
+    UnitOfRatio,
     UnitOfTemperature,
 )
 from homeassistant.core import callback
@@ -776,7 +776,7 @@ _TOTAL_THROUGHPUT = _throughput_description("throughput", "total_bytes_per_sec")
 _LINK_UTILIZATION = UnraidStorageSensorEntityDescription(
     key="link_utilization",
     translation_key="storage_link_utilization",
-    native_unit_of_measurement=PERCENTAGE,
+    native_unit_of_measurement=UnitOfRatio.PERCENTAGE,
     suggested_display_precision=1,
     state_class=SensorStateClass.MEASUREMENT,
     value_fn=_throughput_value("utilization_percent"),

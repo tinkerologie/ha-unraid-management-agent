@@ -46,7 +46,7 @@ jobs:
             uv run --no-project --python 3.14.2 --with packaging script/ha_next/resolve_versions.py
           else
             echo 'ha_version=dev' >> "$GITHUB_OUTPUT"
-            echo 'harness_version=' >> "$GITHUB_OUTPUT"
+            echo 'harness_version=dev' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create environment
@@ -63,10 +63,14 @@ jobs:
           HA_VERSION: ${{ steps.resolve.outputs.ha_version }}
           HARNESS_VERSION: ${{ steps.resolve.outputs.harness_version }}
         run: |
+          # The test extra pins the current release, so name the test tools here.
+          TEST_TOOLS=("pytest-cov>=7.1.0" "pytest-timeout>=2.4.0")
           if [ "$CHANNEL" = dev ]; then
-            uv pip install -e . 'homeassistant @ https://github.com/home-assistant/core/archive/refs/heads/dev.tar.gz'
+            CORE=https://github.com/home-assistant/core/archive/refs/heads/dev.tar.gz
+            uv pip install -e . "homeassistant @ $CORE" \
+              "pytest-homeassistant @ $CORE#subdirectory=packages/pytest-homeassistant" "${TEST_TOOLS[@]}"
           elif [ -n "$HARNESS_VERSION" ]; then
-            uv pip install -e '.[test]' "homeassistant==$HA_VERSION" "pytest-homeassistant-custom-component==$HARNESS_VERSION"
+            uv pip install -e . "homeassistant==$HA_VERSION" "pytest-homeassistant==$HARNESS_VERSION" "${TEST_TOOLS[@]}"
           else
             uv pip install -e . "homeassistant==$HA_VERSION"
           fi
@@ -88,7 +92,7 @@ jobs:
 
       - name: Run tests
         id: pytest
-        if: steps.install.outcome == 'success' && matrix.channel == 'pypi' && steps.resolve.outputs.harness_version != ''
+        if: steps.install.outcome == 'success' && steps.resolve.outputs.harness_version != ''
         continue-on-error: true
         run: pytest --no-cov
 
@@ -137,11 +141,7 @@ jobs:
             echo
             jq -r '.outcomes | to_entries[] | "- \(.key): \(.value)"' "$RUNNER_TEMP/result.json"
             if [ -z "$HARNESS_VERSION" ] && [ "$RESOLVE" = success ]; then
-              if [ "$CHANNEL" = dev ]; then
-                echo 'No pytest-homeassistant-custom-component release matches Core dev; pytest was skipped.'
-              else
-                echo "No pytest-homeassistant-custom-component release pins homeassistant==$HA_VERSION; pytest was skipped."
-              fi
+              echo "No pytest-homeassistant release pins homeassistant==$HA_VERSION; pytest was skipped."
             fi
             if [ -f "$RUNNER_TEMP/ha-next-imports.md" ]; then cat "$RUNNER_TEMP/ha-next-imports.md"; fi
           } > "$RUNNER_TEMP/report.md"

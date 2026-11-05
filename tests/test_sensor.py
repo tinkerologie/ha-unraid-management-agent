@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import UnitOfRatio
 from homeassistant.core import HomeAssistant
 
 from custom_components.unraid_management_agent.api import RateCalculator
@@ -158,7 +158,7 @@ async def test_cpu_usage_sensor(
     state = hass.states.get("sensor.unraid_test_cpu_usage")
     if state:
         assert state.state == "25.5"
-        assert state.attributes.get("unit_of_measurement") == PERCENTAGE
+        assert state.attributes.get("unit_of_measurement") == UnitOfRatio.PERCENTAGE
 
 
 @pytest.mark.usefixtures(
@@ -176,7 +176,7 @@ async def test_ram_usage_sensor(
     state = hass.states.get("sensor.unraid_test_ram_usage")
     if state:
         assert state.state == "45.2"
-        assert state.attributes.get("unit_of_measurement") == PERCENTAGE
+        assert state.attributes.get("unit_of_measurement") == UnitOfRatio.PERCENTAGE
 
 
 @pytest.mark.usefixtures(
@@ -1243,14 +1243,14 @@ def test_entity_description_pattern():
     # Verify system descriptions
     assert len(SYSTEM_SENSOR_DESCRIPTIONS) > 0
     cpu_desc = next(d for d in SYSTEM_SENSOR_DESCRIPTIONS if d.key == "cpu_usage")
-    assert cpu_desc.native_unit_of_measurement == PERCENTAGE
+    assert cpu_desc.native_unit_of_measurement == UnitOfRatio.PERCENTAGE
     assert cpu_desc.value_fn is not None
     assert cpu_desc.extra_state_attributes_fn is not None
 
     # Verify array descriptions
     assert len(ARRAY_SENSOR_DESCRIPTIONS) > 0
     array_desc = next(d for d in ARRAY_SENSOR_DESCRIPTIONS if d.key == "array_usage")
-    assert array_desc.native_unit_of_measurement == PERCENTAGE
+    assert array_desc.native_unit_of_measurement == UnitOfRatio.PERCENTAGE
 
     # Verify GPU descriptions
     # Verify UPS descriptions

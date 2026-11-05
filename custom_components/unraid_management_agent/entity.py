@@ -95,7 +95,8 @@ class UnraidBaseEntity(CoordinatorEntity["UnraidDataUpdateCoordinator"]):
             configuration_url=f"http://{host}",
         )
         if agent_version:
-            device_info["hw_version"] = agent_version
+            # DeviceInfo is a dataclass from Home Assistant 2026.11
+            device_info.hw_version = agent_version
         return device_info
 
     @property

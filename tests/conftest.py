@@ -69,8 +69,6 @@ from .const import (  # noqa: E402
     mock_zfs_pools,
 )
 
-pytest_plugins = "pytest_homeassistant_custom_component"
-
 
 def pytest_collection_finish(session: pytest.Session) -> None:
     """Fail collection for reports emitted by import-time class definitions."""
@@ -272,7 +270,7 @@ async def mock_config_entry(hass: HomeAssistant) -> ConfigEntry:
     )
 
     if not entry:
-        from pytest_homeassistant_custom_component.common import MockConfigEntry
+        from pytest_homeassistant.common import MockConfigEntry
 
         entry = MockConfigEntry(
             domain=DOMAIN,
@@ -343,12 +341,6 @@ def mock_coordinator(
         coordinator.is_collector_enabled = _is_collector_enabled
 
         yield coordinator
-
-
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    """Enable custom integrations for all tests."""
-    return
 
 
 @pytest.fixture(autouse=True)

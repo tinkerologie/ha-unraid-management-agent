@@ -567,7 +567,7 @@ async def test_zeroconf_discovery_already_configured(
     hass: HomeAssistant, mock_setup_entry: AsyncMock
 ) -> None:
     """Test that zeroconf discovery aborts when device is already configured."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant.common import MockConfigEntry
 
     entry = MockConfigEntry(
         domain=DOMAIN,

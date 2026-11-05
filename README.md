@@ -184,7 +184,7 @@ When the agent's `storage_topology` collector is active (`storcli` or `sg3_utils
 ## Prerequisites
 
 - **Unraid OS**: Version 6.9.0 or newer.
-- **Home Assistant**: Version 2026.9 or newer.
+- **Home Assistant**: Version 2026.11 or newer.
 - **Unraid Management Agent**: Installed and running on your Unraid server.
 
 ### Verify The Agent

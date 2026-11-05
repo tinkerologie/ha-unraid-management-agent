@@ -7,7 +7,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from typing import Any, Final
 
-import voluptuous as vol
+import probatio
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_API_TOKEN, CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, callback
@@ -72,29 +72,29 @@ ATTR_ENABLED: Final = "enabled"
 ATTR_REMOVE_IMAGE: Final = "remove_image"
 
 # Service schemas
-SERVICE_CONTAINER_SCHEMA = vol.Schema(
+SERVICE_CONTAINER_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_CONTAINER_ID): cv.string,
+        probatio.Required(ATTR_CONTAINER_ID): cv.string,
     }
 )
 
-SERVICE_VM_SCHEMA = vol.Schema(
+SERVICE_VM_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_VM_ID): cv.string,
+        probatio.Required(ATTR_VM_ID): cv.string,
     }
 )
 
-SERVICE_CONTAINER_AUTOSTART_SCHEMA = vol.Schema(
+SERVICE_CONTAINER_AUTOSTART_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_CONTAINER_ID): cv.string,
-        vol.Required(ATTR_ENABLED): cv.boolean,
+        probatio.Required(ATTR_CONTAINER_ID): cv.string,
+        probatio.Required(ATTR_ENABLED): cv.boolean,
     }
 )
 
-SERVICE_CONTAINER_REMOVE_SCHEMA = vol.Schema(
+SERVICE_CONTAINER_REMOVE_SCHEMA = probatio.Schema(
     {
-        vol.Required(ATTR_CONTAINER_ID): cv.string,
-        vol.Optional(ATTR_REMOVE_IMAGE, default=False): cv.boolean,
+        probatio.Required(ATTR_CONTAINER_ID): cv.string,
+        probatio.Optional(ATTR_REMOVE_IMAGE, default=False): cv.boolean,
     }
 )
 
