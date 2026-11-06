@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Include complete label command examples and native blocking dependencies when engineering skills read GitHub issues.
+
 ### Added
 
 - Configure engineering agent skills with GitHub Issues, the default triage label mapping, and a single-context domain documentation layout.
