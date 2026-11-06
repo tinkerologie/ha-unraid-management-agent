@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a domain glossary and five retrospective architecture decision records, with source references; align related guidance with the implemented architecture.
+
 ### Changed
 
 - Include complete label command examples and native blocking dependencies when engineering skills read GitHub issues.
