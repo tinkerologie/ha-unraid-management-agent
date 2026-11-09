@@ -39,7 +39,7 @@ test = [
     "pytest-asyncio>=1.3.0",
     # Home Assistant's official test plugin pins the matching homeassistant
     # release; upgrade both together.
-    "pytest-homeassistant==2026.11.0b6",
+    "pytest-homeassistant==2026.11.0",
     "pytest-cov>=7.1.0",
     "pytest-timeout>=2.4.0",
 ]
