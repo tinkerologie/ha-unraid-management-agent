@@ -15,7 +15,7 @@ from pytest_homeassistant.common import MockConfigEntry
 from custom_components.unraid_management_agent import UnraidDataUpdateCoordinator
 from custom_components.unraid_management_agent.api.constants import EventType
 from custom_components.unraid_management_agent.api.events import (
-    WebSocketEvent,
+    NUTStatusUpdateEvent,
     identify_event_type,
     parse_event,
 )
@@ -834,7 +834,7 @@ async def test_partial_nut_event_keeps_device_lists(
     coordinator: UnraidDataUpdateCoordinator = entry.runtime_data.coordinator
     partial = NUTInfo.model_validate({"installed": True, "running": True})
     coordinator._handle_websocket_event(
-        WebSocketEvent(event_type=EventType.NUT_STATUS_UPDATE, data=partial)
+        NUTStatusUpdateEvent.model_construct(data=partial)
     )
     assert coordinator.data.nut is not None
     assert coordinator.data.nut.statuses == THREE_DEVICES.statuses
@@ -843,7 +843,7 @@ async def test_partial_nut_event_keeps_device_lists(
     # A full event still replaces the lists
     single = _nut(_ups_status("ups", 600))
     coordinator._handle_websocket_event(
-        WebSocketEvent(event_type=EventType.NUT_STATUS_UPDATE, data=single)
+        NUTStatusUpdateEvent.model_construct(data=single)
     )
     assert coordinator.data.nut.statuses == single.statuses
 

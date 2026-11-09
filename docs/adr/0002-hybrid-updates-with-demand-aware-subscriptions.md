@@ -15,6 +15,8 @@ Push updates provide responsiveness while polling repairs missed state. Topic fi
 Management Agent's demand model, not merely a bandwidth optimization: subscribing to unused topics or
 polling every field unnecessarily keeps the corresponding collectors active.
 
+The telemetry reconciler owns snapshot assembly and replays WebSocket events received during a poll before publication. The coordinator remains responsible for Home Assistant scheduling and notifications.
+
 ## Evidence
 
 - [Subscription selection and compatibility fallback](../../custom_components/unraid_management_agent/collection.py)
