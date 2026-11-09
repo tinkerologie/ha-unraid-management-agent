@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Validate the vendored client against pinned producer REST and WebSocket fixtures and decode network service totals from current and legacy keys (#278).
+
 - Include complete label command examples and native blocking dependencies when engineering skills read GitHub issues.
 
 ### Added

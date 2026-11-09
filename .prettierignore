@@ -44,3 +44,6 @@ node_modules/
 # Auto-generated files
 *.min.js
 *.min.css
+
+# Keep producer fixtures byte-for-byte identical to their upstream pin.
+tests/fixtures/producer_contract/upstream/
