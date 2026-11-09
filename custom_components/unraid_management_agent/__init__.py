@@ -8,8 +8,13 @@ from collections.abc import Callable, Coroutine
 from typing import Any, Final
 
 import probatio
-from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_API_TOKEN, CONF_HOST, CONF_PORT, Platform
+from homeassistant.const import (
+    ATTR_CONFIG_ENTRY_ID,
+    CONF_API_TOKEN,
+    CONF_HOST,
+    CONF_PORT,
+    Platform,
+)
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
@@ -34,9 +39,7 @@ from .api import (
 from .cleanup import async_cleanup_stale_entities, async_remove_empty_devices
 from .const import (
     CONF_ENABLE_WEBSOCKET,
-    CONF_READ_ONLY,
     DEFAULT_ENABLE_WEBSOCKET,
-    DEFAULT_READ_ONLY,
     DOMAIN,
     LEGACY_ACKNOWLEDGED_DISK_IO_ERRORS,
     MANUFACTURER,
@@ -60,6 +63,7 @@ from .entity import (
 from .frontend import async_register_frontend
 from .nic import async_remove_nic_devices
 from .presence import Presence, device_presence
+from .service_target import is_read_only, resolve_service_target
 from .vm_guest import VM_GUEST_KEY_PREFIX
 
 # Service field constants
@@ -71,18 +75,21 @@ ATTR_REMOVE_IMAGE: Final = "remove_image"
 # Service schemas
 SERVICE_CONTAINER_SCHEMA = probatio.Schema(
     {
+        probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         probatio.Required(ATTR_CONTAINER_ID): cv.string,
     }
 )
 
 SERVICE_VM_SCHEMA = probatio.Schema(
     {
+        probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         probatio.Required(ATTR_VM_ID): cv.string,
     }
 )
 
 SERVICE_CONTAINER_AUTOSTART_SCHEMA = probatio.Schema(
     {
+        probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         probatio.Required(ATTR_CONTAINER_ID): cv.string,
         probatio.Required(ATTR_ENABLED): cv.boolean,
     }
@@ -90,9 +97,14 @@ SERVICE_CONTAINER_AUTOSTART_SCHEMA = probatio.Schema(
 
 SERVICE_CONTAINER_REMOVE_SCHEMA = probatio.Schema(
     {
+        probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         probatio.Required(ATTR_CONTAINER_ID): cv.string,
         probatio.Optional(ATTR_REMOVE_IMAGE, default=False): cv.boolean,
     }
+)
+
+SERVICE_SERVER_SCHEMA = probatio.Schema(
+    {probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string}
 )
 
 # Re-export for backwards compatibility and for tests to patch
@@ -310,11 +322,6 @@ READ_ONLY_PLATFORMS: list[Platform] = [
 CONTROL_DOMAINS: frozenset[str] = frozenset(
     str(platform) for platform in PLATFORMS if platform not in READ_ONLY_PLATFORMS
 )
-
-
-def _is_read_only(entry: UnraidConfigEntry) -> bool:
-    """Return True when the entry is configured to only create sensors."""
-    return bool(entry.options.get(CONF_READ_ONLY, DEFAULT_READ_ONLY))
 
 
 @callback
@@ -683,7 +690,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> bo
     await _async_migrate_legacy_entity_unique_ids(hass, entry, coordinator)
 
     # Store runtime data using the new pattern
-    read_only = _is_read_only(entry)
+    read_only = is_read_only(entry)
     platforms = READ_ONLY_PLATFORMS if read_only else PLATFORMS
     entry.runtime_data = UnraidRuntimeData(
         coordinator=coordinator, client=client, platforms=platforms
@@ -803,33 +810,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     if hass.services.has_service(DOMAIN, "container_start"):
         return
 
-    def _get_coordinator(call: ServiceCall) -> UnraidDataUpdateCoordinator:
-        """Get coordinator from any config entry."""
-        entries = hass.config_entries.async_entries(DOMAIN)
-        if not entries:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="no_config_entries",
-            )
-        # Use the first entry's coordinator (services are domain-wide)
-        entry: UnraidConfigEntry = entries[0]
-        # Only a loaded entry has runtime data (and a coordinator) to act on
-        if entry.state is not ConfigEntryState.LOADED:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="entry_not_loaded",
-                translation_placeholders={"title": entry.title},
-            )
-        # Every service changes the server, so none run against an entry that
-        # is in read-only mode
-        if _is_read_only(entry):
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="read_only_mode",
-                translation_placeholders={"title": entry.title},
-            )
-        return entry.runtime_data.coordinator
-
     async def _async_service_call(
         coordinator: UnraidDataUpdateCoordinator,
         api_call: Callable[[], Coroutine[Any, Any, Any]],
@@ -892,7 +872,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Create a service handler bound to a specific API method."""
 
         async def handler(call: ServiceCall) -> None:
-            coordinator = _get_coordinator(call)
+            coordinator = resolve_service_target(hass, call)
             if method_name in PARITY_SERVICE_METHODS and has_no_array_disks(
                 coordinator.data
             ):
@@ -943,10 +923,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             DOMAIN,
             svc_name,
             _make_handler(method, tkey),
+            schema=SERVICE_SERVER_SCHEMA,
         )
 
     async def _handle_container_remove(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(call)
+        coordinator = resolve_service_target(hass, call)
         container_id: str = call.data[ATTR_CONTAINER_ID]
         remove_image: bool = call.data[ATTR_REMOVE_IMAGE]
 
@@ -964,7 +945,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         )
 
     async def _handle_container_set_autostart(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(call)
+        coordinator = resolve_service_target(hass, call)
         container_id: str = call.data[ATTR_CONTAINER_ID]
         enabled: bool = call.data[ATTR_ENABLED]
 
