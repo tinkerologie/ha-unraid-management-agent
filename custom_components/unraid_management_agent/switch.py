@@ -700,18 +700,6 @@ class UnraidRemoteShareSwitch(UnraidBaseEntity, SwitchEntity):
         super().__init__(coordinator, f"remote_share_{safe_name}_mount")
         self._attr_translation_key = "remote_share"
         self._attr_translation_placeholders = {"share_name": share_name}
-        self._optimistic_state: bool | None = None
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Clear optimistic state when API state matches."""
-        if self._optimistic_state is not None:
-            share = self._find_share()
-            if share is not None:
-                actual_mounted = getattr(share, "mounted", False) is True
-                if actual_mounted == self._optimistic_state:
-                    self._optimistic_state = None
-        super()._handle_coordinator_update()
 
     def _find_share(self) -> Any | None:
         """Return the remote share data from coordinator."""
@@ -731,8 +719,6 @@ class UnraidRemoteShareSwitch(UnraidBaseEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return True if the remote share is mounted."""
-        if self._optimistic_state is not None:
-            return self._optimistic_state
         share = self._find_share()
         if share is None:
             return False
@@ -751,16 +737,12 @@ class UnraidRemoteShareSwitch(UnraidBaseEntity, SwitchEntity):
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Mount the remote share."""
+        """Request a mount and let telemetry confirm the result."""
         try:
-            self._optimistic_state = True
-            self.async_write_ha_state()
             await self.coordinator.client.mount_remote_share(self._share_name)
-            _LOGGER.info("Mounted remote share: %s", self._share_name)
+            _LOGGER.debug("Requested remote share mount: %s", self._share_name)
             await self.coordinator.async_request_refresh()
         except Exception as exc:
-            self._optimistic_state = None
-            self.async_write_ha_state()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="remote_share_mount_error",
@@ -768,23 +750,12 @@ class UnraidRemoteShareSwitch(UnraidBaseEntity, SwitchEntity):
             ) from exc
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """
-        Unmount the remote share.
-
-        Note: if Docker containers (or other processes) hold open files on the
-        share, Unraid's Unassigned Devices may report the unmount as successful
-        while the mount actually remains active at /mnt/remotes. This is Unraid
-        behaviour, not an integration bug (reported in #83).
-        """
+        """Request an unmount and let telemetry confirm the result."""
         try:
-            self._optimistic_state = False
-            self.async_write_ha_state()
             await self.coordinator.client.unmount_remote_share(self._share_name)
-            _LOGGER.info("Unmounted remote share: %s", self._share_name)
+            _LOGGER.debug("Requested remote share unmount: %s", self._share_name)
             await self.coordinator.async_request_refresh()
         except Exception as exc:
-            self._optimistic_state = None
-            self.async_write_ha_state()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="remote_share_unmount_error",

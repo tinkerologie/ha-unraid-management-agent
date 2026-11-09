@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep remote-share switches aligned with observed mount status when Unassigned Devices accepts a command without changing the mount (#83).
+
 - Keep VM and container devices protected from removal while their inventory is unavailable (#277).
 
 ### Added
