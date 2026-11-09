@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 
 import pytest
 
 from custom_components.unraid_management_agent.api.events import (
+    CollectorStateChangeEvent,
+    NotificationUpdateEvent,
     NUTStatusUpdateEvent,
     VMGuestUpdateEvent,
     VMListUpdateEvent,
 )
+from custom_components.unraid_management_agent.api.exceptions import UnraidNotFoundError
 from custom_components.unraid_management_agent.api.models import (
+    CollectorDetails,
     CollectorStatus,
+    Notification,
+    NotificationOverview,
+    NotificationsResponse,
     NUTInfo,
     SystemInfo,
     VMGuestInfo,
@@ -66,6 +74,68 @@ async def test_partial_nut_push_keeps_known_lists_during_full_poll():
     assert result.full_poll
     assert result.snapshot.nut.running is False
     assert [device.name for device in result.snapshot.nut.devices] == ["known"]
+
+
+async def test_partial_notifications_and_collector_pushes_during_full_poll():
+    """Replay push updates while preserving metadata missing from the poll."""
+    overview = NotificationOverview(timestamp="previous")
+    docker = CollectorDetails(name="docker", enabled=True, error_count=2)
+    disk = CollectorDetails(name="disk", enabled=True, required=True)
+    current = UnraidData(
+        notifications=NotificationsResponse(overview=overview),
+        collectors=CollectorStatus(collectors=[docker, disk]),
+    )
+    notification = Notification(subject="pushed")
+
+    async def collectors() -> None:
+        assert (
+            reconciler.apply_event(
+                current, NotificationUpdateEvent(data=[notification])
+            )
+            is EventOutcome.APPLIED
+        )
+        assert (
+            reconciler.apply_event(
+                current,
+                CollectorStateChangeEvent(
+                    data=CollectorDetails(name="docker", enabled=False)
+                ),
+            )
+            is EventOutcome.APPLIED
+        )
+
+    reconciler = UnraidTelemetryReconciler(
+        RecordingSource(get_collectors_status=collectors)
+    )
+    result = await reconciler.refresh(current, {}, None)
+    assert result.full_poll
+    assert result.snapshot.notifications is not None
+    assert result.snapshot.notifications.notifications == [notification]
+    assert result.snapshot.notifications.overview == overview
+    assert result.snapshot.collectors is not None
+    assert result.snapshot.collectors.collectors == [
+        CollectorDetails(name="docker", enabled=False, error_count=2),
+        disk,
+    ]
+
+
+async def test_optional_typed_not_found_is_quiet(caplog: pytest.LogCaptureFixture):
+    """Suppress optional 404s even when the status is absent from the message."""
+
+    async def not_found() -> None:
+        message = "Not found"
+        raise UnraidNotFoundError(message, status_code=404)
+
+    reconciler = UnraidTelemetryReconciler(
+        RecordingSource(get_nut_info=not_found, get_collectors_status=not_found)
+    )
+    with caplog.at_level(logging.DEBUG):
+        result = await reconciler.refresh(UnraidData(), {}, None)
+
+    assert result.full_poll
+    assert result.snapshot.nut is None
+    assert "Error fetching NUT status" not in caplog.text
+    assert "Error fetching collectors status" in caplog.text
 
 
 @pytest.mark.parametrize("guest_pushed_later", [False, True])

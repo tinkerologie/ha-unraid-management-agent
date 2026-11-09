@@ -102,15 +102,17 @@ async def test_rejected_target_does_not_fall_back(
 
 
 async def test_ambiguous_legacy_action_warns_and_keeps_the_first_server(
-    hass, configured_servers
+    hass, configured_servers, caplog
 ):
     """Keep existing automations working while flagging missing selectors."""
     first, second = configured_servers
     first.client.stop_array = AsyncMock()
     second.client.stop_array = AsyncMock()
     await hass.services.async_call(DOMAIN, "array_stop", {}, blocking=True)
-    first.client.stop_array.assert_awaited_once()
+    await hass.services.async_call(DOMAIN, "array_stop", {}, blocking=True)
+    assert first.client.stop_array.await_count == 2
     second.client.stop_array.assert_not_awaited()
+    assert caplog.text.count("omitted config_entry_id with multiple servers") == 1
     assert ir.async_get(hass).async_get_issue(
         DOMAIN, "service_config_entry_id_required"
     )

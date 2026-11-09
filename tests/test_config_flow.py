@@ -5,6 +5,8 @@ from __future__ import annotations
 from ipaddress import ip_address
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import probatio
+import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
@@ -24,6 +26,7 @@ from custom_components.unraid_management_agent.const import (
     CONF_ENABLE_WEBSOCKET,
     CONF_ENABLE_ZFS_POOL_DEVICES,
     CONF_READ_ONLY,
+    DEFAULT_PORT,
     DOMAIN,
     ERROR_CANNOT_CONNECT,
     ERROR_TIMEOUT,
@@ -48,6 +51,9 @@ async def test_form_user_success(
     assert result["type"] == FlowResultType.FORM
     assert result["errors"] == {}
     assert result["step_id"] == "user"
+    with pytest.raises(probatio.Invalid, match="required key not provided"):
+        result["data_schema"]({})
+    assert result["data_schema"]({CONF_HOST: "unraid.local"})[CONF_PORT] == DEFAULT_PORT
 
     mock_client = MagicMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -529,7 +535,7 @@ async def test_zeroconf_discovery_new_entry(
         ip_addresses=[ip_address("192.168.1.100")],
         hostname="unraid-test.local.",
         name="_unraid-mgmt-agent._tcp.local.",
-        port=8043,
+        port=18043,
         type="_unraid-mgmt-agent._tcp.local.",
         properties={"version": "2026.06.02", "path": "/api/v1"},
     )
@@ -542,6 +548,9 @@ async def test_zeroconf_discovery_new_entry(
 
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "user"
+    defaults = result["data_schema"]({})
+    assert defaults[CONF_HOST] == "192.168.1.100"
+    assert defaults[CONF_PORT] == 18043
 
     mock_client = MagicMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -554,13 +563,13 @@ async def test_zeroconf_discovery_new_entry(
     ):
         result2 = await hass.config_entries.flow.async_configure(
             result["flow_id"],
-            {CONF_HOST: "192.168.1.100", CONF_PORT: 8043},
+            defaults,
         )
         await hass.async_block_till_done()
 
     assert result2["type"] == FlowResultType.CREATE_ENTRY
     assert result2["data"][CONF_HOST] == "192.168.1.100"
-    assert result2["data"][CONF_PORT] == 8043
+    assert result2["data"][CONF_PORT] == 18043
 
 
 async def test_zeroconf_discovery_already_configured(

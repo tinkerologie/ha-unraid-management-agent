@@ -9,6 +9,7 @@ from typing import Any
 
 from custom_components.unraid_management_agent.api.exceptions import (
     UnraidAuthenticationError,
+    UnraidNotFoundError,
     UnraidTimeoutError,
 )
 from custom_components.unraid_management_agent.api.models import (
@@ -94,8 +95,11 @@ class Fetch[T]:
         except UnraidTimeoutError as err:
             _LOGGER.debug("Timeout fetching %s: %s", self.label, err)
         except Exception as err:
-            if not (self.suppress_404 and "404" in str(err)):
-                _LOGGER.debug("Error fetching %s: %s", self.label, err)
+            if self.suppress_404 and (
+                isinstance(err, UnraidNotFoundError) or "404" in str(err)
+            ):
+                return
+            _LOGGER.debug("Error fetching %s: %s", self.label, err)
 
 
 @dataclass
