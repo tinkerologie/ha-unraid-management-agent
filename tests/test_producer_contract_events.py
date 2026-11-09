@@ -113,3 +113,56 @@ def test_drift_is_detected():
     without_legacy_status.pop("status")
     with pytest.raises(AssertionError):
         check_event("nut-event", {**wrong_topic, "data": without_legacy_status})
+
+
+def test_producer_events_keep_snapshot_fields_separate():
+    """Apply decoded frames through the same interface as the HA coordinator."""
+    from unittest.mock import MagicMock
+
+    from custom_components.unraid_management_agent.api.models import (
+        CollectorDetails,
+        CollectorStatus,
+        NotificationOverview,
+        NotificationsResponse,
+        UPSInfo,
+    )
+    from custom_components.unraid_management_agent.telemetry import (
+        EventOutcome,
+        TelemetryReconciler,
+        UnraidData,
+    )
+
+    reconciler = TelemetryReconciler(MagicMock())
+    snapshot = UnraidData(
+        ups=UPSInfo(load_percent=25),
+        notifications=NotificationsResponse(
+            overview=NotificationOverview.model_validate({"unread": {"total": 4}})
+        ),
+        collectors=CollectorStatus(
+            collectors=[
+                CollectorDetails(name="disk", required=True, error_count=2),
+                CollectorDetails(name="other", status="running", enabled=False),
+            ]
+        ),
+    )
+
+    def apply(case: str) -> EventOutcome:
+        return reconciler.apply_event(snapshot, parse_event(json.loads(fixture(case))))
+
+    assert apply("nut-event") is EventOutcome.APPLIED
+    assert snapshot.ups.load_percent == 25
+    nut = snapshot.nut
+    assert apply("ups-event") is EventOutcome.APPLIED
+    assert snapshot.nut is nut
+    assert snapshot.ups.load_percent == 0
+    assert apply("legacy-notification-event") is EventOutcome.APPLIED
+    assert snapshot.notifications.overview.unread.total == 4
+    assert apply("notifications-event") is EventOutcome.APPLIED
+    assert snapshot.notifications.overview.unread.total == 1
+    assert apply("collector-state-event") is EventOutcome.APPLIED
+    assert snapshot.collectors.enabled_count == 1
+    assert snapshot.collectors.collectors[0].required
+    assert snapshot.collectors.collectors[0].error_count == 2
+    assert snapshot.collectors.collectors[1].name == "other"
+    assert apply("source-health-event") is EventOutcome.REFRESH_REQUESTED
+    assert snapshot.diagnostics_self_test is None

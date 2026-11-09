@@ -242,3 +242,12 @@ async def test_drift_is_detected():
         assert_values(empty, ZFS_LIST)
     with pytest.raises(ValidationError):
         await request("zfs-pools", "list_zfs_pools", body=b'{"wrong":true}')
+
+
+async def test_malformed_error_body_reaches_aiohttp_text_fallback():
+    """The byte-backed response uses aiohttp's real JSON and text methods."""
+    with pytest.raises(UnraidAPIError, match="invalid JSON") as result:
+        await request(
+            "network-services-error", "get_network_services", body=b"invalid JSON"
+        )
+    assert result.value.status_code == 500

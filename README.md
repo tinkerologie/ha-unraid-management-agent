@@ -360,7 +360,7 @@ automation:
 
 ### Critical UPS Battery Shutdown
 
-Choose the intended Unraid server in the action editor before stopping its array.
+Enable the Stop Array button before using this example. The button targets its configured server. If you use the `array_stop` action instead, select the server with `config_entry_id`.
 
 ```yaml
 automation:
