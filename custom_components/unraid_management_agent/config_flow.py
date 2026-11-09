@@ -168,11 +168,14 @@ class UnraidConfigFlow(ConfigFlow, domain=DOMAIN):
                     data=user_input,
                 )
 
+        host_field = (
+            probatio.Required(CONF_HOST, default=self._discovered_host)
+            if self._discovered_host
+            else probatio.Required(CONF_HOST)
+        )
         schema = probatio.Schema(
             {
-                probatio.Required(
-                    CONF_HOST, default=self._discovered_host or probatio.UNDEFINED
-                ): cv.string,
+                host_field: cv.string,
                 probatio.Required(
                     CONF_PORT,
                     default=self._discovered_port

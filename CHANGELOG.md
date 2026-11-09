@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Build the config-flow host field without an explicit Probatio sentinel, preserving manual and discovery defaults (#280).
+
 - Array and parity actions validate their input and reject unknown fields (#275).
 
 - Reconcile typed REST results and WebSocket events in one telemetry module so an in-flight poll preserves newer push updates (#276).
