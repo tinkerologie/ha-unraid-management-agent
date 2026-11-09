@@ -3022,8 +3022,16 @@ class NetworkServicesStatus(BaseModel):
         validation_alias=AliasChoices("syslog", "syslog_server"),
         description="Remote syslog server",
     )
-    services_enabled: int | None = Field(None, description="Number of enabled services")
-    services_running: int | None = Field(None, description="Number of running services")
+    services_enabled: int | None = Field(
+        None,
+        validation_alias=AliasChoices("services_enabled", "enabled_services"),
+        description="Number of enabled services",
+    )
+    services_running: int | None = Field(
+        None,
+        validation_alias=AliasChoices("services_running", "running_services"),
+        description="Number of running services",
+    )
     timestamp: str | None = Field(None, description="Data collection timestamp")
 
     model_config = ConfigDict(frozen=True, extra="allow")

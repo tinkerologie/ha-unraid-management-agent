@@ -8,8 +8,13 @@ from collections.abc import Callable, Coroutine
 from typing import Any, Final
 
 import probatio
-from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import CONF_API_TOKEN, CONF_HOST, CONF_PORT, Platform
+from homeassistant.const import (
+    ATTR_CONFIG_ENTRY_ID,
+    CONF_API_TOKEN,
+    CONF_HOST,
+    CONF_PORT,
+    Platform,
+)
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
@@ -34,9 +39,7 @@ from .api import (
 from .cleanup import async_cleanup_stale_entities, async_remove_empty_devices
 from .const import (
     CONF_ENABLE_WEBSOCKET,
-    CONF_READ_ONLY,
     DEFAULT_ENABLE_WEBSOCKET,
-    DEFAULT_READ_ONLY,
     DOMAIN,
     LEGACY_ACKNOWLEDGED_DISK_IO_ERRORS,
     MANUFACTURER,
@@ -54,17 +57,13 @@ from .entity import (
     VMS_DEVICE,
     async_get_or_create_group_device,
     gpu_device_identifier,
-    gpu_device_keys,
     group_device_identifier,
-    hwmon_controller_identifier,
     is_group_device_enabled,
-    zfs_pool_device_identifier,
 )
 from .frontend import async_register_frontend
-from .hwmon import hid_drivers_without_ids, hwmon_controller_of
-from .nic import async_remove_nic_devices, current_card_ids
-from .nic import device_identifier as nic_device_identifier
-from .storage import CONTROLLER, ENCLOSURE, current_storage_ids, device_identifier
+from .nic import async_remove_nic_devices
+from .presence import Presence, device_presence
+from .service_target import is_read_only, resolve_service_target
 from .vm_guest import VM_GUEST_KEY_PREFIX
 
 # Service field constants
@@ -76,18 +75,21 @@ ATTR_REMOVE_IMAGE: Final = "remove_image"
 # Service schemas
 SERVICE_CONTAINER_SCHEMA = probatio.Schema(
     {
+        probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         probatio.Required(ATTR_CONTAINER_ID): cv.string,
     }
 )
 
 SERVICE_VM_SCHEMA = probatio.Schema(
     {
+        probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         probatio.Required(ATTR_VM_ID): cv.string,
     }
 )
 
 SERVICE_CONTAINER_AUTOSTART_SCHEMA = probatio.Schema(
     {
+        probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         probatio.Required(ATTR_CONTAINER_ID): cv.string,
         probatio.Required(ATTR_ENABLED): cv.boolean,
     }
@@ -95,9 +97,14 @@ SERVICE_CONTAINER_AUTOSTART_SCHEMA = probatio.Schema(
 
 SERVICE_CONTAINER_REMOVE_SCHEMA = probatio.Schema(
     {
+        probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string,
         probatio.Required(ATTR_CONTAINER_ID): cv.string,
         probatio.Optional(ATTR_REMOVE_IMAGE, default=False): cv.boolean,
     }
+)
+
+SERVICE_SERVER_SCHEMA = probatio.Schema(
+    {probatio.Optional(ATTR_CONFIG_ENTRY_ID): cv.string}
 )
 
 # Re-export for backwards compatibility and for tests to patch
@@ -315,11 +322,6 @@ READ_ONLY_PLATFORMS: list[Platform] = [
 CONTROL_DOMAINS: frozenset[str] = frozenset(
     str(platform) for platform in PLATFORMS if platform not in READ_ONLY_PLATFORMS
 )
-
-
-def _is_read_only(entry: UnraidConfigEntry) -> bool:
-    """Return True when the entry is configured to only create sensors."""
-    return bool(entry.options.get(CONF_READ_ONLY, DEFAULT_READ_ONLY))
 
 
 @callback
@@ -688,7 +690,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> bo
     await _async_migrate_legacy_entity_unique_ids(hass, entry, coordinator)
 
     # Store runtime data using the new pattern
-    read_only = _is_read_only(entry)
+    read_only = is_read_only(entry)
     platforms = READ_ONLY_PLATFORMS if read_only else PLATFORMS
     entry.runtime_data = UnraidRuntimeData(
         coordinator=coordinator, client=client, platforms=platforms
@@ -775,68 +777,15 @@ async def async_remove_config_entry_device(
     enclosures, ZFS pools, network cards or USB sensor controllers that the agent
     still reports, cannot be removed.
     """
-    data = entry.runtime_data.coordinator.data
-    vm_prefix = f"{entry.entry_id}_vm_"
-    container_prefix = f"{entry.entry_id}_container_"
-    gpu_prefix = gpu_device_identifier(entry.entry_id, "")
-    hwmon_prefix = f"{entry.entry_id}_hwmon_"
-    nic_prefix = nic_device_identifier(entry.entry_id, "")
-    zfs_pool_prefix = zfs_pool_device_identifier(entry.entry_id, "")
-    topology = data.storage_topology if data else None
+    runtime = getattr(entry, "runtime_data", None)
+    if runtime is None or not runtime.coordinator.last_update_success:
+        return False
+    data = runtime.coordinator.data
     for domain, identifier in device_entry.identifiers:
-        if domain != DOMAIN:
-            continue
-        if identifier.startswith(nic_prefix):
-            cards = data.network_cards if data else None
-            if cards is None or cards.state != "ok":
-                return False
-            return identifier[len(nic_prefix) :] not in current_card_ids(cards)
-        for kind in (CONTROLLER, ENCLOSURE):
-            prefix = device_identifier(entry.entry_id, kind, "")
-            if identifier.startswith(prefix):
-                if topology is None or topology.state != "ok":
-                    return False
-                return identifier[len(prefix) :] not in current_storage_ids(
-                    topology, kind
-                )
-        if identifier.startswith(vm_prefix):
-            current_vms = {
-                getattr(vm, "id", None) or getattr(vm, "name", None)
-                for vm in ((data.vms if data else None) or [])
-            }
-            return identifier[len(vm_prefix) :] not in current_vms
-        if identifier.startswith(gpu_prefix):
-            gpus = data.gpu if data else None
-            if gpus is None:
-                return False
-            return identifier[len(gpu_prefix) :] not in gpu_device_keys(gpus).values()
-        if identifier.startswith(container_prefix):
-            current_containers = {
-                getattr(container, "name", None)
-                for container in ((data.containers if data else None) or [])
-            }
-            return identifier[len(container_prefix) :] not in current_containers
-        if identifier.startswith(hwmon_prefix):
-            system = data.system if data else None
-            if (
-                system is None
-                or system.fans is None
-                or system.temperatures is None
-                or hid_drivers_without_ids([*system.fans, *system.temperatures])
-            ):
-                # Not a complete inventory: the controller may still be there.
-                return False
-            current_controllers = {
-                hwmon_controller_identifier(entry.entry_id, *controller)
-                for item in [*(system.fans or []), *(system.temperatures or [])]
-                if (controller := hwmon_controller_of(item)) is not None
-            }
-            return identifier not in current_controllers
-        if identifier.startswith(zfs_pool_prefix):
-            if data is None or data.zfs_pools is None:
-                return False
-            current_pools = {pool.name for pool in data.zfs_pools}
-            return identifier[len(zfs_pool_prefix) :] not in current_pools
+        if domain == DOMAIN:
+            presence = device_presence(data, entry.entry_id, identifier)
+            if presence is not None:
+                return presence is Presence.ABSENT
     return False
 
 
@@ -863,33 +812,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     # Check if services are already registered
     if hass.services.has_service(DOMAIN, "container_start"):
         return
-
-    def _get_coordinator(call: ServiceCall) -> UnraidDataUpdateCoordinator:
-        """Get coordinator from any config entry."""
-        entries = hass.config_entries.async_entries(DOMAIN)
-        if not entries:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="no_config_entries",
-            )
-        # Use the first entry's coordinator (services are domain-wide)
-        entry: UnraidConfigEntry = entries[0]
-        # Only a loaded entry has runtime data (and a coordinator) to act on
-        if entry.state is not ConfigEntryState.LOADED:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="entry_not_loaded",
-                translation_placeholders={"title": entry.title},
-            )
-        # Every service changes the server, so none run against an entry that
-        # is in read-only mode
-        if _is_read_only(entry):
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="read_only_mode",
-                translation_placeholders={"title": entry.title},
-            )
-        return entry.runtime_data.coordinator
 
     async def _async_service_call(
         coordinator: UnraidDataUpdateCoordinator,
@@ -953,7 +875,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Create a service handler bound to a specific API method."""
 
         async def handler(call: ServiceCall) -> None:
-            coordinator = _get_coordinator(call)
+            coordinator = resolve_service_target(hass, call)
             if method_name in PARITY_SERVICE_METHODS and has_no_array_disks(
                 coordinator.data
             ):
@@ -1004,10 +926,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             DOMAIN,
             svc_name,
             _make_handler(method, tkey),
+            schema=SERVICE_SERVER_SCHEMA,
         )
 
     async def _handle_container_remove(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(call)
+        coordinator = resolve_service_target(hass, call)
         container_id: str = call.data[ATTR_CONTAINER_ID]
         remove_image: bool = call.data[ATTR_REMOVE_IMAGE]
 
@@ -1025,7 +948,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         )
 
     async def _handle_container_set_autostart(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(call)
+        coordinator = resolve_service_target(hass, call)
         container_id: str = call.data[ATTR_CONTAINER_ID]
         enabled: bool = call.data[ATTR_ENABLED]
 

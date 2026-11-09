@@ -26,6 +26,7 @@ from custom_components.unraid_management_agent.api import (
     UnraidDynamicCollectionModeError,
     UnraidWebSocketClient,
 )
+from custom_components.unraid_management_agent.api.events import SystemUpdateEvent
 from custom_components.unraid_management_agent.api.models import (
     CollectorDetails,
     CollectorStatus,
@@ -45,7 +46,6 @@ from custom_components.unraid_management_agent.const import (
     DOMAIN,
 )
 from custom_components.unraid_management_agent.coordinator import (
-    _DYNAMIC_FULL_POLL_INTERVAL,
     UnraidData,
     UnraidDataUpdateCoordinator,
 )
@@ -54,6 +54,9 @@ from custom_components.unraid_management_agent.diagnostics import (
 )
 from custom_components.unraid_management_agent.sensor import (
     UnraidSystemStatusSensor,
+)
+from custom_components.unraid_management_agent.telemetry.reconciler import (
+    DYNAMIC_FULL_POLL_INTERVAL,
 )
 
 from .const import MOCK_CONFIG, mock_array_status
@@ -530,29 +533,52 @@ async def test_dynamic_mode_skips_pushed_rest_reads(
     coordinator._ws_client.set_topics.assert_awaited_with(topics)
 
     # The safety net: everything is fetched once the interval has passed
-    freezer.tick(_DYNAMIC_FULL_POLL_INTERVAL)
+    freezer.tick(DYNAMIC_FULL_POLL_INTERVAL)
     await _poll(coordinator)
     assert client.get_system_info.await_count == 2
     assert client.get_notification_overview.await_count == 2
 
 
+@pytest.mark.parametrize("full_poll", [False, True])
 async def test_push_during_poll_is_kept(
-    coordinator: UnraidDataUpdateCoordinator, freezer: FrozenDateTimeFactory
+    coordinator: UnraidDataUpdateCoordinator,
+    freezer: FrozenDateTimeFactory,
+    full_poll: bool,
 ) -> None:
-    """A WebSocket push that arrives while a skipped poll awaits is not undone."""
+    """A push received during a poll survives publication of the new snapshot."""
     first = await _poll(coordinator)
     coordinator._ws_client = _ws(subscription_topics(first, {}))
     pushed = SystemInfo(hostname="tower", uptime_seconds=2000)
 
     async def collectors_status() -> CollectorStatus:
         # The event arrives while the poll waits on REST calls
-        coordinator.data.system = pushed
+        coordinator._handle_websocket_event(SystemUpdateEvent(data=pushed))
         return _status()
 
     coordinator.client.get_collectors_status.side_effect = collectors_status
-    freezer.tick(timedelta(seconds=30))
+    freezer.tick(DYNAMIC_FULL_POLL_INTERVAL if full_poll else timedelta(seconds=30))
     data = await _poll(coordinator)
     assert data.system is pushed
+
+
+async def test_reconnect_during_full_poll_invalidates_that_poll(
+    coordinator: UnraidDataUpdateCoordinator, freezer: FrozenDateTimeFactory
+) -> None:
+    """A filter change during refresh still requires the next poll to read REST."""
+    first = await _poll(coordinator)
+    coordinator._ws_client = _ws(subscription_topics(first, {}))
+
+    async def set_topics(_topics) -> None:
+        coordinator._handle_ws_connect()
+
+    coordinator._ws_client.set_topics.side_effect = set_topics
+    freezer.tick(DYNAMIC_FULL_POLL_INTERVAL)
+    coordinator.async_request_refresh = AsyncMock()
+    await _poll(coordinator)
+    await coordinator.hass.async_block_till_done()
+    coordinator._ws_client.set_topics.side_effect = None
+    await _poll(coordinator)
+    assert coordinator.client.get_system_info.await_count == 3
 
 
 async def test_skipped_poll_detects_unreachable_agent(
@@ -660,17 +686,6 @@ async def test_missing_collector_status_keeps_filter(
     assert coordinator.collection_mode is None
 
 
-async def test_fetch_pushed_without_data(
-    coordinator: UnraidDataUpdateCoordinator,
-) -> None:
-    """A skipped field with no data yet gives None."""
-    coordinator._skip_fields = frozenset({"system"})
-    coordinator.data = None
-    fetch = AsyncMock()
-    assert await coordinator._fetch("system", fetch, pushed="system") is None
-    fetch.assert_not_awaited()
-
-
 async def test_websocket_started_with_filter(
     coordinator: UnraidDataUpdateCoordinator,
 ) -> None:
@@ -695,7 +710,6 @@ def test_coordinator_properties_without_data(
     coordinator.data = None
     assert coordinator.collection_mode is None
     assert coordinator.websocket_topics is None
-    assert coordinator._pushed_fields_to_skip() == frozenset()
 
 
 # --- Visibility -------------------------------------------------------------

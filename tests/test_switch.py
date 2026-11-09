@@ -7,6 +7,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
+
+from custom_components.unraid_management_agent.api.models import (
+    ActionResponse,
+    RemoteShare,
+    UnassignedInfo,
+)
+from custom_components.unraid_management_agent.const import DOMAIN
 
 
 @pytest.mark.usefixtures(
@@ -1479,6 +1487,57 @@ class TestDiskSpinSwitch:
         assert switch._optimistic_state is None
 
 
+@pytest.mark.parametrize(
+    "action",
+    ["turn_on", "turn_off"],
+)
+@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
+async def test_remote_share_switch_waits_for_observed_mount_state(
+    hass: HomeAssistant, mock_config_entry, mock_async_unraid_client, action: str
+) -> None:
+    """An accepted command with unchanged telemetry cannot flip the switch."""
+    source = "//nas/backup"
+    initial, eventual = (
+        ("unmounted", "mounted") if action == "turn_on" else ("mounted", "unmounted")
+    )
+
+    def inventory(status: str) -> UnassignedInfo:
+        return UnassignedInfo(
+            remote_shares=[RemoteShare(source=source, type="smb", status=status)]
+        )
+
+    mock_async_unraid_client.get_unassigned_info.return_value = inventory(initial)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    registry = er.async_get(hass)
+    prefix = f"{mock_config_entry.entry_id}_remote_share_nas_backup"
+    switch = registry.async_get_entity_id("switch", DOMAIN, f"{prefix}_mount")
+    mounted = registry.async_get_entity_id("binary_sensor", DOMAIN, f"{prefix}_mounted")
+    assert switch is not None
+    assert mounted is not None
+
+    method = (
+        mock_async_unraid_client.mount_remote_share
+        if action == "turn_on"
+        else mock_async_unraid_client.unmount_remote_share
+    )
+    method.return_value = ActionResponse(success=True)
+    await hass.services.async_call(
+        "switch", action, {"entity_id": switch}, blocking=True
+    )
+    method.assert_awaited_once_with(source)
+    coordinator = mock_config_entry.runtime_data.coordinator
+    await coordinator.async_refresh()
+
+    expected = STATE_ON if initial == "mounted" else STATE_OFF
+    assert hass.states.get(switch).state == hass.states.get(mounted).state == expected
+
+    mock_async_unraid_client.get_unassigned_info.return_value = inventory(eventual)
+    await coordinator.async_refresh()
+    expected = STATE_ON if eventual == "mounted" else STATE_OFF
+    assert hass.states.get(switch).state == hass.states.get(mounted).state == expected
+
+
 class TestRemoteShareSwitch:
     """Tests for remote share switch."""
 
@@ -1519,12 +1578,6 @@ class TestRemoteShareSwitch:
             "mount_point": "/mnt/remotes/backup_share",
         }
 
-        # Optimistic clearing
-        switch._optimistic_state = True
-        switch.async_write_ha_state = MagicMock()
-        switch._handle_coordinator_update()
-        assert switch._optimistic_state is None
-
     async def test_remote_share_turn_on_and_off(self) -> None:
         """Test mounting and unmounting remote share."""
         from custom_components.unraid_management_agent.switch import (
@@ -1546,14 +1599,12 @@ class TestRemoteShareSwitch:
         await switch.async_turn_on()
         coordinator.client.mount_remote_share.assert_called_once_with("backup_share")
         coordinator.async_request_refresh.assert_called_once()
-        assert switch._optimistic_state is True
 
         # Unmount
         coordinator.async_request_refresh.reset_mock()
         await switch.async_turn_off()
         coordinator.client.unmount_remote_share.assert_called_once_with("backup_share")
         coordinator.async_request_refresh.assert_called_once()
-        assert switch._optimistic_state is False
 
     async def test_remote_share_errors(self) -> None:
         """Test remote share switch errors."""
@@ -1579,8 +1630,6 @@ class TestRemoteShareSwitch:
 
         with pytest.raises(HomeAssistantError):
             await switch.async_turn_on()
-        assert switch._optimistic_state is None
 
         with pytest.raises(HomeAssistantError):
             await switch.async_turn_off()
-        assert switch._optimistic_state is None

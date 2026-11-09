@@ -1,0 +1,68 @@
+{
+  "cases": [
+    {
+      "id": "legacy-network",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/settings/network-services",
+      "status": 200,
+      "fixture": "legacy-network.json",
+      "compatibility": "legacy",
+      "origin": "synthetic compatibility case"
+    },
+    {
+      "id": "legacy-shares",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/shares",
+      "status": 200,
+      "fixture": "legacy-shares.json",
+      "compatibility": "legacy",
+      "origin": "synthetic compatibility case"
+    },
+    {
+      "id": "legacy-ups",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/ups",
+      "status": 200,
+      "fixture": "legacy-ups.json",
+      "compatibility": "legacy",
+      "origin": "synthetic compatibility case"
+    },
+    {
+      "id": "legacy-zfs",
+      "transport": "rest",
+      "method": "GET",
+      "path": "/api/v1/zfs/pools",
+      "status": 200,
+      "fixture": "legacy-zfs.json",
+      "compatibility": "legacy",
+      "origin": "synthetic compatibility case"
+    },
+    {
+      "id": "legacy-collector-event",
+      "transport": "websocket",
+      "event": "update",
+      "fixture": "legacy-collector-event.json",
+      "compatibility": "legacy",
+      "origin": "synthetic compatibility case"
+    },
+    {
+      "id": "legacy-notification-event",
+      "transport": "websocket",
+      "event": "notifications_update",
+      "fixture": "legacy-notification-event.json",
+      "compatibility": "legacy",
+      "origin": "synthetic compatibility case"
+    },
+    {
+      "id": "legacy-nut-event",
+      "transport": "websocket",
+      "event": "nut_status_update",
+      "fixture": "legacy-nut-event.json",
+      "compatibility": "legacy",
+      "origin": "synthetic compatibility case"
+    }
+  ]
+}

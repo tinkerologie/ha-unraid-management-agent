@@ -988,6 +988,9 @@
     },
     "container_update_failed": {
       "message": "Failed to update container {name}"
+    },
+    "config_entry_not_found": {
+      "message": "Configured Unraid server {config_entry_id} was not found."
     }
   },
   "services": {
@@ -998,6 +1001,10 @@
         "container_id": {
           "name": "Container ID",
           "description": "The ID or name of the container to start"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1008,6 +1015,10 @@
         "container_id": {
           "name": "Container ID",
           "description": "The ID or name of the container to stop"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1018,6 +1029,10 @@
         "container_id": {
           "name": "Container ID",
           "description": "The ID or name of the container to restart"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1028,6 +1043,10 @@
         "container_id": {
           "name": "Container ID",
           "description": "The ID or name of the container to pause"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1038,6 +1057,10 @@
         "container_id": {
           "name": "Container ID",
           "description": "The ID or name of the container to resume"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1052,6 +1075,10 @@
         "remove_image": {
           "name": "Remove Image",
           "description": "Also remove the container image"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1066,6 +1093,10 @@
         "enabled": {
           "name": "Enabled",
           "description": "Whether container autostart should be enabled"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1076,6 +1107,10 @@
         "vm_id": {
           "name": "VM ID",
           "description": "The ID or name of the VM to start"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1086,6 +1121,10 @@
         "vm_id": {
           "name": "VM ID",
           "description": "The ID or name of the VM to stop"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1096,6 +1135,10 @@
         "vm_id": {
           "name": "VM ID",
           "description": "The ID or name of the VM to restart"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1106,6 +1149,10 @@
         "vm_id": {
           "name": "VM ID",
           "description": "The ID or name of the VM to pause"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1116,6 +1163,10 @@
         "vm_id": {
           "name": "VM ID",
           "description": "The ID or name of the VM to resume"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1126,6 +1177,10 @@
         "vm_id": {
           "name": "VM ID",
           "description": "The ID or name of the VM to hibernate"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1136,6 +1191,10 @@
         "vm_id": {
           "name": "VM ID",
           "description": "The ID or name of the VM to force stop"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
@@ -1146,36 +1205,88 @@
         "vm_id": {
           "name": "VM ID",
           "description": "The ID or name of the VM to reset"
+        },
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
         }
       }
     },
     "array_start": {
       "name": "Start Array",
-      "description": "Start the Unraid array"
+      "description": "Start the Unraid array",
+      "fields": {
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
+        }
+      }
     },
     "array_stop": {
       "name": "Stop Array",
-      "description": "Stop the Unraid array"
+      "description": "Stop the Unraid array",
+      "fields": {
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
+        }
+      }
     },
     "array_clear_disk_stats": {
       "name": "Clear Array Disk Stats",
-      "description": "Clear array disk read/write statistics"
+      "description": "Clear array disk read/write statistics",
+      "fields": {
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
+        }
+      }
     },
     "parity_check_start": {
       "name": "Start Parity Check",
-      "description": "Start a parity check"
+      "description": "Start a parity check",
+      "fields": {
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
+        }
+      }
     },
     "parity_check_stop": {
       "name": "Stop Parity Check",
-      "description": "Stop the running parity check"
+      "description": "Stop the running parity check",
+      "fields": {
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
+        }
+      }
     },
     "parity_check_pause": {
       "name": "Pause Parity Check",
-      "description": "Pause the running parity check"
+      "description": "Pause the running parity check",
+      "fields": {
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
+        }
+      }
     },
     "parity_check_resume": {
       "name": "Resume Parity Check",
-      "description": "Resume a paused parity check"
+      "description": "Resume a paused parity check",
+      "fields": {
+        "config_entry_id": {
+          "name": "Unraid server",
+          "description": "The configured Unraid server to control."
+        }
+      }
+    }
+  },
+  "issues": {
+    "service_config_entry_id_required": {
+      "title": "Choose an Unraid server for service actions",
+      "description": "With multiple Unraid servers, an action without a server uses the first configured entry. Update your scripts and automations to select the intended server. A future release will reject ambiguous calls."
     }
   }
 }

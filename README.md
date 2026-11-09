@@ -286,7 +286,11 @@ The **System Status** sensor shows the mode in its `collection_mode` attribute. 
 
 ## Home Assistant Services
 
-The integration exposes 18 service actions for dashboard buttons and automations:
+The integration exposes service actions for dashboard buttons and automations.
+Use the **Unraid server** picker in the action editor to set `config_entry_id`.
+A single-server installation can still omit it. With multiple servers, omitting
+it uses the first configured entry and raises a Repair warning. Update those
+automations to choose a server before a future release rejects ambiguous calls.
 
 ### Docker Container Actions
 
@@ -300,6 +304,7 @@ The integration exposes 18 service actions for dashboard buttons and automations
 action: unraid_management_agent.container_restart
 data:
   container_id: plex
+  config_entry_id: "YOUR_CONFIG_ENTRY_ID"
 ```
 
 ### Virtual Machine Actions
@@ -355,7 +360,7 @@ automation:
 
 ### Critical UPS Battery Shutdown
 
-The Stop Array button is disabled by default; enable it first. The button targets this server, whereas the `array_stop` action acts on the first configured server.
+Enable the Stop Array button before using this example. The button targets its configured server. If you use the `array_stop` action instead, select the server with `config_entry_id`.
 
 ```yaml
 automation:

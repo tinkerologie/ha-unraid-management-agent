@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -17,59 +15,11 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import UnraidClient
-from .api.constants import EventType
 from .api.events import WebSocketEvent, parse_event
-from .api.exceptions import UnraidAuthenticationError, UnraidTimeoutError
-from .api.models import (
-    AlertRule,
-    AlertsStatusResponse,
-    AlertStatus,
-    ArrayStatus,
-    CollectorDetails,
-    CollectorStatus,
-    ContainerInfo,
-    ContainerUpdatesResult,
-    DiagnosticsSelfTestResponse,
-    DiskInfo,
-    DiskSettings,
-    DockerPortConflict,
-    DockerSettings,
-    FanControlStatus,
-    FlashDriveInfo,
-    GPUInfo,
-    MoverSettings,
-    NetworkInterface,
-    NetworkServicesStatus,
-    NICList,
-    NotificationOverview,
-    NotificationsResponse,
-    NUTInfo,
-    ParityHistory,
-    ParitySchedule,
-    PluginList,
-    RegistrationInfo,
-    RemoteShare,
-    ShareInfo,
-    StorageTopology,
-    SystemInfo,
-    SystemService,
-    SystemServiceList,
-    UnassignedDevice,
-    UnassignedInfo,
-    UpdateStatus,
-    UPSInfo,
-    UserScript,
-    VMGuestInfo,
-    VMInfo,
-    VMSettings,
-    ZFSArcStats,
-    ZFSDataset,
-    ZFSPool,
-    ZFSSnapshot,
-)
+from .api.exceptions import UnraidAuthenticationError
 from .api.websocket import UnraidWebSocketClient
 from .collection import collection_mode as agent_collection_mode
-from .collection import pushed_fields, subscription_topics
+from .collection import subscription_topics
 from .const import (
     CONF_ENABLE_CONTAINER_DEVICES,
     CONF_ENABLE_CONTAINER_UPDATES,
@@ -90,6 +40,9 @@ from .const import (
     DOMAIN,
     UPDATE_INTERVAL,
 )
+from .telemetry import EventOutcome, UnraidTelemetryReconciler
+from .telemetry import UnraidData as UnraidData  # noqa: PLC0414 - compatibility export
+from .telemetry.reconciler import AgentUnavailableError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,74 +52,6 @@ _FAILED_UPDATE_WARN_THRESHOLD = 3
 # Minimum time between coordinator refreshes triggered by WebSocket reconnects,
 # so rapid connect/disconnect cycles don't hammer the API.
 _RECONNECT_REFRESH_DEBOUNCE = timedelta(seconds=10)
-
-# Parity history only changes when a parity check or sync finishes, and the
-# agent re-reads parity-checks.log from the boot device on every request, so
-# it is fetched on this slower cadence instead of on every poll.
-_PARITY_HISTORY_INTERVAL = timedelta(minutes=15)
-
-# In the agent's Dynamic collection mode, data pushed over the subscribed
-# WebSocket topics is fetched over REST only on this cadence: a safety net
-# for missed events. A REST read also counts as demand for its collector.
-_DYNAMIC_FULL_POLL_INTERVAL = timedelta(minutes=10)
-
-
-@dataclass
-class UnraidData:
-    """Container for Unraid coordinator data."""
-
-    system: SystemInfo | None = None
-    array: ArrayStatus | None = None
-    disks: list[DiskInfo] | None = None
-    containers: list[ContainerInfo] | None = None
-    vms: list[VMInfo] | None = None
-    ups: UPSInfo | None = None
-    # /nut: every NUT device (statuses). None when the fetch failed.
-    nut: NUTInfo | None = None
-    gpu: list[GPUInfo] | None = None
-    network: list[NetworkInterface] | None = None
-    shares: list[ShareInfo] | None = None
-    notifications: NotificationsResponse | None = None
-    user_scripts: list[UserScript] | None = None
-    zfs_pools: list[ZFSPool] | None = None
-    zfs_datasets: list[ZFSDataset] | None = None
-    zfs_snapshots: list[ZFSSnapshot] | None = None
-    zfs_arc: ZFSArcStats | None = None
-    collectors: CollectorStatus | None = None
-    # New data for enhanced features
-    fan_control: FanControlStatus | None = None
-    disk_settings: DiskSettings | None = None
-    mover_settings: MoverSettings | None = None
-    parity_schedule: ParitySchedule | None = None
-    parity_history: ParityHistory | None = None
-    flash_info: FlashDriveInfo | None = None
-    plugins: PluginList | None = None
-    update_status: UpdateStatus | None = None
-    docker_settings: DockerSettings | None = None
-    vm_settings: VMSettings | None = None
-    registration: RegistrationInfo | None = None
-    network_services: NetworkServicesStatus | None = None
-    unassigned_devices: list[UnassignedDevice] | None = None
-    remote_shares: list[RemoteShare] | None = None
-    container_updates: ContainerUpdatesResult | None = None
-    diagnostics_self_test: DiagnosticsSelfTestResponse | None = None
-    docker_port_conflicts: list[DockerPortConflict] | None = None
-    # None when the agent has no /storage/topology endpoint or the fetch failed
-    storage_topology: StorageTopology | None = None
-    # None when network card devices are off, the agent has no /network/cards
-    # endpoint, or the fetch failed
-    network_cards: NICList | None = None
-    # Data read inside configured VMs through the guest agent (/vm/guest).
-    # None when VM devices are off, the agent has no such endpoint (404), or
-    # the fetch failed; readings inside an entry are None while the VM is off.
-    vm_guest: list[VMGuestInfo] | None = None
-    # Alerting engine (agent /alerts/rules and /alerts/status). None when the
-    # agent does not provide them (older agents: 404) or the fetch failed.
-    alert_rules: list[AlertRule] | None = None
-    alert_statuses: list[AlertStatus] | None = None
-    # Running state of system services (docker, libvirt, nginx, ...) from
-    # /services; None when the agent lacks the endpoint or the fetch failed
-    system_services: list[SystemService] | None = None
 
 
 def has_no_array_disks(data: UnraidData | None) -> bool:
@@ -209,74 +94,6 @@ class UnraidRuntimeData:
 type UnraidConfigEntry = ConfigEntry[UnraidRuntimeData]
 
 
-def _drop_replaced_vm_guests(
-    guests: list[VMGuestInfo] | None,
-    old_vms: list[Any] | None,
-    new_vms: list[Any],
-) -> list[VMGuestInfo] | None:
-    """
-    Return the guest records without those of VMs replaced under the same name.
-
-    Guest records name their VM but carry no UUID. When a VM list update brings
-    a VM with a known name but a new UUID, the cached record belongs to the old
-    VM, so it is dropped until the agent reports the new VM's guest data.
-    """
-    if not guests:
-        return guests
-    old_ids = {
-        getattr(vm, "name", None): getattr(vm, "id", None) for vm in old_vms or []
-    }
-    replaced = {
-        name
-        for vm in new_vms
-        if (name := getattr(vm, "name", None)) is not None
-        and name in old_ids
-        and old_ids[name] != getattr(vm, "id", None)
-    }
-    if not replaced:
-        return guests
-    return [guest for guest in guests if guest.vm_name not in replaced]
-
-
-def _merge_collector_state(
-    status: CollectorStatus | None, details: CollectorDetails
-) -> CollectorStatus | None:
-    """
-    Return the collectors status with one collector's details replaced.
-
-    A collector_state_change event carries a single CollectorDetails, not the
-    full CollectorStatus. Without a full status yet (no successful poll),
-    keep None so collector checks fall back to their defaults. The agent's
-    event has no required, error_count or last_run, so those are kept from
-    the polled entry.
-    """
-    if status is None or not isinstance(details, CollectorDetails):
-        return status
-    changes = details.model_dump(
-        include=set(CollectorDetails.model_fields), exclude_unset=True
-    )
-    collectors: list[CollectorDetails] = []
-    found = False
-    for collector in status.collectors or []:
-        if collector.name == details.name:
-            collectors.append(collector.model_copy(update=changes))
-            found = True
-        else:
-            collectors.append(collector)
-    if not found:
-        collectors.append(details)
-    # Recount like the agent's /collectors/status (enabled or still running)
-    enabled = sum(1 for c in collectors if c.enabled or c.status == "running")
-    return status.model_copy(
-        update={
-            "collectors": collectors,
-            "total": len(collectors),
-            "enabled_count": enabled,
-            "disabled_count": len(collectors) - enabled,
-        }
-    )
-
-
 class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
     """Class to manage fetching Unraid data from the API."""
 
@@ -312,13 +129,7 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         self._pending_system_action_disconnected = False
         self._previous_uptime_seconds: int | None = None
         self._last_reboot_detected_at: datetime | None = None
-        # Last successfully fetched parity history and when it was fetched
-        self._parity_history: ParityHistory | None = None
-        self._parity_history_fetched_at: datetime | None = None
-        # Fields the current poll keeps instead of fetching (Dynamic mode),
-        # and when the last poll that fetched everything ran
-        self._skip_fields: frozenset[str] = frozenset()
-        self._last_full_poll: datetime | None = None
+        self._telemetry = UnraidTelemetryReconciler(client)
 
         super().__init__(
             hass,
@@ -573,330 +384,14 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
             return True
         return getattr(self.data.vm_settings, "enabled", True)
 
-    async def _fetch[T](
-        self,
-        label: str,
-        coro_fn: Callable[[], Coroutine[Any, Any, T]],
-        *,
-        suppress_404: bool = False,
-        pushed: str | None = None,
-        keep_pushed: bool = True,
-    ) -> T | None:
-        """
-        Fetch data from a single API endpoint, returning *None* on failure.
-
-        *pushed* names the UnraidData field a WebSocket topic keeps up to
-        date. When this poll skips that field, the current value is returned
-        instead of fetching (or None with ``keep_pushed=False``).
-        """
-        if pushed is not None and pushed in self._skip_fields:
-            if not keep_pushed or self.data is None:
-                return None
-            return cast("T | None", getattr(self.data, pushed))
-        try:
-            return await coro_fn()
-        except UnraidAuthenticationError:
-            # A rejected token fails the whole update so HA starts reauth
-            raise
-        except UnraidTimeoutError as err:
-            # Logged distinctly: a timeout while the server is otherwise
-            # reachable usually means the agent plugin is stalled.
-            _LOGGER.debug("Timeout fetching %s: %s", label, err)
-            return None
-        except Exception as err:
-            if not (suppress_404 and "404" in str(err)):
-                _LOGGER.debug("Error fetching %s: %s", label, err)
-            return None
-
-    async def _fetch_network_cards(self) -> NICList | None:
-        """Fetch the network cards, only when NIC devices are enabled."""
-        if not self.is_nic_devices_enabled():
-            return None
-        return await self._fetch(
-            "network cards", self.client.get_network_cards, suppress_404=True
-        )
-
-    async def _fetch_vm_guest(self) -> list[VMGuestInfo] | None:
-        """Fetch guest agent data, only when VMs are shown as devices."""
-        if not self.is_vm_devices_enabled():
-            return None
-        return await self._fetch(
-            "VM guest data",
-            self.client.get_vm_guest,
-            suppress_404=True,
-            pushed="vm_guest",
-        )
-
-    async def _fetch_parity_history(self) -> ParityHistory | None:
-        """
-        Return parity history, fetching it at most once per interval.
-
-        Between fetches the last fetched value is reused, even if the poll
-        that fetched it failed. A failed fetch keeps the last value and is
-        retried on the next poll.
-        """
-        now = dt_util.utcnow()
-        if (
-            self._parity_history_fetched_at is None
-            or now - self._parity_history_fetched_at >= _PARITY_HISTORY_INTERVAL
-        ):
-            history = await self._fetch(
-                "parity history", self.client.get_parity_history
-            )
-            if history is not None:
-                self._parity_history = history
-                self._parity_history_fetched_at = now
-        return self._parity_history
-
-    def _pushed_fields_to_skip(self) -> frozenset[str]:
-        """
-        Return the fields this poll keeps instead of fetching.
-
-        Only in Dynamic mode with a filtered WebSocket connection: its topics
-        push these fields. Every _DYNAMIC_FULL_POLL_INTERVAL, and after each
-        reconnect, the poll fetches everything.
-        """
-        topics = self.websocket_topics
-        if self.data is None or not topics:
-            return frozenset()
-        if (
-            self._last_full_poll is None
-            or dt_util.utcnow() - self._last_full_poll >= _DYNAMIC_FULL_POLL_INTERVAL
-        ):
-            return frozenset()
-        return pushed_fields(topics)
-
-    async def _async_sync_topics(self, data: UnraidData) -> None:
-        """Send the WebSocket topic filter for the agent's collection mode."""
-        if self._ws_client is None or data.collectors is None:
-            # Without collector status the mode is unknown: keep the filter
-            return
-        try:
-            await self._ws_client.set_topics(
-                subscription_topics(data, self.config_entry.options)
-            )
-        except Exception as err:
-            # The client reports the connection as unfiltered, so polls fetch
-            # everything; the filter is sent again on the next poll
-            _LOGGER.debug("Error sending WebSocket topic filter: %s", err)
-
     async def _async_update_data(self) -> UnraidData:
-        """
-        Fetch data from API endpoint.
-
-        This is the place to pre-process the data to lookup tables
-        so entities can quickly look up their data.
-
-        Note: Collector enable/disable is configured on the Unraid Management Agent
-        plugin side. The integration fetches all available data and the API will
-        return empty results for disabled collectors.
-
-        ZFS datasets and snapshots are not polled because no entity uses them
-        (the snapshot list can be large), and parity history is fetched on a
-        slower cadence (see _fetch_parity_history). In the agent's Dynamic
-        collection mode, data the subscribed WebSocket topics push is kept
-        between full polls (see _pushed_fields_to_skip).
-        """
-        self._skip_fields = self._pushed_fields_to_skip()
+        """Fetch and publish telemetry for this configured server."""
         try:
-            # Fetch all data concurrently - each method returns typed Pydantic models
-            results: list[Any] = await asyncio.gather(
-                self._fetch(
-                    "system info", self.client.get_system_info, pushed="system"
-                ),
-                self._fetch(
-                    "array status", self.client.get_array_status, pushed="array"
-                ),
-                self._fetch("disks", self.client.list_disks, pushed="disks"),
-                self._fetch(
-                    "containers", self.client.list_containers, pushed="containers"
-                ),
-                self._fetch("VMs", self.client.list_vms, pushed="vms"),
-                self._fetch("UPS status", self.client.get_ups_info, pushed="ups"),
-                self._fetch(
-                    "GPU metrics",
-                    self.client.list_gpus,
-                    suppress_404=True,
-                    pushed="gpu",
-                ),
-                self._fetch(
-                    "network interfaces",
-                    self.client.list_network_interfaces,
-                    pushed="network",
-                ),
-                self._fetch("shares", self.client.list_shares, pushed="shares"),
-                self._fetch(
-                    "notifications",
-                    self.client.list_notifications,
-                    pushed="notifications",
-                ),
-                # notifications_update carries the overview with the list
-                self._fetch(
-                    "notification overview",
-                    self.client.get_notification_overview,
-                    pushed="notifications",
-                    keep_pushed=False,
-                ),
-                self._fetch("user scripts", self.client.list_user_scripts),
-                self._fetch(
-                    "ZFS pools", self.client.list_zfs_pools, pushed="zfs_pools"
-                ),
-                self._fetch(
-                    "ZFS ARC stats",
-                    self.client.get_zfs_arc_stats,
-                    suppress_404=True,
-                    pushed="zfs_arc",
-                ),
-                self._fetch("collectors status", self.client.get_collectors_status),
-                self._fetch(
-                    "fan control status",
-                    self.client.get_fan_status,
-                    suppress_404=True,
-                    pushed="fan_control",
-                ),
-                self._fetch("disk settings", self.client.get_disk_settings),
-                self._fetch("mover settings", self.client.get_mover_settings),
-                self._fetch("parity schedule", self.client.get_parity_schedule),
-                self._fetch_parity_history(),
-                self._fetch("flash info", self.client.get_flash_info),
-                self._fetch("plugins", self.client.list_plugins),
-                self._fetch("update status", self.client.get_update_status),
-                self._fetch("docker settings", self.client.get_docker_settings),
-                self._fetch("VM settings", self.client.get_vm_settings),
-                self._fetch("registration info", self.client.get_registration_info),
-                self._fetch("network services", self.client.get_network_services),
-                self._fetch(
-                    "unassigned devices",
-                    self.client.get_unassigned_info,
-                    suppress_404=True,
-                ),
-                self._fetch(
-                    "diagnostics self-test",
-                    self.client.get_diagnostics_self_test,
-                    suppress_404=True,
-                ),
-                self._fetch(
-                    "docker port conflicts",
-                    self.client.get_docker_port_conflicts,
-                    suppress_404=True,
-                ),
-                # /services exists on agents v2026.02.02+; older ones return 404
-                self._fetch(
-                    "system services", self.client.list_services, suppress_404=True
-                ),
-                self._fetch(
-                    "alert rules", self.client.list_alert_rules, suppress_404=True
-                ),
-                self._fetch(
-                    "alert status", self.client.get_alerts_status, suppress_404=True
-                ),
-                self._fetch(
-                    "storage topology",
-                    self.client.get_storage_topology,
-                    suppress_404=True,
-                ),
-                self._fetch(
-                    "NUT status",
-                    self.client.get_nut_info,
-                    suppress_404=True,
-                    pushed="nut",
-                ),
-                self._fetch_network_cards(),
-                self._fetch_vm_guest(),
+            result = await self._telemetry.refresh(
+                self.data, self.config_entry.options, self._ws_client
             )
-
-            # Unpack results with proper types (gather loses individual type info).
-            # List-valued fields deliberately preserve the None/[] distinction:
-            # None means the fetch failed (data unavailable), while [] means the
-            # API responded and the list is genuinely empty. Stale entity cleanup
-            # relies on this to avoid removing entities during transient outages.
-            system: SystemInfo | None = results[0]
-            array: ArrayStatus | None = results[1]
-            disks: list[DiskInfo] | None = results[2]
-            containers: list[ContainerInfo] | None = results[3]
-            vms: list[VMInfo] | None = results[4]
-            ups: UPSInfo | None = results[5]
-            gpu: list[GPUInfo] | None = results[6]
-            network: list[NetworkInterface] | None = results[7]
-            shares: list[ShareInfo] | None = results[8]
-            notifications: NotificationsResponse | None = results[9]
-            notification_overview: NotificationOverview | None = results[10]
-            user_scripts: list[UserScript] | None = results[11]
-            zfs_pools: list[ZFSPool] | None = results[12]
-            zfs_arc: ZFSArcStats | None = results[13]
-            collectors: CollectorStatus | None = results[14]
-            fan_control: FanControlStatus | None = results[15]
-            disk_settings: DiskSettings | None = results[16]
-            mover_settings: MoverSettings | None = results[17]
-            parity_schedule: ParitySchedule | None = results[18]
-            parity_history: ParityHistory | None = results[19]
-            flash_info: FlashDriveInfo | None = results[20]
-            plugins: PluginList | None = results[21]
-            update_status: UpdateStatus | None = results[22]
-            docker_settings: DockerSettings | None = results[23]
-            vm_settings: VMSettings | None = results[24]
-            registration: RegistrationInfo | None = results[25]
-            network_services: NetworkServicesStatus | None = results[26]
-            unassigned_info: UnassignedInfo | None = results[27]
-            diagnostics_self_test: DiagnosticsSelfTestResponse | None = results[28]
-            docker_port_conflicts: list[DockerPortConflict] | None = results[29]
-            system_service_list: SystemServiceList | None = results[30]
-            alert_rules: list[AlertRule] | None = results[31]
-            alerts_status: AlertsStatusResponse | None = results[32]
-            storage_topology: StorageTopology | None = results[33]
-            nut: NUTInfo | None = results[34]
-            network_cards: NICList | None = results[35]
-            vm_guest: list[VMGuestInfo] | None = results[36]
-
-            # If the core endpoints are all unreachable, treat the whole update
-            # as failed instead of returning an empty snapshot. This flips
-            # last_update_success to False so entities become unavailable and
-            # stale entity cleanup is suppressed (the previous behaviour fed an
-            # empty-but-"successful" snapshot to cleanup, which then removed
-            # every dynamic entity while the server was rebooting; see #83).
-            # A poll that kept system and array from the WebSocket checks the
-            # collector status instead, which every poll fetches.
-            core_missing = system is None and array is None
-            if {"system", "array"} <= self._skip_fields:
-                core_missing = collectors is None
-            if core_missing:
-                if not self._unavailable_logged:
-                    _LOGGER.warning(
-                        "Unraid server is unreachable (core endpoints returned no data)"
-                    )
-                    self._unavailable_logged = True
-                raise UpdateFailed(
-                    translation_domain=DOMAIN,
-                    translation_key="api_error",
-                )
-
-            # Optionally fetch container updates (can be slow — user opt-in)
-            container_updates: ContainerUpdatesResult | None = None
-            if self.is_container_updates_enabled():
-                container_updates = await self._fetch(
-                    "container updates",
-                    self.client.check_all_container_updates,
-                    suppress_404=True,
-                )
-
-            # Merge notification overview into notifications response
-            if isinstance(notifications, list):
-                notifications = NotificationsResponse(
-                    overview=None,
-                    notifications=notifications,
-                    timestamp=None,
-                )
-            if notification_overview is not None:
-                if notifications is None:
-                    notifications = NotificationsResponse(
-                        overview=notification_overview,
-                        notifications=None,
-                        timestamp=None,
-                    )
-                else:
-                    notifications = notifications.model_copy(
-                        update={"overview": notification_overview}
-                    )
+            data = result.snapshot
+            system = data.system
 
             # Log recovery if we were previously unavailable
             if self._unavailable_logged:
@@ -932,77 +427,18 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
                     self._last_reboot_detected_at = dt_util.utcnow()
                 self._previous_uptime_seconds = current_uptime
 
-            # Build data container with Pydantic models
-            data = UnraidData(
-                system=system,
-                array=array,
-                disks=disks,
-                containers=containers,
-                vms=vms,
-                ups=ups,
-                nut=nut,
-                gpu=gpu,
-                network=network,
-                shares=shares,
-                notifications=notifications,
-                user_scripts=user_scripts,
-                zfs_pools=zfs_pools,
-                # Not polled (no entity uses them); keep values from WebSocket
-                zfs_datasets=self.data.zfs_datasets if self.data else None,
-                zfs_snapshots=self.data.zfs_snapshots if self.data else None,
-                zfs_arc=zfs_arc,
-                collectors=collectors,
-                fan_control=fan_control,
-                disk_settings=disk_settings,
-                mover_settings=mover_settings,
-                parity_schedule=parity_schedule,
-                parity_history=parity_history,
-                flash_info=flash_info,
-                plugins=plugins,
-                update_status=update_status,
-                docker_settings=docker_settings,
-                vm_settings=vm_settings,
-                registration=registration,
-                network_services=network_services,
-                unassigned_devices=list(unassigned_info.devices or [])
-                if unassigned_info
-                else None,
-                remote_shares=list(unassigned_info.remote_shares or [])
-                if unassigned_info
-                else None,
-                container_updates=container_updates,
-                diagnostics_self_test=diagnostics_self_test,
-                docker_port_conflicts=docker_port_conflicts,
-                # A null service list is treated like a failed fetch (None)
-                system_services=list(system_service_list.services)
-                if system_service_list and system_service_list.services is not None
-                else None,
-                alert_rules=alert_rules,
-                # The agent sends "statuses": null when no rule is enabled
-                alert_statuses=list(alerts_status.statuses or [])
-                if alerts_status is not None
-                else None,
-                storage_topology=storage_topology,
-                network_cards=network_cards,
-                vm_guest=vm_guest,
-            )
-
-            if not self._skip_fields:
-                self._last_full_poll = dt_util.utcnow()
-            await self._async_sync_topics(data)
-
-            # WebSocket events may have updated kept fields while this poll
-            # awaited: return their newest values
-            if self.data is not None:
-                for field in self._skip_fields:
-                    setattr(data, field, getattr(self.data, field))
-
             return data
-
-        except UpdateFailed:
+        except AgentUnavailableError as err:
+            if not self._unavailable_logged:
+                _LOGGER.warning(
+                    "Unraid server is unreachable (core endpoints returned no data)"
+                )
+                self._unavailable_logged = True
             self._record_failed_update()
-            raise
-
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="api_error",
+            ) from err
         except UnraidAuthenticationError as err:
             self._record_failed_update()
             raise ConfigEntryAuthFailed(
@@ -1036,115 +472,12 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
             )
 
     def _handle_websocket_event(self, event: WebSocketEvent) -> None:
-        """Handle WebSocket event and update coordinator data."""
-        if not self.data or event.event_type is None:
-            # No data yet, or an event the integration does not use
-            # (UnknownEvent): nothing changed, so don't notify entities.
-            return
-
-        # Update coordinator data based on event type using the vendored EventType enum
-        if event.event_type == EventType.SYSTEM_UPDATE:
-            self.data.system = event.data
-        elif event.event_type == EventType.ARRAY_STATUS_UPDATE:
-            self.data.array = event.data
-        elif event.event_type == EventType.DISK_LIST_UPDATE:
-            self.data.disks = (
-                event.data if isinstance(event.data, list) else [event.data]
-            )
-        elif event.event_type == EventType.UPS_STATUS_UPDATE:
-            self.data.ups = event.data
-        elif event.event_type == EventType.GPU_UPDATE:
-            self.data.gpu = event.data if isinstance(event.data, list) else [event.data]
-        elif event.event_type == EventType.NETWORK_LIST_UPDATE:
-            self.data.network = (
-                event.data if isinstance(event.data, list) else [event.data]
-            )
-        elif event.event_type == EventType.CONTAINER_LIST_UPDATE:
-            self.data.containers = (
-                event.data if isinstance(event.data, list) else [event.data]
-            )
-        elif event.event_type == EventType.VM_LIST_UPDATE:
-            vms = event.data if isinstance(event.data, list) else [event.data]
-            self.data.vm_guest = _drop_replaced_vm_guests(
-                self.data.vm_guest, self.data.vms, vms
-            )
-            self.data.vms = vms
-        elif event.event_type == EventType.VM_GUEST_UPDATE:
-            self.data.vm_guest = (
-                event.data if isinstance(event.data, list) else [event.data]
-            )
-        elif event.event_type == EventType.SHARE_LIST_UPDATE:
-            self.data.shares = (
-                event.data if isinstance(event.data, list) else [event.data]
-            )
-        elif event.event_type == EventType.NOTIFICATION_UPDATE:
-            current_notifications = self.data.notifications
-            if isinstance(current_notifications, NotificationsResponse):
-                self.data.notifications = current_notifications.model_copy(
-                    update={"notifications": event.data}
-                )
-            else:
-                self.data.notifications = NotificationsResponse(
-                    notifications=event.data,
-                    overview=None,
-                    timestamp=None,
-                )
-        elif event.event_type == EventType.NOTIFICATIONS_RESPONSE:
-            # Full notifications response with overview and counts
-            self.data.notifications = event.data
-        elif event.event_type == EventType.ZFS_POOL_UPDATE:
-            self.data.zfs_pools = (
-                event.data if isinstance(event.data, list) else [event.data]
-            )
-        elif event.event_type == EventType.ZFS_DATASET_UPDATE:
-            self.data.zfs_datasets = (
-                event.data if isinstance(event.data, list) else [event.data]
-            )
-        elif event.event_type == EventType.ZFS_SNAPSHOT_UPDATE:
-            self.data.zfs_snapshots = (
-                event.data if isinstance(event.data, list) else [event.data]
-            )
-        elif event.event_type == EventType.ZFS_ARC_UPDATE:
-            self.data.zfs_arc = event.data
-        elif event.event_type == EventType.NUT_STATUS_UPDATE:
-            # NUTInfo feeds the per-device NUT entities; data.ups (UPSInfo)
-            # comes from ups_status_update and is left alone. An event without
-            # the per-device lists (older agents) keeps the ones already known.
-            nut = event.data
-            current = self.data.nut
-            if current is not None and isinstance(nut, NUTInfo):
-                keep = {
-                    field: getattr(current, field)
-                    for field in ("statuses", "devices")
-                    if getattr(nut, field) is None
-                    and getattr(current, field) is not None
-                }
-                if keep:
-                    nut = nut.model_copy(update=keep)
-            self.data.nut = nut
-        elif event.event_type == EventType.HARDWARE_UPDATE:
-            # HardwareFullInfo is a different model from data.system
-            # (SystemInfo) and is not used by any entity. Storing it there
-            # replaced system data until the next poll, so ignore it.
-            return
-        elif event.event_type == EventType.COLLECTOR_STATE_CHANGE:
-            # One collector changed: update it within the full status
-            self.data.collectors = _merge_collector_state(
-                self.data.collectors, event.data
-            )
-        elif event.event_type == EventType.FAN_CONTROL_UPDATE:
-            self.data.fan_control = event.data
-        elif event.event_type == EventType.SOURCE_STATUS_CHANGED:
-            # Source status changes can affect unassigned devices and remote shares.
-            # Schedule a full refresh so all related entities stay in sync.
-            self.hass.async_create_task(self.async_request_refresh())
-            return
-
-        # Notify listeners of data update without resetting the polling timer.
-        # Using async_set_updated_data would cancel and reschedule the poll
-        # interval, which prevents periodic full REST polls from firing if
-        # WebSocket events arrive frequently (e.g., during reconnect cycles).
-        self.async_update_listeners()
+        """Apply the parsed event without resetting the polling timer."""
+        match self._telemetry.apply_event(self.data, event):
+            case EventOutcome.APPLIED:
+                self.async_update_listeners()
+            case EventOutcome.REFRESH_REQUESTED:
+                self.hass.async_create_task(self.async_request_refresh())
 
     def _handle_raw_message(self, data: dict) -> None:
         """Handle raw WebSocket message and parse to typed event."""
@@ -1165,7 +498,7 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         connect/disconnect cycles.
         """
         # Events may have been missed while disconnected: fetch everything
-        self._last_full_poll = None
+        self._telemetry.invalidate_full_poll()
         if self._websocket_disconnect_logged:
             _LOGGER.info("WebSocket reconnected")
             self._websocket_disconnect_logged = False

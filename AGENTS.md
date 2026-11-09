@@ -282,7 +282,7 @@ Sensor entities use `UnraidSensorEntityDescription` with `value_fn` and `extra_s
 
 Registered in `async_setup` (not `async_setup_entry`). Each service handler:
 
-- Gets coordinator from the first config entry
+- Resolve each action through `service_target.py`. Use the selected config entry when `config_entry_id` is present. Preserve first-entry routing for legacy calls without a selector.
 - Calls the API method, then `coordinator.async_request_refresh()`
 - Raises `HomeAssistantError` with `translation_domain`/`translation_key` on failure
 
@@ -335,7 +335,7 @@ All entities provide consistent device info via the base entity class (manufactu
 
 **Repairs:**
 
-- The integration raises no repair issues. Report server health (disk temperature, SMART, I/O errors, parity, share FUSE fallback) with entities, not repairs. Repairs are only for a problem the user must fix in Home Assistant that reauth or reconfigure cannot handle.
+- Report server health through entities. Use Repairs for actionable Home Assistant configuration problems outside reauthentication or reconfiguration. The service-target migration warning directs users to update ambiguous multi-server actions.
 
 **Entity availability:**
 

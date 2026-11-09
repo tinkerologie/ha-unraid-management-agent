@@ -5,6 +5,13 @@ container_start:
   name: Start Container
   description: Start a Docker container
   fields:
+    config_entry_id: &configured_server
+      name: Unraid server
+      description: The configured Unraid server to control
+      required: false
+      selector:
+        config_entry:
+          integration: unraid_management_agent
     container_id:
       name: Container ID
       description: The ID or name of the container to start
@@ -17,6 +24,7 @@ container_stop:
   name: Stop Container
   description: Stop a Docker container
   fields:
+    config_entry_id: *configured_server
     container_id:
       name: Container ID
       description: The ID or name of the container to stop
@@ -29,6 +37,7 @@ container_restart:
   name: Restart Container
   description: Restart a Docker container
   fields:
+    config_entry_id: *configured_server
     container_id:
       name: Container ID
       description: The ID or name of the container to restart
@@ -41,6 +50,7 @@ container_pause:
   name: Pause Container
   description: Pause a running Docker container
   fields:
+    config_entry_id: *configured_server
     container_id:
       name: Container ID
       description: The ID or name of the container to pause
@@ -53,6 +63,7 @@ container_resume:
   name: Resume Container
   description: Resume a paused Docker container (unpause)
   fields:
+    config_entry_id: *configured_server
     container_id:
       name: Container ID
       description: The ID or name of the container to resume
@@ -65,6 +76,7 @@ container_remove:
   name: Remove Container
   description: Remove a Docker container
   fields:
+    config_entry_id: *configured_server
     container_id:
       name: Container ID
       description: The ID or name of the container to remove
@@ -84,6 +96,7 @@ container_set_autostart:
   name: Set Container Autostart
   description: Enable or disable autostart for a Docker container
   fields:
+    config_entry_id: *configured_server
     container_id:
       name: Container ID
       description: The ID or name of the container to configure
@@ -104,6 +117,7 @@ vm_start:
   name: Start VM
   description: Start a virtual machine
   fields:
+    config_entry_id: *configured_server
     vm_id:
       name: VM ID
       description: The ID or name of the VM to start
@@ -116,6 +130,7 @@ vm_stop:
   name: Stop VM
   description: Stop a virtual machine (graceful shutdown)
   fields:
+    config_entry_id: *configured_server
     vm_id:
       name: VM ID
       description: The ID or name of the VM to stop
@@ -128,6 +143,7 @@ vm_restart:
   name: Restart VM
   description: Restart a virtual machine
   fields:
+    config_entry_id: *configured_server
     vm_id:
       name: VM ID
       description: The ID or name of the VM to restart
@@ -140,6 +156,7 @@ vm_pause:
   name: Pause VM
   description: Pause a running virtual machine (suspend to RAM)
   fields:
+    config_entry_id: *configured_server
     vm_id:
       name: VM ID
       description: The ID or name of the VM to pause
@@ -152,6 +169,7 @@ vm_resume:
   name: Resume VM
   description: Resume a paused virtual machine
   fields:
+    config_entry_id: *configured_server
     vm_id:
       name: VM ID
       description: The ID or name of the VM to resume
@@ -164,6 +182,7 @@ vm_hibernate:
   name: Hibernate VM
   description: Hibernate a virtual machine (suspend to disk)
   fields:
+    config_entry_id: *configured_server
     vm_id:
       name: VM ID
       description: The ID or name of the VM to hibernate
@@ -176,6 +195,7 @@ vm_force_stop:
   name: Force Stop VM
   description: Force stop a virtual machine (equivalent to power off)
   fields:
+    config_entry_id: *configured_server
     vm_id:
       name: VM ID
       description: The ID or name of the VM to force stop
@@ -188,6 +208,7 @@ vm_reset:
   name: Reset VM
   description: Force reset a virtual machine
   fields:
+    config_entry_id: *configured_server
     vm_id:
       name: VM ID
       description: The ID or name of the VM to reset
@@ -200,28 +221,42 @@ vm_reset:
 array_start:
   name: Start Array
   description: Start the Unraid array
+  fields:
+    config_entry_id: *configured_server
 
 array_stop:
   name: Stop Array
   description: Stop the Unraid array
+  fields:
+    config_entry_id: *configured_server
 
 array_clear_disk_stats:
   name: Clear Array Disk Stats
   description: Clear array disk read/write statistics
+  fields:
+    config_entry_id: *configured_server
 
 # Parity Check Services
 parity_check_start:
   name: Start Parity Check
   description: Start a parity check
+  fields:
+    config_entry_id: *configured_server
 
 parity_check_stop:
   name: Stop Parity Check
   description: Stop the running parity check
+  fields:
+    config_entry_id: *configured_server
 
 parity_check_pause:
   name: Pause Parity Check
   description: Pause the running parity check
+  fields:
+    config_entry_id: *configured_server
 
 parity_check_resume:
   name: Resume Parity Check
   description: Resume a paused parity check
+  fields:
+    config_entry_id: *configured_server

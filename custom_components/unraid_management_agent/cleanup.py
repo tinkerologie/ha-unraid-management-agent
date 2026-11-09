@@ -31,6 +31,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from homeassistant.util import slugify
 
+from . import presence
 from .alerts import ALERT_RULE_KEY_PREFIX, alert_rule_key, alert_rule_names
 from .api.models import fan_sensor_keys, hwmon_temperature_keys
 from .const import (
@@ -158,7 +159,7 @@ def _build_valid_dynamic_entity_keys(
     keys: set[str] = set(_ALWAYS_VALID_KEYS)
 
     # ── Containers ──────────────────────────────────────────────────────────
-    for container in data.containers or []:
+    for container in presence.containers(data).items or []:
         name = getattr(container, "name", None)
         if not name:
             continue
@@ -186,7 +187,7 @@ def _build_valid_dynamic_entity_keys(
         vm_sensor_keys = tuple(d.key for d in VM_SENSOR_DESCRIPTIONS)
     if vm_devices:
         keys.update(d.key for d in vm_guest_descriptions(data))
-    for vm in data.vms or []:
+    for vm in presence.vms(data).items or []:
         vm_id = getattr(vm, "id", None) or getattr(vm, "name", None)
         vm_name = getattr(vm, "name", None)
         if not vm_id or not vm_name:
@@ -250,7 +251,7 @@ def _build_valid_dynamic_entity_keys(
                 keys.add(f"fan_speed_{sanitized}")  # number
 
     # ── GPUs ─────────────────────────────────────────────────────────────────
-    for idx, gpu in enumerate(data.gpu or []):
+    for idx, gpu in enumerate(presence.gpus(data).items or []):
         gpu_index = getattr(gpu, "index", None)
         if gpu_index is None:
             gpu_index = idx
@@ -317,7 +318,7 @@ def _build_valid_dynamic_entity_keys(
             keys.add(f"share_{name}_fuse_fallback")  # binary sensor
 
     # ── ZFS pools ─────────────────────────────────────────────────────────────
-    for pool in data.zfs_pools or []:
+    for pool in presence.pools(data).items or []:
         name = getattr(pool, "name", None)
         if name:
             keys.add(f"zfs_{name}_usage")  # sensor
@@ -422,11 +423,11 @@ def _unavailable_data_prefixes(data: UnraidData) -> set[str]:
     reflects a fetch failure rather than intentional removal from Unraid.
     """
     prefixes: set[str] = set()
-    if data.containers is None:
+    if not presence.containers(data).known:
         prefixes.add("container_")
-    if data.vms is None:
+    if not presence.vms(data).known:
         prefixes.add("vm_")
-    if data.vms is None or data.vm_guest is None:
+    if not presence.vms(data).known or data.vm_guest is None:
         prefixes.add(VM_GUEST_KEY_PREFIX)
     else:
         prefixes.update(vm_guest_offline_prefixes(data))
@@ -449,7 +450,7 @@ def _unavailable_data_prefixes(data: UnraidData) -> set[str]:
             f"temperature_{d}_hid_"
             for d in hid_drivers_without_ids(system.temperatures)
         )
-    if data.gpu is None:
+    if not presence.gpus(data).known:
         prefixes.add("gpu_")
     if data.network is None:
         prefixes.add("network_")
@@ -459,7 +460,7 @@ def _unavailable_data_prefixes(data: UnraidData) -> set[str]:
         prefixes.add("share_")
     if data.system_services is None:
         prefixes.add("system_service_")
-    if data.zfs_pools is None:
+    if not presence.pools(data).known:
         prefixes.add("zfs_")
     if data.remote_shares is None:
         prefixes.add("remote_share_")
@@ -547,12 +548,14 @@ def async_cleanup_stale_entities(
         key = unique_id[len(entry_prefix) :]
         seen_unique_ids.add(unique_id)
 
-        if not _is_dynamic_key(key) or key in valid_keys:
+        if not _is_dynamic_key(key):
             candidates.pop(unique_id, None)
             continue
 
-        if any(key.startswith(prefix) for prefix in unavailable_prefixes):
-            # Source data fetch failed this cycle; absence is not meaningful.
+        if (
+            presence.entity_key_presence(key, valid_keys, unavailable_prefixes)
+            is not presence.Presence.ABSENT
+        ):
             candidates.pop(unique_id, None)
             continue
 

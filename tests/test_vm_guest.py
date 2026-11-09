@@ -37,7 +37,9 @@ from custom_components.unraid_management_agent.const import (
 )
 from custom_components.unraid_management_agent.coordinator import (
     UnraidData,
-    _drop_replaced_vm_guests,
+)
+from custom_components.unraid_management_agent.telemetry.state import (
+    drop_replaced_vm_guests,
 )
 from custom_components.unraid_management_agent.vm_guest import (
     _ident,
@@ -615,12 +617,12 @@ async def test_vm_list_update_drops_guest_data_of_a_replaced_vm(
 async def test_vm_list_update_keeps_guest_data_of_unchanged_vms(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    """A VM list update for the same VMs (here a single VM, not a list) keeps guests."""
+    """A VM list update for the same VMs keeps guest data."""
     await _setup(hass, mock_config_entry)
     _event(
         hass,
         mock_config_entry,
-        VMListUpdateEvent.model_construct(data=_vm(state="paused")),
+        VMListUpdateEvent(data=[_vm(state="paused")]),
     )
     await hass.async_block_till_done()
 
@@ -633,11 +635,11 @@ async def test_vm_list_update_keeps_guest_data_of_unchanged_vms(
 async def test_vm_guest_update_with_a_single_entry(
     hass: HomeAssistant, mock_config_entry: MockConfigEntry
 ) -> None:
-    """A vm_guest_update carrying one entry instead of a list still applies."""
+    """A guest update with one VM updates its sensors."""
     await _setup(hass, mock_config_entry)
     sensors = [{"name": "fps", "value": "30"}]
     single = _guests(_guest(sensors=sensors))[0]
-    _event(hass, mock_config_entry, VMGuestUpdateEvent.model_construct(data=single))
+    _event(hass, mock_config_entry, VMGuestUpdateEvent(data=[single]))
     await hass.async_block_till_done()
     assert _state(hass, "fps").state == "30.0"
 
@@ -666,8 +668,8 @@ async def test_null_guest_values_are_unknown(
 def test_drop_replaced_vm_guests_without_guest_data() -> None:
     """No guest data (older agent or none fetched yet) stays as it is."""
     new_vms = [_vm(vm_id="f" * 32)]
-    assert _drop_replaced_vm_guests(None, [_vm()], new_vms) is None
-    assert _drop_replaced_vm_guests([], [_vm()], new_vms) == []
+    assert drop_replaced_vm_guests(None, [_vm()], new_vms) is None
+    assert drop_replaced_vm_guests([], [_vm()], new_vms) == []
 
 
 def test_guest_without_collections_has_only_a_hostname() -> None:

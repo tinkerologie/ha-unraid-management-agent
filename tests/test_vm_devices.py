@@ -216,6 +216,8 @@ async def test_only_devices_of_deleted_vms_can_be_removed(
 
     assert not await async_remove_config_entry_device(hass, mock_config_entry, server)
     assert not await async_remove_config_entry_device(hass, mock_config_entry, ubuntu)
+    mock_config_entry.runtime_data.coordinator.data.vms = None
+    assert not await async_remove_config_entry_device(hass, mock_config_entry, ubuntu)
     await _push_vms(hass, mock_config_entry, [_vm()])
     assert await async_remove_config_entry_device(hass, mock_config_entry, ubuntu)
 

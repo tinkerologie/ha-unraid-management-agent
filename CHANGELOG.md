@@ -7,17 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep remote-share switches aligned with observed mount status when Unassigned Devices accepts a command without changing the mount (#83).
+
+- Keep VM and container devices protected from removal while their inventory is unavailable (#277).
+
 ### Added
+
+- Select the configured Unraid server with `config_entry_id` on every service action (#275).
 
 - Add a domain glossary and five retrospective architecture decision records, with source references; align related guidance with the implemented architecture.
 
 ### Changed
+
+- Build the config-flow host field without an explicit Probatio sentinel, preserving manual and discovery defaults (#280).
+
+- Array and parity actions validate their input and reject unknown fields (#275).
+
+- Reconcile typed REST results and WebSocket events in one telemetry module so an in-flight poll preserves newer push updates (#276).
+
+- Validate the vendored client against pinned producer REST and WebSocket fixtures and decode network service totals from current and legacy keys (#278).
 
 - Include complete label command examples and native blocking dependencies when engineering skills read GitHub issues.
 
 ### Added
 
 - Configure engineering agent skills with GitHub Issues, the default triage label mapping, and a single-context domain documentation layout.
+
+### Deprecated
+
+- With multiple configured servers, actions without `config_entry_id` use the first configured entry and raise a Repair warning. Set the intended server before a future release rejects ambiguous calls (#275).
 
 ## [2026.11.0] — 2026-11-05
 

@@ -19,7 +19,22 @@ from custom_components.unraid_management_agent import (
     async_setup,
 )
 from custom_components.unraid_management_agent.api.constants import EventType
-from custom_components.unraid_management_agent.api.events import WebSocketEvent
+from custom_components.unraid_management_agent.api.events import (
+    ArrayStatusUpdateEvent,
+    ContainerListUpdateEvent,
+    DiskListUpdateEvent,
+    GPUUpdateEvent,
+    NetworkListUpdateEvent,
+    NotificationUpdateEvent,
+    ShareListUpdateEvent,
+    SystemUpdateEvent,
+    UPSStatusUpdateEvent,
+    VMListUpdateEvent,
+    ZFSArcUpdateEvent,
+    ZFSDatasetUpdateEvent,
+    ZFSPoolUpdateEvent,
+    ZFSSnapshotUpdateEvent,
+)
 from custom_components.unraid_management_agent.api.models import (
     NotificationCounts,
     NotificationOverview,
@@ -32,8 +47,10 @@ from custom_components.unraid_management_agent.api.models import (
 )
 from custom_components.unraid_management_agent.const import DOMAIN
 from custom_components.unraid_management_agent.coordinator import (
-    _PARITY_HISTORY_INTERVAL,
     UnraidData,
+)
+from custom_components.unraid_management_agent.telemetry.reconciler import (
+    PARITY_HISTORY_INTERVAL,
 )
 
 from .const import (
@@ -104,7 +121,7 @@ class TestCoordinatorWebSocketEvents:
 
     def test_handle_websocket_event_no_data(self, coordinator) -> None:
         """Test handling WebSocket event when coordinator has no data."""
-        event = WebSocketEvent(event_type=EventType.SYSTEM_UPDATE, data=MagicMock())
+        event = SystemUpdateEvent.model_construct(data=MagicMock())
         coordinator.data = None
 
         # Should return early without error
@@ -114,7 +131,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling system update WebSocket event."""
         coordinator.data = MagicMock()
         new_system_info = mock_system_info()
-        event = WebSocketEvent(event_type=EventType.SYSTEM_UPDATE, data=new_system_info)
+        event = SystemUpdateEvent.model_construct(data=new_system_info)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -125,9 +142,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling array status update WebSocket event."""
         coordinator.data = MagicMock()
         new_array_status = mock_array_status()
-        event = WebSocketEvent(
-            event_type=EventType.ARRAY_STATUS_UPDATE, data=new_array_status
-        )
+        event = ArrayStatusUpdateEvent.model_construct(data=new_array_status)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -138,29 +153,18 @@ class TestCoordinatorWebSocketEvents:
         """Test handling disk list update WebSocket event."""
         coordinator.data = MagicMock()
         new_disks = mock_disks()
-        event = WebSocketEvent(event_type=EventType.DISK_LIST_UPDATE, data=new_disks)
+        event = DiskListUpdateEvent.model_construct(data=new_disks)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
 
         assert coordinator.data.disks == new_disks
 
-    def test_handle_websocket_event_disk_single_update(self, coordinator) -> None:
-        """Test handling single disk update WebSocket event."""
-        coordinator.data = MagicMock()
-        single_disk = mock_disks()[0]
-        event = WebSocketEvent(event_type=EventType.DISK_LIST_UPDATE, data=single_disk)
-
-        with patch.object(coordinator, "async_set_updated_data"):
-            coordinator._handle_websocket_event(event)
-
-        assert coordinator.data.disks == [single_disk]
-
     def test_handle_websocket_event_ups_status_update(self, coordinator) -> None:
         """Test handling UPS status update WebSocket event."""
         coordinator.data = MagicMock()
         new_ups = mock_ups_info()
-        event = WebSocketEvent(event_type=EventType.UPS_STATUS_UPDATE, data=new_ups)
+        event = UPSStatusUpdateEvent.model_construct(data=new_ups)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -171,31 +175,18 @@ class TestCoordinatorWebSocketEvents:
         """Test handling GPU update WebSocket event."""
         coordinator.data = MagicMock()
         new_gpu = mock_gpu_list()
-        event = WebSocketEvent(event_type=EventType.GPU_UPDATE, data=new_gpu)
+        event = GPUUpdateEvent.model_construct(data=new_gpu)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
 
         assert coordinator.data.gpu == new_gpu
 
-    def test_handle_websocket_event_gpu_single_update(self, coordinator) -> None:
-        """Test handling single GPU update WebSocket event."""
-        coordinator.data = MagicMock()
-        single_gpu = mock_gpu_list()[0]
-        event = WebSocketEvent(event_type=EventType.GPU_UPDATE, data=single_gpu)
-
-        with patch.object(coordinator, "async_set_updated_data"):
-            coordinator._handle_websocket_event(event)
-
-        assert coordinator.data.gpu == [single_gpu]
-
     def test_handle_websocket_event_network_list_update(self, coordinator) -> None:
         """Test handling network list update WebSocket event."""
         coordinator.data = MagicMock()
         new_network = mock_network_interfaces()
-        event = WebSocketEvent(
-            event_type=EventType.NETWORK_LIST_UPDATE, data=new_network
-        )
+        event = NetworkListUpdateEvent.model_construct(data=new_network)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -206,9 +197,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling container list update WebSocket event."""
         coordinator.data = MagicMock()
         new_containers = mock_containers()
-        event = WebSocketEvent(
-            event_type=EventType.CONTAINER_LIST_UPDATE, data=new_containers
-        )
+        event = ContainerListUpdateEvent.model_construct(data=new_containers)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -219,7 +208,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling VM list update WebSocket event."""
         coordinator.data = MagicMock()
         new_vms = mock_vms()
-        event = WebSocketEvent(event_type=EventType.VM_LIST_UPDATE, data=new_vms)
+        event = VMListUpdateEvent.model_construct(data=new_vms)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -230,7 +219,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling share list update WebSocket event."""
         coordinator.data = MagicMock()
         new_shares = [MagicMock()]
-        event = WebSocketEvent(event_type=EventType.SHARE_LIST_UPDATE, data=new_shares)
+        event = ShareListUpdateEvent.model_construct(data=new_shares)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -244,9 +233,7 @@ class TestCoordinatorWebSocketEvents:
             overview=NotificationOverview(unread=NotificationCounts(total=2))
         )
         new_notifications = MagicMock()
-        event = WebSocketEvent(
-            event_type=EventType.NOTIFICATION_UPDATE, data=new_notifications
-        )
+        event = NotificationUpdateEvent.model_construct(data=new_notifications)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -260,7 +247,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling ZFS pool update WebSocket event."""
         coordinator.data = MagicMock()
         new_pools = [MagicMock()]
-        event = WebSocketEvent(event_type=EventType.ZFS_POOL_UPDATE, data=new_pools)
+        event = ZFSPoolUpdateEvent.model_construct(data=new_pools)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -271,9 +258,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling ZFS dataset update WebSocket event."""
         coordinator.data = MagicMock()
         new_datasets = [MagicMock()]
-        event = WebSocketEvent(
-            event_type=EventType.ZFS_DATASET_UPDATE, data=new_datasets
-        )
+        event = ZFSDatasetUpdateEvent.model_construct(data=new_datasets)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -284,9 +269,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling ZFS snapshot update WebSocket event."""
         coordinator.data = MagicMock()
         new_snapshots = [MagicMock()]
-        event = WebSocketEvent(
-            event_type=EventType.ZFS_SNAPSHOT_UPDATE, data=new_snapshots
-        )
+        event = ZFSSnapshotUpdateEvent.model_construct(data=new_snapshots)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -297,7 +280,7 @@ class TestCoordinatorWebSocketEvents:
         """Test handling ZFS ARC update WebSocket event."""
         coordinator.data = MagicMock()
         new_arc = MagicMock()
-        event = WebSocketEvent(event_type=EventType.ZFS_ARC_UPDATE, data=new_arc)
+        event = ZFSArcUpdateEvent.model_construct(data=new_arc)
 
         with patch.object(coordinator, "async_set_updated_data"):
             coordinator._handle_websocket_event(event)
@@ -2763,11 +2746,11 @@ class TestCoordinatorAPIErrorHandling:
         coordinator.client.get_docker_settings = AsyncMock(return_value=None)
         coordinator.client.get_vm_settings = AsyncMock(return_value=None)
 
-        # Fail after every fetch, while syncing WebSocket topics
+        # A failed reconciliation must be reported as an unavailable server.
         with (
             patch.object(
-                coordinator,
-                "_async_sync_topics",
+                coordinator._telemetry,
+                "refresh",
                 AsyncMock(side_effect=Exception("Unexpected error")),
             ),
             pytest.raises(UpdateFailed),
@@ -3229,64 +3212,6 @@ class TestCoordinatorAPIErrorHandling:
         assert data is not None
 
 
-# ───────────────────────────────────────────────────────────────────
-# _fetch helper tests
-# ───────────────────────────────────────────────────────────────────
-
-
-async def test_fetch_success(hass: HomeAssistant) -> None:
-    """Test _fetch returns result on success."""
-    coordinator = MagicMock(spec=UnraidDataUpdateCoordinator)
-    coordinator._fetch = UnraidDataUpdateCoordinator._fetch.__get__(coordinator)
-
-    async def ok_coro() -> str:
-        return "hello"
-
-    result = await coordinator._fetch("test", ok_coro)
-    assert result == "hello"
-
-
-async def test_fetch_error_returns_none(hass: HomeAssistant) -> None:
-    """Test _fetch returns None and logs on error."""
-    coordinator = MagicMock(spec=UnraidDataUpdateCoordinator)
-    coordinator._fetch = UnraidDataUpdateCoordinator._fetch.__get__(coordinator)
-
-    async def fail_coro() -> str:
-        msg = "boom"
-        raise RuntimeError(msg)
-
-    result = await coordinator._fetch("test_endpoint", fail_coro)
-    assert result is None
-
-
-async def test_fetch_404_suppressed(hass: HomeAssistant) -> None:
-    """Test _fetch suppresses 404 errors when suppress_404=True."""
-    coordinator = MagicMock(spec=UnraidDataUpdateCoordinator)
-    coordinator._fetch = UnraidDataUpdateCoordinator._fetch.__get__(coordinator)
-
-    async def not_found_coro() -> str:
-        msg = "404 Not Found"
-        raise Exception(msg)
-
-    result = await coordinator._fetch(
-        "optional_endpoint", not_found_coro, suppress_404=True
-    )
-    assert result is None
-
-
-async def test_fetch_404_not_suppressed(hass: HomeAssistant) -> None:
-    """Test _fetch logs 404 errors when suppress_404=False."""
-    coordinator = MagicMock(spec=UnraidDataUpdateCoordinator)
-    coordinator._fetch = UnraidDataUpdateCoordinator._fetch.__get__(coordinator)
-
-    async def not_found_coro() -> str:
-        msg = "404 Not Found"
-        raise Exception(msg)
-
-    result = await coordinator._fetch("endpoint", not_found_coro, suppress_404=False)
-    assert result is None
-
-
 class TestCoordinatorPollCadence:
     """Tests for data that is not fetched on every poll."""
 
@@ -3324,7 +3249,7 @@ class TestCoordinatorPollCadence:
         assert get_history.await_count == 1
 
         # Later polls within the interval reuse the previous value
-        freezer.tick(_PARITY_HISTORY_INTERVAL - timedelta(seconds=1))
+        freezer.tick(PARITY_HISTORY_INTERVAL - timedelta(seconds=1))
         data = await self._poll(coordinator)
         assert data.parity_history == _PARITY_HISTORY
         assert get_history.await_count == 1
@@ -3345,7 +3270,7 @@ class TestCoordinatorPollCadence:
         get_history = coordinator.client.get_parity_history
         await self._poll(coordinator)
 
-        freezer.tick(_PARITY_HISTORY_INTERVAL)
+        freezer.tick(PARITY_HISTORY_INTERVAL)
         get_history.side_effect = Exception("Parity history error")
         data = await self._poll(coordinator)
         assert data.parity_history == _PARITY_HISTORY
@@ -3390,10 +3315,10 @@ class TestCoordinatorPollCadence:
         datasets = [ZFSDataset(name="tank/media")]
         snapshots = [ZFSSnapshot(name="tank/media@daily", dataset="tank/media")]
         coordinator._handle_websocket_event(
-            WebSocketEvent(event_type=EventType.ZFS_DATASET_UPDATE, data=datasets)
+            ZFSDatasetUpdateEvent.model_construct(data=datasets)
         )
         coordinator._handle_websocket_event(
-            WebSocketEvent(event_type=EventType.ZFS_SNAPSHOT_UPDATE, data=snapshots)
+            ZFSSnapshotUpdateEvent.model_construct(data=snapshots)
         )
 
         data = await self._poll(coordinator)

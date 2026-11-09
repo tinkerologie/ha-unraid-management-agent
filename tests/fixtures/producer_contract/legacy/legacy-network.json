@@ -1,0 +1,82 @@
+{
+  "smb": {
+    "name": "SMB",
+    "enabled": true,
+    "running": true,
+    "port": 445
+  },
+  "nfs": {
+    "name": "NFS",
+    "enabled": false,
+    "running": false,
+    "port": 2049
+  },
+  "afp": {
+    "name": "AFP",
+    "enabled": false,
+    "running": false,
+    "port": 548
+  },
+  "ftp": {
+    "name": "FTP",
+    "enabled": false,
+    "running": false,
+    "port": 21
+  },
+  "ssh": {
+    "name": "SSH",
+    "enabled": false,
+    "running": false,
+    "port": 22
+  },
+  "telnet": {
+    "name": "Telnet",
+    "enabled": false,
+    "running": false,
+    "port": 23
+  },
+  "avahi": {
+    "name": "Avahi",
+    "enabled": false,
+    "running": false,
+    "port": 5353
+  },
+  "netbios": {
+    "name": "NetBIOS",
+    "enabled": false,
+    "running": false,
+    "port": 137
+  },
+  "wsd": {
+    "name": "WSD",
+    "enabled": false,
+    "running": false,
+    "port": 3702
+  },
+  "wireguard": {
+    "name": "WireGuard",
+    "enabled": false,
+    "running": false
+  },
+  "upnp": {
+    "name": "UPnP",
+    "enabled": false,
+    "running": false
+  },
+  "ntp": {
+    "name": "NTP",
+    "enabled": false,
+    "running": false,
+    "port": 123
+  },
+  "total_services": 13,
+  "timestamp": "2026-01-01T00:00:00Z",
+  "syslog": {
+    "name": "Syslog",
+    "enabled": true,
+    "running": true,
+    "port": 514
+  },
+  "services_enabled": 2,
+  "services_running": 2
+}

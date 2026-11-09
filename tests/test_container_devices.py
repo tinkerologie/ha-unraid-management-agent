@@ -158,9 +158,10 @@ async def test_only_devices_of_deleted_containers_can_be_removed(
     assert not await async_remove_config_entry_device(hass, entry, plex)
 
     coordinator = entry.runtime_data.coordinator
-    coordinator.data.containers = [
-        c for c in coordinator.data.containers if c.name != "plex"
-    ]
+    observed = coordinator.data.containers
+    coordinator.data.containers = None
+    assert not await async_remove_config_entry_device(hass, entry, plex)
+    coordinator.data.containers = [c for c in observed if c.name != "plex"]
     assert await async_remove_config_entry_device(hass, entry, plex)
 
 
