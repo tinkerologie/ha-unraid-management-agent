@@ -10,295 +10,249 @@
 
 <!-- BADGES:END -->
 
-This custom integration connects Home Assistant to the [Unraid Management Agent](https://github.com/tinkerologie/unraid-management-agent) (UMA) running on your Unraid server. It delivers comprehensive monitoring, interactive controls, dynamic entity discovery, real-time WebSocket telemetry, and a bundled suite of custom Lovelace dashboard cards.
+This integration connects Home Assistant to the [Unraid Management Agent](https://github.com/tinkerologie/unraid-management-agent) on your Unraid server.
+Use it to monitor the server, control its resources, and show its data on Home Assistant dashboards.
 
----
+[Install](#installation) · [Connect a server](#configuration) · [Add dashboard cards](#dashboard-cards) · [Troubleshoot](#troubleshooting)
 
-## Highlights & Features
+## Requirements
 
-- **Bundled Lovelace Dashboard Cards**: 15 custom Lovelace cards bundled directly with the integration—no manual JavaScript download or separate HACS frontend repository required.
-- **Unified UI Setup & Zeroconf**: Effortless discovery via Zeroconf (`_unraid-mgmt-agent._tcp.local.`) or guided manual config flow.
-- **Hybrid Real-Time Updates**: Local push via WebSocket event stream with automatic reconnect and 30-second REST polling fallback.
-- **Dynamic Entity Discovery**: Automatically creates, tracks, and cleans up entities for Docker containers, virtual machines, disks, fans, network interfaces, ZFS pools, remote shares, unassigned devices, and SAS storage topology.
-- **Modular Device Organization**: Docker-wide and VM-wide entities live on `<server> Docker` and `<server> VMs` devices linked to the server, and optional settings give each Docker container and virtual machine its own child device under them, with clean, short entity names.
-- **Update Management Platform**: Monitor Unraid OS versions, track plugin updates, and detect Docker container image updates via image digest tracking.
-- **Agent Alert Rules Engine**: Monitor custom and built-in UMA alert rules as problem binary sensors, track firing counts, and trigger automations from alert events.
-- **Enterprise SAS Storage Topology**: Discovers RAID/HBA controllers, SAS disk shelves/backplanes, power supplies, I/O modules, cabling maps, and path redundancy.
-- **Flexible Control Surfaces**: Switches for containers, VMs, and disk spin; buttons for array operations, parity checks, power commands, and user scripts; numbers for PWM fan control.
-- **Safe Read-Only Mode**: Dedicated toggle to restrict the integration to sensors and telemetry only, disabling all control switches, buttons, numbers, and service calls.
+- Unraid OS 6.9.0 or a subsequent version.
+- Home Assistant 2026.11.0 or a subsequent version.
+- An active installation of the Unraid Management Agent plugin on Unraid.
 
----
-
-## Lovelace Dashboard Cards Suite
-
-The integration automatically registers a complete suite of custom Lovelace cards in Home Assistant's resource registry upon integration setup. Each card features visual UI configuration, auto-detection of your Unraid server, and responsive layouts for desktop and mobile dashboards.
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                custom:unraid-management-agent-dashboard-card                 │
-│  [ Server ] [ Storage ] [ Docker ] [ VMs ] [ UPS ] [ Network ] [ ZFS ] ...  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  All-in-one unified dashboard card with tabbed navigation across subsystems │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Available Custom Cards
-
-| Card Tag                                                 | Description                      | Key Features                                                                                              |
-| :------------------------------------------------------- | :------------------------------- | :-------------------------------------------------------------------------------------------------------- |
-| `custom:unraid-management-agent-dashboard-card`          | **Unified Multi-Tab Dashboard**  | Full-featured dashboard embedding all modules with intuitive sub-navigation tabs.                         |
-| `custom:unraid-management-agent-server-card`             | **Server Telemetry & Health**    | CPU, RAM, uptime, system load, motherboard info, array status, and navigation rings.                      |
-| `custom:unraid-management-agent-storage-card`            | **Array & Storage Manager**      | Array state, parity status & operations, cache pools, drive temperatures, and health.                     |
-| `custom:unraid-management-agent-docker-card`             | **Docker Containers**            | Container list or grid, autostart badges, running switches, CPU/memory telemetry, and update status.      |
-| `custom:unraid-management-agent-vm-card`                 | **Virtual Machines**             | VM list, power state, start/stop/pause controls, vCPUs, memory allocation, and transfer rates.            |
-| `custom:unraid-management-agent-ups-card`                | **UPS Power Monitoring**         | Battery percentage, load %, estimated runtime duration, input/output voltage, and power draw.             |
-| `custom:unraid-management-agent-gpu-card`                | **GPU Telemetry**                | Multi-GPU support (NVIDIA, Intel, AMD), utilization rings, VRAM usage, clocks, driver version, and temps. |
-| `custom:unraid-management-agent-network-card`            | **Network Interfaces**           | Interface status, IPv4/IPv6 addresses, link speeds, MTU, and real-time RX/TX throughput.                  |
-| `custom:unraid-management-agent-shares-card`             | **User Shares**                  | Measured share data, backing storage usage, free space, and parity protection status badges.              |
-| `custom:unraid-management-agent-remote-shares-card`      | **Remote Shares**                | Mounted remote SMB/NFS shares, mount/unmount switches, and usage metrics.                                 |
-| `custom:unraid-management-agent-unassigned-devices-card` | **Unassigned Devices**           | External USB/SATA drives, file systems, mount switches, and partition details.                            |
-| `custom:unraid-management-agent-zfs-card`                | **ZFS Pools & Datasets**         | Pool status, ARC hit ratio gauges, scrub status, error counts, and dataset capacity.                      |
-| `custom:unraid-management-agent-fans-card`               | **Fan & Thermal Control**        | PWM fan speeds (RPM), duty cycle percentages, and fan control number sliders.                             |
-| `custom:unraid-management-agent-notifications-card`      | **System Notifications**         | System notifications breakdown across alerts, warnings, and informational notices.                        |
-| `custom:unraid-management-agent-maintenance-card`        | **Maintenance & Parity History** | Boot flash drive health, parity check schedule, history, duration, and sync errors.                       |
-
-### Dashboard Configuration Examples
-
-#### 1. All-in-One Dashboard (Recommended)
-
-Simply add the unified dashboard card to any Lovelace view. It automatically discovers your Unraid server:
-
-Cards appear in Home Assistant's picker as **Unraid Management Agent**. Card and editor elements use the `unraid-management-agent-*` namespace and discover only this integration's devices and entities, so the separate Unraid integration can be installed alongside it.
-
-**Migrating existing dashboards:** Back up each Agent dashboard in its raw configuration editor, then change its card types from `custom:unraid-<module>-card` to `custom:unraid-management-agent-<module>-card`. For example, Docker uses `custom:unraid-management-agent-docker-card`. Change only cards intended for the Agent; the separate Unraid integration keeps its own types. Reload the browser after updating the resource. The new bundle deliberately does not register ambiguous legacy aliases.
-
-```yaml
-type: custom:unraid-management-agent-dashboard-card
-```
-
-To bind to a specific server or customize the header:
-
-```yaml
-type: custom:unraid-management-agent-dashboard-card
-server: tower # Name or device ID of your Unraid server (optional)
-title: Main Unraid Server
-```
-
-#### 2. Individual Cards
-
-You can mix and match individual cards across your custom dashboards:
-
-```yaml
-# Server telemetry overview
-type: custom:unraid-management-agent-server-card
-show_system_info: true
-show_motherboard: true
-
-# Docker container monitoring in grid view
-type: custom:unraid-management-agent-docker-card
-view_mode: grid # "grid" or "list"
-
-# Storage array and disk health
-type: custom:unraid-management-agent-storage-card
-
-# Power & UPS status
-type: custom:unraid-management-agent-ups-card
-
-# Multi-GPU metrics
-type: custom:unraid-management-agent-gpu-card
-```
-
----
-
-## What The Integration Exposes
-
-The exact entities exposed depend on the hardware, plugins, and collectors active on your Unraid server:
-
-### System & Telemetry
-
-- **CPU & Memory**: Overall CPU utilization, memory used/free/percentage, swap memory, and system load averages (1m, 5m, 15m).
-- **Temperatures**: CPU temperature, motherboard temperature, plus individual per-channel hwmon sensors (`temp*_input`) for VRMs, chipsets, coolant probes, and custom sensors.
-- **Uptime & Boot**: System uptime duration and boot timestamp.
-- **Diagnostics**: Degraded subsystem counts and Docker port conflict sensors.
-
-### Array & Parity
-
-- **Array State**: Array status (Started, Stopped), total capacity, used space, free space, and usage percentage.
-- **Parity Operations**: Parity check progress percentage, parity check state (Running, Paused, Idle), schedule, history timestamp, duration, and parity sync error count.
-- **Flash Boot Drive**: Flash drive utilization, free space, and device status.
-- **User Shares**: Each **Share {share_name} Storage Usage** sensor reports backing pool or array utilisation, with `storage_used`, `storage_free` and `storage_total` attributes (null when capacity is unknown). `used_size` is present only when a new agent measures the share content (including zero); legacy `total_size` and `free_size` mirror storage capacity. The Shares card labels storage figures separately from measured share data. Also provides a **FUSE Fallback** problem binary sensor for each share that is, or can be, an Unraid 6.12+ exclusive share (on when the share has silently fallen back to the slower FUSE layer). The binary sensor exposes the reported locations that prevent exclusive access; use its state in automations for notifications. The integration does not create repair issues for server health. Needs an agent that reports exclusive share state.
-
-### SAS Storage Topology
-
-When the agent's `storage_topology` collector is active (`storcli` or `sg3_utils` SES):
-
-- **Controllers**: Controller temperature, firmware version, PCIe link generation/width, port link rates, and overall controller problem binary sensor.
-- **Enclosures / Shelves**: Enclosure status, highest temperature, lowest fan speed, drive media/other error totals, and slot error counters.
-- **Throughput**: Read, write and total throughput and link utilization for each controller and enclosure (agents that report `throughput` in `/storage/topology`).
-- **Problem Binary Sensors**: Dedicated problem sensors for each power supply, I/O module, fan bank, cabling anomaly, path redundancy loss, drive health, and I/O firmware mismatches.
-
-### Docker Containers
-
-- **Status & Control**: Running binary sensor, power switch (`switch`), autostart switch, and restart button (`button`).
-- **Telemetry**: Container CPU utilization, memory allocated, memory percentage, restart count, and network RX/TX transfer rates.
-- **Image Updates**: Update entity (`update`) tracking upstream image digest updates; one-click image pull and container recreation from Home Assistant.
-- **Device Grouping**: Docker CPU, memory and vDisk usage, the Docker service sensor and Container Updates Available sit on a `<server> Docker` device linked to the server. An optional toggle gives each container its own child device under it.
-
-### Virtual Machines
-
-- **Status & Control**: Running binary sensor, power switch (`switch`), restart button, pause/resume button, force-stop button, and hibernate action.
-- **Telemetry**: vCPU count, memory allocation, and network RX/TX transfer rates.
-- **Device Grouping**: The VM service (libvirt) sensor sits on a `<server> VMs` device linked to the server. An optional toggle gives each VM its own child device under it, named after the VM.
-
-### ZFS Pools & Datasets
-
-- **Pool Health**: Pool status sensor, pool problem binary sensor, and fragmentation percentage.
-- **Scrubbing & Errors**: Scrub status (Scrubbing, Paused, Finished), last scrub timestamp, scrub error count, repaired bytes, and aggregate read/write/checksum error totals.
-- **Corrupted Files**: Permanent corrupted file count and attribute list of corrupted file paths.
-- **ARC Cache**: ARC size, target size, max size, hit ratio percentage, data size, and metadata size.
-
-### Updates (Update Platform)
-
-- **Unraid OS**: Displays installed version and latest available version (read-only; upgrades remain safely handled via Unraid UI).
-- **Plugins**: Displays installed and available versions (read-only; apply updates from the Unraid Plugins page).
-- **Containers**: Digest-based image update detection with one-click pull and restart.
-
-### Alerts & Notifications
-
-- **Alert Rules**: Each UMA alert rule is exposed as a problem binary sensor (on while firing; unavailable if disabled) with severity, duration, and rule expressions in attributes.
-- **Alert Events**: `event` entity emitting `firing` and `resolved` events for easy automation triggering.
-- **Firing Count**: Sensor reporting the current count of active firing alert rules.
-- **Notification Center**: Notification counts categorized by alerts, warnings, and informational notices.
-
-### GPUs, UPS, Fans, & Services
-
-- **GPUs**: Utilization percentage, VRAM Used (MiB), VRAM Total (GiB), VRAM Usage (%), temperatures, and clock frequencies. Optionally each GPU gets its own `GPU · <name>` child device.
-- **UPS**: Battery percentage, load percentage, estimated runtime duration, and power draw. With NUT, every additional NUT device (a second UPS, an ATS, ...) gets its own `UPS <device> ...` entities for the readings it reports, plus a connected sensor (needs an agent with multi-device NUT support).
-- **Fans**: Fan RPM sensors are always created for agent-reported fans. PWM speed number entities (`number`) are created when fan control is enabled.
-- **Network Interfaces**: Status, IPv4/IPv6 addresses, link speeds, MTU, and real-time throughput.
-- **Network & System Services**: Binary sensors for network services (SMB, NFS, SSH, FTP, Syslog) and system services (Docker, Libvirt, Nginx).
-- **Remote Shares & Unassigned Devices**: Mount state binary sensors, mount toggles (`switch`), and capacity usage.
-
----
-
-## Prerequisites
-
-- **Unraid OS**: Version 6.9.0 or newer.
-- **Home Assistant**: Version 2026.11 or newer.
-- **Unraid Management Agent**: Installed and running on your Unraid server.
-
-### Verify The Agent
-
-Confirm the agent is running and accessible before setting up the integration:
-
-```text
-http://<your-unraid-ip>:8043/api/v1/health
-```
-
-A healthy agent responds with JSON status `{"status":"ok",...}`.
-
----
+Open `http://<unraid-ip>:8043/api/v1/health` in a browser. The response must include `"status": "ok"`.
+Use your server address and the agent port.
 
 ## Installation
 
-### Method 1: Via HACS (Recommended)
+### Install with HACS
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tinkerologie&repository=ha-unraid-management-agent&category=integration)
+[![Open this integration in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tinkerologie&repository=ha-unraid-management-agent&category=integration)
+
+Use the button to open the repository in the Home Assistant Community Store (HACS). Use HACS 2.0.1 or a subsequent version.
+Select **Download**. Then restart Home Assistant.
+
+If you cannot find the integration, add it as a custom repository. [HACS custom repository instructions](https://www.hacs.xyz/docs/faq/custom_repositories/)
 
 1. Open **HACS** in Home Assistant.
-2. Navigate to **Integrations**.
-3. Click the three-dot menu in the upper-right corner and select **Custom repositories**.
-4. Enter `https://github.com/tinkerologie/ha-unraid-management-agent` and select category **Integration**.
-5. Click **Add**, find **Unraid Management Agent**, and click **Download**.
-6. Restart Home Assistant.
+2. Open the three-dot menu.
+3. Select **Custom repositories**.
+4. Put `https://github.com/tinkerologie/ha-unraid-management-agent` in the repository field.
+5. Select **Integration** as the category.
+6. Select **Add**.
+7. Find **Unraid Management Agent** in HACS.
+8. Select **Download**.
+9. Restart Home Assistant.
 
-### Method 2: Manual Installation
+### Install manually
 
-1. Download `unraid_management_agent.zip` from the [latest GitHub release](https://github.com/tinkerologie/ha-unraid-management-agent/releases/latest).
-2. Create `<config>/custom_components/unraid_management_agent/` and extract the ZIP into it. `manifest.json` must be directly inside this folder.
-3. Restart Home Assistant.
+1. Download `unraid_management_agent.zip` from the [latest release](https://github.com/tinkerologie/ha-unraid-management-agent/releases/latest).
+2. Make a directory at `<config>/custom_components/unraid_management_agent/`.
+3. Extract the ZIP into that directory.
+4. Make sure that `manifest.json` is directly in the new directory.
+5. Restart Home Assistant.
 
 #### Verify the download
 
-Download `SHA256SUMS` from the same release into the directory containing the ZIP.
-Using the [GitHub CLI](https://cli.github.com/), replace `<tag>` with the release tag:
+Download `SHA256SUMS` from the same release. Put it in the directory that contains the ZIP.
+Replace `RELEASE_TAG` with the release tag. Run these commands from that directory with the [GitHub CLI](https://cli.github.com/) available.
 
 ```bash
+tag='RELEASE_TAG'
 sha256sum -c SHA256SUMS
 gh attestation verify unraid_management_agent.zip --repo tinkerologie/ha-unraid-management-agent --signer-workflow tinkerologie/ha-unraid-management-agent/.github/workflows/release.yml
-gh release verify-asset <tag> unraid_management_agent.zip --repo tinkerologie/ha-unraid-management-agent
+gh release verify-asset "$tag" unraid_management_agent.zip --repo tinkerologie/ha-unraid-management-agent
 ```
 
-HACS and the Marketplace count downloads of this fixed-name release asset. After
-the first ZIP release, selecting an older release without this asset may fail.
-
----
+HACS uses the ZIP file with this name. An older release without the ZIP can fail to install.
 
 ## Configuration
 
-### Automatic Discovery
+### Connect a server
 
-If your Unraid Management Agent advertises via Zeroconf (`_unraid-mgmt-agent._tcp.local.`), Home Assistant discovers it automatically. Click **Configure** on the discovered device to complete setup.
+Home Assistant can find agents that advertise the Zeroconf service `_unraid-mgmt-agent._tcp.local.`.
+For a discovered server, select **Configure** to open its setup form.
 
-### Manual Setup
+For manual setup, do these steps.
 
-1. In Home Assistant, navigate to **Settings** > **Devices & Services**.
-2. Click **Add Integration** and search for **Unraid Management Agent**.
-3. Fill in the connection settings:
-   - **Host**: IP address or hostname of your Unraid server.
-   - **Port**: API port (default: `8043`).
-   - **API Token** _(optional)_: Required if `API_TOKEN` is configured on your agent (agent v2026.08.02+). Sent as a bearer token. Supports automatic re-authentication if rotated.
-   - **Enable WebSocket**: Checked by default for instant local push updates.
-4. Click **Submit**.
+1. Open **Settings** > **Devices & Services**.
+2. Select **Add Integration**.
+3. Find **Unraid Management Agent**.
 
-### Integration Options
+Complete the setup form.
 
-Click **Configure** on an active integration entry to adjust operational options at any time:
+| Field                                      | Value                                                                                                     |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Host**                                   | The IP address or hostname of your Unraid server.                                                         |
+| **Port**                                   | The agent API port. The default is `8043`.                                                                |
+| **API Token**                              | Put the token in this field if the agent uses `API_TOKEN`. Use agent v2026.08.02 or a subsequent version. |
+| **Enable WebSocket for real-time updates** | Keep this option on to receive updates from the agent between polls.                                      |
 
-| Option                                              | Default | Description                                                                                                                                                                                                        |
-| :-------------------------------------------------- | :-----: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Enable container update checks**                  | `false` | Tracks container image digest updates and adds an `update` entity per container.                                                                                                                                   |
-| **Enable fan control entities**                     | `true`  | Exposes PWM number control entities (`number`) for configurable fan controllers. Fan RPM sensors are always created for reported fans.                                                                             |
-| **Enable read-only mode (sensors only)**            | `false` | Restricts the integration to monitoring only, disabling all switches, buttons, and control actions.                                                                                                                |
-| **Enable WebSocket for real-time updates**          | `true`  | Real-time push updates via WebSocket with automatic 30s polling fallback.                                                                                                                                          |
-| **Show Docker containers as separate devices**      | `false` | Creates a child device for each container under the server's Docker device, with short entity names.                                                                                                               |
-| **Show GPUs as separate devices**                   | `false` | Creates a `GPU · <name>` child device for each GPU, keyed by its UUID or PCI address.                                                                                                                              |
-| **Show network cards as separate devices**          | `false` | Creates a child device per PCI network card with ASIC/PHY/MAC temperatures, link speed and SFP/QSFP optic diagnostics (needs an agent with the `nic` collector).                                                   |
-| **Show USB sensor controllers as separate devices** | `false` | Creates a child device for each USB sensor controller the agent identifies (e.g. an Aquacomputer Octo), holding its fan and temperature sensors named by their lm-sensors labels.                                  |
-| **Show virtual machines as separate devices**       | `false` | Creates a child device for each VM under the server's VMs device, keyed by libvirt UUID. With the agent's `vm_guest_agent` feature it also shows GPU, disk, filesystem and custom sensors read from inside the VM. |
-| **Show ZFS pools as separate devices**              | `false` | Creates a child device for each ZFS pool holding its sensors, plus drive health roll-ups (hottest drive, worst NVMe wear, media errors, failing drives).                                                           |
-| **CPU temperature source**                          | `auto`  | Where the CPU temperature sensor gets its value. **Automatic** uses the agent's CPU temperature; pick a hwmon channel (e.g. `k10temp Tctl`) if that shows the wrong chip.                                          |
+Select **Submit**. The integration sends the token as a bearer token. If you change the token on the agent, use the new token when Home Assistant requests it.
 
-The dialog only shows the options that apply to your server. **Read-only mode** and **WebSocket** are always shown. The other options appear only when the integration detects what they are for: Docker or VMs enabled (or containers/VMs present), GPUs, PCI network cards (the agent's `nic` collector enabled), USB sensor controllers, ZFS pools, fans (for PWM fan control only), or hwmon temperature channels for the CPU temperature source. An option that is already on stays visible so you can turn it off, hidden options keep their saved values, and every option is shown while the server's data is not available (for example before the first connection).
+### Integration options
 
-If you pick a CPU temperature channel, the CPU temperature sensor shows that channel's reading and is unavailable while the agent does not report it. With **Automatic** nothing changes.
+Select **Configure** on the integration entry to change its options.
+
+| Option                                              | Default       | Effect                                                                                                                           |
+| --------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Enable container update checks**                  | Off           | Checks container image digests and adds an update entity for each container.                                                     |
+| **Enable fan control entities**                     | On            | Adds number entities for supported pulse-width modulation (PWM) fan controls.                                                    |
+| **Enable read-only mode (sensors only)**            | Off           | Disables control entities and actions. Monitoring continues.                                                                     |
+| **Enable WebSocket for real-time updates**          | On            | Receives updates through WebSocket. Polling continues if the connection fails.                                                   |
+| **Show Docker containers as separate devices**      | Off           | Adds one child device for each container in the Docker device group.                                                             |
+| **Show GPUs as separate devices**                   | Off           | Adds one child device for each GPU. The integration uses its UUID or PCI address as its identifier.                              |
+| **Show network cards as separate devices**          | Off           | Adds one device for each PCI network card. The agent must run the `nic` collector.                                               |
+| **Show USB sensor controllers as separate devices** | Off           | Adds one device for each supported USB sensor controller, with its fan and temperature sensors.                                  |
+| **Show virtual machines as separate devices**       | Off           | Adds one child device for each virtual machine (VM). The agent must support `vm_guest_agent` to show sensors from inside the VM. |
+| **Show ZFS pools as separate devices**              | Off           | Adds one device for each ZFS pool, with pool sensors and a summary of drive health.                                              |
+| **CPU temperature source**                          | **Automatic** | Uses the CPU temperature from the agent. Select a hardware monitor channel to use its reading.                                   |
+
+The form always shows the read-only and WebSocket options. It shows other options when the server reports the related hardware or service.
+The form continues to show an enabled option so that you can turn it off. The integration keeps the values of hidden options.
+If server data is unavailable, the form shows all options.
+
+If you select a CPU temperature channel, the sensor is unavailable when the agent does not report that channel.
 
 ### Agent collection mode
 
-Agents from v2026.10.01 have a **collection mode** setting. In **Dynamic** mode the agent runs each collector at its active rate only while something uses its data, and slows it down otherwise. The integration detects the mode from the agent; there is no option for it.
+Agent v2026.10.01 and subsequent versions can use Dynamic or Manual collection. Set the mode on the agent.
 
-- **Dynamic**: the WebSocket subscribes only to the data the integration uses (system, array, disks, shares, notifications, and Docker, VMs, UPS, NUT, GPU, network, ZFS and fans when their collectors are enabled; VM guest data only with "Show virtual machines as separate devices"). While the WebSocket is connected, the 30-second poll skips the data these topics push and reads it in full every 10 minutes and after each reconnect, as a safety net for missed events. With the WebSocket off or disconnected, the full 30-second poll is used.
-- **Manual**, or an agent without collection modes: nothing changes. The WebSocket receives every event and the full poll runs every 30 seconds.
+- **Dynamic**. The agent adjusts each collector interval as demand changes. The integration subscribes to the WebSocket topics it uses. While WebSocket is connected, the 30-second poll skips the data that those topics supply. The integration does a full poll at 10-minute intervals and after each reconnect. If WebSocket is off or disconnected, the full poll runs at 30-second intervals.
+- **Manual** or agents without collection modes. The integration receives all events when WebSocket is on. The full poll runs at 30-second intervals.
 
-The **System Status** sensor shows the mode in its `collection_mode` attribute. Diagnostics list the mode, the WebSocket topics in use, and each collector's `effective_interval_seconds` and `reason` (`event`, `active`, `idle`, `floor` or `manual`).
+The **System Status** sensor shows the mode in `collection_mode`.
+Diagnostics show the active WebSocket topics and the value of each collector's `effective_interval_seconds` and `reason`.
 
----
+## Dashboard cards
 
-## Home Assistant Services
+The integration includes 15 dashboard cards. It registers them during setup.
+The cards use devices and entities from this integration.
+Use the card picker to find cards with names that start with **Unraid Management Agent**.
 
-The integration exposes service actions for dashboard buttons and automations.
-Use the **Unraid server** picker in the action editor to set `config_entry_id`.
-A single-server installation can still omit it. With multiple servers, omitting
-it uses the first configured entry and raises a Repair warning. Update those
-automations to choose a server before a future release rejects ambiguous calls.
+### Add the dashboard card
 
-### Docker Container Actions
+Use the dashboard card to monitor your server in one card. Select a tab to see its data.
+The card can select a server automatically. To specify a server, set `server` to its device name or ID.
 
-- `unraid_management_agent.container_start`: Start a Docker container.
-- `unraid_management_agent.container_stop`: Gracefully stop a container.
-- `unraid_management_agent.container_restart`: Restart a container.
-- `unraid_management_agent.container_pause`: Pause container execution.
-- `unraid_management_agent.container_resume`: Resume a paused container.
+```yaml
+type: custom:unraid-management-agent-dashboard-card
+```
+
+This example selects a server and sets the card title. Replace `tower` with your server's device name or ID.
+
+```yaml
+type: custom:unraid-management-agent-dashboard-card
+server: tower
+title: Main Unraid Server
+```
+
+### Select an individual card
+
+Use an individual card to show only one set of data or controls.
+
+| Card               | YAML type                                                | Data and controls                                                                 |
+| ------------------ | -------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Server             | `custom:unraid-management-agent-server-card`             | CPU, memory, uptime, system load, and array status.                               |
+| Storage            | `custom:unraid-management-agent-storage-card`            | Array status, parity checks, cache pools, and drive health.                       |
+| Docker             | `custom:unraid-management-agent-docker-card`             | Container status, controls, CPU use, memory use, and updates.                     |
+| Virtual machines   | `custom:unraid-management-agent-vm-card`                 | VM status, power controls, CPU allocation, memory allocation, and transfer rates. |
+| UPS                | `custom:unraid-management-agent-ups-card`                | Battery charge, load, runtime, voltage, and power.                                |
+| GPU                | `custom:unraid-management-agent-gpu-card`                | GPU use, video memory, clock speeds, driver versions, and temperatures.           |
+| Network            | `custom:unraid-management-agent-network-card`            | Interface status, IP addresses, link speeds, and transfer rates.                  |
+| User shares        | `custom:unraid-management-agent-shares-card`             | Share data size, storage capacity, free space, and parity protection.             |
+| Remote shares      | `custom:unraid-management-agent-remote-shares-card`      | SMB and NFS mount state, controls, and capacity.                                  |
+| Unassigned devices | `custom:unraid-management-agent-unassigned-devices-card` | External drives, file systems, mount controls, and partitions.                    |
+| ZFS                | `custom:unraid-management-agent-zfs-card`                | Pool status, cache hit rate, scrub status, errors, and dataset capacity.          |
+| Fans               | `custom:unraid-management-agent-fans-card`               | Fan speed, PWM duty cycle, and speed controls.                                    |
+| Notifications      | `custom:unraid-management-agent-notifications-card`      | Alert, warning, and information counts.                                           |
+| Maintenance        | `custom:unraid-management-agent-maintenance-card`        | Flash drive health, parity schedule, check history, and sync errors.              |
+
+Each example configures one card.
+
+```yaml
+type: custom:unraid-management-agent-server-card
+show_system_info: true
+```
+
+```yaml
+type: custom:unraid-management-agent-docker-card
+view_mode: grid
+```
+
+### Update older dashboard configurations
+
+1. Back up your dashboard with its raw configuration editor.
+2. Change the types of the cards that belong to this integration.
+3. Replace `custom:unraid-<module>-card` with `custom:unraid-management-agent-<module>-card`.
+4. Select **Save**.
+5. Reload the browser page.
+
+For example, use `custom:unraid-management-agent-docker-card` for this integration's Docker card.
+The separate Unraid integration uses its own card types.
+
+## Monitoring and controls
+
+The hardware, plugins, and collectors on your server determine which entities are available.
+
+| Area                                 | Data and controls                                                                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| System                               | CPU and memory use, system load, uptime, boot time, and temperatures.                                                                       |
+| Array and parity                     | Array status, capacity, parity progress, schedule, history, and sync errors.                                                                |
+| Boot flash drive                     | Drive status, used space, and free space.                                                                                                   |
+| Docker                               | Container status, autostart, restart, CPU use, memory use, transfer rates, and image updates.                                               |
+| Virtual machines                     | VM status, power, pause, restart, CPU allocation, memory allocation, and transfer rates.                                                    |
+| ZFS                                  | Pool status, fragmentation, scrub progress, errors, damaged file paths, and adaptive replacement cache (ARC) data.                          |
+| Updates                              | Installed and available versions for Unraid OS and plugins. Install OS and plugin updates in Unraid.                                        |
+| Alerts                               | Rule state, severity, firing count, and `firing` and `resolved` events.                                                                     |
+| GPUs                                 | GPU use, video memory, temperature, and clock speed.                                                                                        |
+| Power                                | Uninterruptible power supply (UPS) charge, load, runtime, and power. Compatible agents report data for each Network UPS Tools (NUT) device. |
+| Fans                                 | Speed in revolutions per minute. The integration adds PWM control entities when you enable fan controls.                                    |
+| Network                              | Interface status, IP addresses, link speed, maximum transmission unit (MTU), and transfer rates.                                            |
+| Services                             | Binary sensors for network and system services, such as SMB, NFS, Docker, and libvirt.                                                      |
+| Remote shares and unassigned devices | Mount state, mount switches, and capacity.                                                                                                  |
+
+When container update checks are on, use the container's update entity to install an available image.
+Docker and VM entities use the `<server> Docker` and `<server> VMs` devices for data that applies to each service.
+Use [integration options](#integration-options) to give individual containers and VMs their own devices.
+
+### User share storage
+
+The **Share {share_name} Storage Usage** sensor reports the capacity of the pool or array that holds the share.
+The `storage_used`, `storage_free`, and `storage_total` attributes use `null` for unknown values.
+The legacy `total_size` and `free_size` attributes also report storage capacity.
+
+The `used_size` attribute shows how much data the share contains when the agent measures it. The agent can report a value of zero.
+The Shares card shows the data size and storage capacity in different fields.
+
+The **FUSE Fallback** problem binary sensor reports when an exclusive share uses FUSE. This sensor is available with agents that report exclusive share state.
+Its attributes show the reported locations that prevent exclusive access. Use the sensor in an automation to send a notification.
+
+### SAS storage topology
+
+Use the `storage_topology` collector on the agent. Use `storcli` or `sg3_utils` with SCSI Enclosure Services (SES).
+The integration shows controller and enclosure status, temperatures, link speeds, and drive errors.
+Compatible agents also report throughput for controllers and enclosures.
+Problem sensors report power supply, I/O module, fan, cable, path redundancy, drive, and firmware faults.
+
+## Home Assistant actions
+
+Use actions in automations, scripts, or from **Developer Tools**.
+Set **Unraid server** in the action editor, or set `config_entry_id` in YAML.
+
+If you configure one server, you can keep the field empty.
+If you configure more than one server, an action without this field uses the first configured server.
+Home Assistant creates a Repairs issue for this condition.
+Update those automations to specify a server before a future release requires it.
+
+### Docker container actions
+
+- `unraid_management_agent.container_start` — Start a Docker container.
+- `unraid_management_agent.container_stop` — Stop a container.
+- `unraid_management_agent.container_restart` — Restart a container.
+- `unraid_management_agent.container_pause` — Pause a container.
+- `unraid_management_agent.container_resume` — Resume a paused container.
 
 ```yaml
 action: unraid_management_agent.container_restart
@@ -307,15 +261,15 @@ data:
   config_entry_id: "YOUR_CONFIG_ENTRY_ID"
 ```
 
-### Virtual Machine Actions
+### Virtual machine actions
 
-- `unraid_management_agent.vm_start`: Power on a VM.
-- `unraid_management_agent.vm_stop`: Gracefully shut down a VM.
-- `unraid_management_agent.vm_restart`: Restart a VM.
-- `unraid_management_agent.vm_pause`: Pause a running VM.
-- `unraid_management_agent.vm_resume`: Resume a paused VM.
-- `unraid_management_agent.vm_hibernate`: Suspend / hibernate a VM.
-- `unraid_management_agent.vm_force_stop`: Forcefully stop / power off a VM.
+- `unraid_management_agent.vm_start` — Start a VM.
+- `unraid_management_agent.vm_stop` — Shut down a VM.
+- `unraid_management_agent.vm_restart` — Restart a VM.
+- `unraid_management_agent.vm_pause` — Pause a running VM.
+- `unraid_management_agent.vm_resume` — Resume a paused VM.
+- `unraid_management_agent.vm_hibernate` — Hibernate a VM.
+- `unraid_management_agent.vm_force_stop` — Force a VM to stop.
 
 ```yaml
 action: unraid_management_agent.vm_start
@@ -323,24 +277,27 @@ data:
   vm_id: Ubuntu-Server
 ```
 
-### Array & Parity Actions
+### Array and parity actions
 
-- `unraid_management_agent.array_start`: Start the storage array.
-- `unraid_management_agent.array_stop`: Stop the storage array.
-- `unraid_management_agent.parity_check_start`: Begin a parity check.
-- `unraid_management_agent.parity_check_stop`: Stop an ongoing parity check.
-- `unraid_management_agent.parity_check_pause`: Pause parity check operations.
-- `unraid_management_agent.parity_check_resume`: Resume paused parity operations.
+- `unraid_management_agent.array_start` — Start the storage array.
+- `unraid_management_agent.array_stop` — Stop the storage array.
+- `unraid_management_agent.parity_check_start` — Start a parity check.
+- `unraid_management_agent.parity_check_stop` — Stop a parity check.
+- `unraid_management_agent.parity_check_pause` — Pause a parity check.
+- `unraid_management_agent.parity_check_resume` — Resume a parity check.
 
-The Start Array and Stop Array buttons are disabled by default, so the array cannot be started or stopped by an accidental tap on a dashboard. Enable them in the entity settings if you want them, or call these actions from a script, an automation or Developer Tools.
+The **Start Array** and **Stop Array** buttons are off by default. To use the buttons, enable them in the entity settings.
+If the server has no Unraid array disks, Home Assistant does not create parity entities. Parity actions then give an error.
 
-On a server with no Unraid array disks (for example ZFS pools only), parity entities are not created and the parity actions fail with a "no parity array" error.
+See the [action reference](custom_components/unraid_management_agent/services.yaml) for the full list and input fields.
 
----
+## Example automations
 
-## Example Automations
+Replace the example entity IDs with IDs from your installation.
+Replace `notify.mobile_app` with your mobile app's notification action.
+For the container action, select the correct server if you have more than one.
 
-### High CPU Alert
+### High CPU use alert
 
 ```yaml
 automation:
@@ -355,12 +312,14 @@ automation:
       - action: notify.mobile_app
         data:
           title: "Unraid Alert: High CPU"
-          message: "CPU utilization has remained at {{ states('sensor.unraid_tower_cpu_usage') }}% for 5 minutes."
+          message: "CPU use is {{ states('sensor.unraid_tower_cpu_usage') }}%. It was above 85% for 5 minutes."
 ```
 
-### Critical UPS Battery Shutdown
+### Shutdown when the UPS battery is low
 
-Enable the Stop Array button before using this example. The button targets its configured server. If you use the `array_stop` action instead, select the server with `config_entry_id`.
+Enable the **Stop Array** button before you use this example.
+Use **Stop Array** and **Shutdown System** from the same server.
+If you use the `array_stop` action, select the server with `config_entry_id`.
 
 ```yaml
 automation:
@@ -377,10 +336,10 @@ automation:
           seconds: 30
       - action: button.press
         target:
-          entity_id: button.unraid_tower_shutdown
+          entity_id: button.unraid_tower_shutdown_system
 ```
 
-### React to Agent Alert Rule Events
+### Send a notification when a rule fires
 
 ```yaml
 automation:
@@ -398,7 +357,7 @@ automation:
           message: "{{ trigger.to_state.attributes.rule_name }}"
 ```
 
-### Auto-Restart Container on Unplanned Stop
+### Start a container when it stops
 
 ```yaml
 automation:
@@ -415,88 +374,48 @@ automation:
           container_id: vaultwarden
 ```
 
----
-
-## Architecture & Project Structure
-
-The integration is built upon modern Home Assistant architectural patterns (Platinum Quality Scale target) with typed Pydantic models and asynchronous I/O:
-
-```text
-custom_components/unraid_management_agent/
-├── __init__.py           # Setup lifecycle, services registration, frontend registration
-├── api/                  # Vendored async API client, Pydantic models, and WebSocket hub
-├── binary_sensor.py      # Binary sensor platform (array, services, alerts, ZFS, topology)
-├── button.py             # Button platform (array, parity, reboot, VM, container restart)
-├── cleanup.py            # Dynamic entity cleanup coordinator
-├── config_flow.py        # Config flow, Zeroconf discovery, reauth, and options flow
-├── const.py              # Domain constants, configuration keys, default intervals
-├── coordinator.py        # Central data coordinator (WebSocket push + REST polling)
-├── diagnostics.py        # Redacted diagnostics export
-├── entity.py             # Base entity classes and device info builders
-├── event.py              # Event platform (notifications and alert rule events)
-├── frontend.py           # Lovelace custom cards resource registration & static asset serving
-├── frontend/             # Compiled custom cards bundle (unraid-cards.js)
-├── number.py             # Number platform (PWM fan duty cycle control)
-├── sensor.py             # Sensor platform (system, array, disks, GPUs, UPS, ZFS, rates)
-├── services.yaml         # Action schemas and translation descriptions
-├── switch.py             # Switch platform (containers, VMs, disk spin, remote shares)
-├── update.py             # Update platform (Unraid OS, plugins, Docker containers)
-└── translations/         # Multi-language translations
-```
-
----
-
 ## Troubleshooting
 
-### Connection Failures
+### The integration cannot connect
 
-- Verify the agent is running on your Unraid server by visiting `http://<unraid-ip>:8043/api/v1/health` in a browser.
-- Check firewall settings on Unraid and any intermediate routers.
-- If `API_TOKEN` is enabled on the agent, verify the token in the re-authentication or reconfigure dialog.
+1. Open the agent health URL from [Requirements](#requirements).
+2. If the URL does not open, check the agent status and firewall settings on Unraid and your routers.
+3. If the agent uses a token, check the token in the **Reconfigure** or reauthentication form.
 
-### Missing Entities
+### Entities are missing
 
-- Certain entities only populate when the corresponding subsystem or collector is active on the server (e.g. ZFS pools, UPS, GPU, fan controllers, SAS topology).
-- Storage topology devices require `storcli` or `sg3_utils` (SES) on Unraid and usually appear within 1–2 minutes of starting the agent.
-- If you recently added new containers, disks, or pools, reload the integration entry under **Settings** > **Devices & Services**.
+- Check that the related hardware, service, or collector is available on Unraid.
+- For SAS devices, check the [SAS storage topology requirements](#sas-storage-topology).
+- If you added a container, drive, or pool, reload the integration entry in **Settings** > **Devices & Services**.
 
-### Dashboard Cards Not Appearing
+### Home Assistant cannot find a dashboard card
 
-- The cards are bundled directly with the integration and registered automatically.
-- If custom cards show as unknown in Lovelace after an upgrade, perform a hard refresh in your browser (Ctrl+F5 or Shift+Reload) to clear the browser cache.
+1. Make sure that the integration has a configured server.
+2. Check the card type against the [card table](#select-an-individual-card).
+3. Reload the browser page without the cache.
 
----
+## Development
 
-## Development & Testing
+The coordinator reads the agent API and receives WebSocket events.
+The telemetry package combines the data from these sources for Home Assistant entities.
+See the [architecture decisions](docs/adr/README.md) and the [domain glossary](GLOSSARY.md).
+
+Run the commands from the repository root.
 
 ```bash
-# Linting and formatting
-script/lint
-
-# Run test suite with pytest
-pytest tests/ -v --timeout=30
-
-# Launch local Home Assistant development environment
+./script/lint
+./script/test
 ./script/develop
 ```
 
----
-
-## Contributing
-
-Contributions are welcome! Please ensure:
-
-1. Code adheres to Home Assistant Platinum Quality Scale rules (no deprecated APIs, full type annotations, async I/O).
-2. All pre-commit hooks and tests pass (`script/lint` and `pytest`).
-3. `CHANGELOG.md` is updated under `## [Unreleased]`.
-4. Pull requests follow the provided PR template.
-
----
+The first command formats and checks the code. The second runs the tests. The third starts a local Home Assistant instance.
+See [Contributing](CONTRIBUTING.md) for setup instructions and contribution requirements.
 
 ## License
 
-This project is licensed under the Apache License 2.0. See [LICENSE](https://github.com/tinkerologie/ha-unraid-management-agent/blob/main/LICENSE) for details.
+This project uses the [Apache License 2.0](LICENSE).
 
-## Trademark Notice
+## Trademark notice
 
-Unraid is a registered trademark of Lime Technology, Inc. This project is an independent community integration and is not affiliated with, endorsed by, or sponsored by Lime Technology, Inc.
+Unraid is a registered trademark of Lime Technology, Inc.
+This community integration operates independently of Lime Technology, Inc. Lime Technology, Inc. does not endorse or sponsor it.
