@@ -14,6 +14,9 @@ Resource-key changes require a migration strategy, even when the proposed key lo
 Grouping and resource-device options are presentation choices within the configured server, not new
 server connections; disabling an option can remove entities specific to that option.
 
+Manual resource-device removal and stale-entity cleanup share inventory presence rules.
+An unavailable inventory cannot establish that a resource is absent.
+
 ## Evidence
 
 - [Entity IDs and device relationships](../../custom_components/unraid_management_agent/entity.py)

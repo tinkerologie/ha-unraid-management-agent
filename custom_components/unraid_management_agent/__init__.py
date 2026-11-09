@@ -54,17 +54,12 @@ from .entity import (
     VMS_DEVICE,
     async_get_or_create_group_device,
     gpu_device_identifier,
-    gpu_device_keys,
     group_device_identifier,
-    hwmon_controller_identifier,
     is_group_device_enabled,
-    zfs_pool_device_identifier,
 )
 from .frontend import async_register_frontend
-from .hwmon import hid_drivers_without_ids, hwmon_controller_of
-from .nic import async_remove_nic_devices, current_card_ids
-from .nic import device_identifier as nic_device_identifier
-from .storage import CONTROLLER, ENCLOSURE, current_storage_ids, device_identifier
+from .nic import async_remove_nic_devices
+from .presence import Presence, device_presence
 from .vm_guest import VM_GUEST_KEY_PREFIX
 
 # Service field constants
@@ -776,67 +771,11 @@ async def async_remove_config_entry_device(
     still reports, cannot be removed.
     """
     data = entry.runtime_data.coordinator.data
-    vm_prefix = f"{entry.entry_id}_vm_"
-    container_prefix = f"{entry.entry_id}_container_"
-    gpu_prefix = gpu_device_identifier(entry.entry_id, "")
-    hwmon_prefix = f"{entry.entry_id}_hwmon_"
-    nic_prefix = nic_device_identifier(entry.entry_id, "")
-    zfs_pool_prefix = zfs_pool_device_identifier(entry.entry_id, "")
-    topology = data.storage_topology if data else None
     for domain, identifier in device_entry.identifiers:
-        if domain != DOMAIN:
-            continue
-        if identifier.startswith(nic_prefix):
-            cards = data.network_cards if data else None
-            if cards is None or cards.state != "ok":
-                return False
-            return identifier[len(nic_prefix) :] not in current_card_ids(cards)
-        for kind in (CONTROLLER, ENCLOSURE):
-            prefix = device_identifier(entry.entry_id, kind, "")
-            if identifier.startswith(prefix):
-                if topology is None or topology.state != "ok":
-                    return False
-                return identifier[len(prefix) :] not in current_storage_ids(
-                    topology, kind
-                )
-        if identifier.startswith(vm_prefix):
-            current_vms = {
-                getattr(vm, "id", None) or getattr(vm, "name", None)
-                for vm in ((data.vms if data else None) or [])
-            }
-            return identifier[len(vm_prefix) :] not in current_vms
-        if identifier.startswith(gpu_prefix):
-            gpus = data.gpu if data else None
-            if gpus is None:
-                return False
-            return identifier[len(gpu_prefix) :] not in gpu_device_keys(gpus).values()
-        if identifier.startswith(container_prefix):
-            current_containers = {
-                getattr(container, "name", None)
-                for container in ((data.containers if data else None) or [])
-            }
-            return identifier[len(container_prefix) :] not in current_containers
-        if identifier.startswith(hwmon_prefix):
-            system = data.system if data else None
-            if (
-                system is None
-                or system.fans is None
-                or system.temperatures is None
-                or hid_drivers_without_ids([*system.fans, *system.temperatures])
-            ):
-                # Not a complete inventory: the controller may still be there.
-                return False
-            current_controllers = {
-                hwmon_controller_identifier(entry.entry_id, *controller)
-                for item in [*(system.fans or []), *(system.temperatures or [])]
-                if (controller := hwmon_controller_of(item)) is not None
-            }
-            return identifier not in current_controllers
-        if identifier.startswith(zfs_pool_prefix):
-            if data is None or data.zfs_pools is None:
-                return False
-            current_pools = {pool.name for pool in data.zfs_pools}
-            return identifier[len(zfs_pool_prefix) :] not in current_pools
+        if domain == DOMAIN:
+            presence = device_presence(data, entry.entry_id, identifier)
+            if presence is not None:
+                return presence is Presence.ABSENT
     return False
 
 

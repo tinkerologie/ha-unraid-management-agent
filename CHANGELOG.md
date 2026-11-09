@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Keep VM and container devices protected from removal while their inventory is unavailable (#277).
+
 ### Added
 
 - Add a domain glossary and five retrospective architecture decision records, with source references; align related guidance with the implemented architecture.
