@@ -62,7 +62,7 @@ from custom_components.unraid_management_agent.const import (
     DEFAULT_ENABLE_VM_DEVICES,
 )
 
-from .ports import TelemetrySource
+from .ports import UnraidTelemetrySource
 from .state import UnraidData
 
 _LOGGER = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ class RefreshPlan:
 
 
 def build_plan(
-    source: TelemetrySource,
+    source: UnraidTelemetrySource,
     current: UnraidData | None,
     options: Mapping[str, Any],
     parity_history: Callable[[], Awaitable[ParityHistory | None]],

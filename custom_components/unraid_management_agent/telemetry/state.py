@@ -186,11 +186,18 @@ def merge_nut(current: NUTInfo | None, incoming: NUTInfo) -> NUTInfo:
 
 
 def merge_notifications(
-    current: NotificationsResponse | None, notifications: list[Notification]
+    current: NotificationsResponse | None,
+    notifications: list[Notification],
+    previous: NotificationsResponse | None = None,
 ) -> NotificationsResponse:
     """Replace the list while retaining the separately collected overview."""
+    if not isinstance(current, NotificationsResponse):
+        current = previous
     if isinstance(current, NotificationsResponse):
-        return current.model_copy(update={"notifications": notifications})
+        update: dict[str, object] = {"notifications": notifications}
+        if previous is not None and current.overview is None:
+            update["overview"] = previous.overview
+        return current.model_copy(update=update)
     return NotificationsResponse(
         notifications=notifications, overview=None, timestamp=None
     )

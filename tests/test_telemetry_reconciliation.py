@@ -1,0 +1,99 @@
+"""Exercise telemetry reconciliation across a full REST poll."""
+
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+
+import pytest
+
+from custom_components.unraid_management_agent.api.events import (
+    NUTStatusUpdateEvent,
+    VMGuestUpdateEvent,
+    VMListUpdateEvent,
+)
+from custom_components.unraid_management_agent.api.models import (
+    CollectorStatus,
+    NUTInfo,
+    SystemInfo,
+    VMGuestInfo,
+    VMInfo,
+)
+from custom_components.unraid_management_agent.const import CONF_ENABLE_VM_DEVICES
+from custom_components.unraid_management_agent.telemetry import (
+    EventOutcome,
+    UnraidData,
+    UnraidTelemetryReconciler,
+)
+
+
+class RecordingSource:
+    """An offline source with an event hook on a mandatory endpoint."""
+
+    def __init__(self, **responses: Callable[[], Awaitable[object]]) -> None:
+        """Store endpoint overrides without starting any I/O."""
+        self.responses = responses
+
+    def __getattr__(self, name: str) -> Callable[[], Awaitable[object]]:
+        """Expose a response for an optional REST read."""
+        return self.responses.get(name, self.no_data)
+
+    async def get_system_info(self) -> SystemInfo:
+        """Provide a reachable core endpoint."""
+        return SystemInfo(hostname="test")
+
+    @staticmethod
+    async def no_data() -> None:
+        """Represent an unavailable optional endpoint."""
+
+
+async def test_partial_nut_push_keeps_known_lists_during_full_poll():
+    """Missing REST data cannot erase lists retained by a concurrent NUT event."""
+    current = UnraidData(
+        nut=NUTInfo.model_validate({"running": True, "devices": [{"name": "known"}]})
+    )
+
+    async def collectors() -> CollectorStatus:
+        outcome = reconciler.apply_event(
+            current, NUTStatusUpdateEvent(data=NUTInfo(installed=True, running=False))
+        )
+        assert outcome is EventOutcome.APPLIED
+        return CollectorStatus()
+
+    reconciler = UnraidTelemetryReconciler(
+        RecordingSource(get_collectors_status=collectors)
+    )
+    result = await reconciler.refresh(current, {}, None)
+    assert result.full_poll
+    assert result.snapshot.nut.running is False
+    assert [device.name for device in result.snapshot.nut.devices] == ["known"]
+
+
+@pytest.mark.parametrize("guest_pushed_later", [False, True])
+async def test_vm_replacement_push_invalidates_guest_read_during_full_poll(
+    guest_pushed_later: bool,
+):
+    """A fetched VM list cannot hide the identity change that invalidates guest data."""
+    guest = VMGuestInfo(vm_name="VM", hostname="old")
+    new_guest = VMGuestInfo(vm_name="VM", hostname="new")
+    current = UnraidData(vms=[VMInfo(name="VM", id="old")], vm_guest=[guest])
+    vms = [VMInfo(name="VM", id="new")]
+
+    async def list_vms() -> list[VMInfo]:
+        return vms
+
+    async def guests() -> list[VMGuestInfo]:
+        outcome = reconciler.apply_event(current, VMListUpdateEvent(data=vms))
+        assert outcome is EventOutcome.APPLIED
+        if guest_pushed_later:
+            outcome = reconciler.apply_event(
+                current, VMGuestUpdateEvent(data=[new_guest])
+            )
+            assert outcome is EventOutcome.APPLIED
+        return [guest]
+
+    reconciler = UnraidTelemetryReconciler(
+        RecordingSource(list_vms=list_vms, get_vm_guest=guests)
+    )
+    result = await reconciler.refresh(current, {CONF_ENABLE_VM_DEVICES: True}, None)
+    assert result.snapshot.vms == vms
+    assert result.snapshot.vm_guest == ([new_guest] if guest_pushed_later else [])

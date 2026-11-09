@@ -2,11 +2,10 @@
 
 Existing decision, recorded 2026-11-07.
 
-The integration exposes Unraid health conditions through entities and creates no Home Assistant repair
-issues, rather than duplicating server notifications for problems that cannot be corrected in Home Assistant.
+The integration exposes Unraid health conditions through entities. Repairs address actionable Home Assistant configuration problems.
 Earlier disk, parity, connection, and share-fallback repair issues and stored disk-I/O acknowledgements are
 removed during setup. Connection and authentication failures use availability, setup retry, and
-reauthentication flows as appropriate instead of creating a separate health-repair workflow.
+reauthentication flows as appropriate. The service-target migration warning asks users to update ambiguous multi-server actions in Home Assistant.
 
 ## Consequences
 

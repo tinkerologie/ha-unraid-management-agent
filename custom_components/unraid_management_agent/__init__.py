@@ -777,7 +777,10 @@ async def async_remove_config_entry_device(
     enclosures, ZFS pools, network cards or USB sensor controllers that the agent
     still reports, cannot be removed.
     """
-    data = entry.runtime_data.coordinator.data
+    runtime = getattr(entry, "runtime_data", None)
+    if runtime is None or not runtime.coordinator.last_update_success:
+        return False
+    data = runtime.coordinator.data
     for domain, identifier in device_entry.identifiers:
         if domain == DOMAIN:
             presence = device_presence(data, entry.entry_id, identifier)

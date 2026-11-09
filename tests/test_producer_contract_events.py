@@ -128,11 +128,11 @@ def test_producer_events_keep_snapshot_fields_separate():
     )
     from custom_components.unraid_management_agent.telemetry import (
         EventOutcome,
-        TelemetryReconciler,
         UnraidData,
+        UnraidTelemetryReconciler,
     )
 
-    reconciler = TelemetryReconciler(MagicMock())
+    reconciler = UnraidTelemetryReconciler(MagicMock())
     snapshot = UnraidData(
         ups=UPSInfo(load_percent=25),
         notifications=NotificationsResponse(

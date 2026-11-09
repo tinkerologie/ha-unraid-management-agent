@@ -11,6 +11,17 @@ from custom_components.unraid_management_agent.api.exceptions import (
 )
 from tests.producer_contract import assert_values, fixture, request
 
+
+@pytest.fixture(autouse=True)
+def _prevent_owned_http_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail if a contract test tries to leave the offline response adapter."""
+    from unittest.mock import Mock
+
+    monkeypatch.setattr(
+        "aiohttp.ClientSession", Mock(side_effect=AssertionError("Unexpected I/O"))
+    )
+
+
 NETWORK = {
     "syslog.port": 514,
     "syslog.enabled": True,
@@ -45,6 +56,9 @@ ZFS_LIST = {
     "0.corrupted_file_count": 1,
     "0.corrupted_file_paths": ["/mnt/sample/example.bin"],
     "1.corrupted_file_count": 0,
+    "1.corrupted_file_paths": [],
+    "2.corrupted_file_count": None,
+    "2.corrupted_file_paths": [],
 }
 NOTIFICATIONS = {
     "notifications.0.id": "sample-notification",

@@ -46,7 +46,7 @@ from custom_components.unraid_management_agent.api.models import (
 )
 
 
-class TelemetrySource(Protocol):
+class UnraidTelemetrySource(Protocol):
     """REST data consumed by a telemetry refresh."""
 
     async def get_system_info(self) -> SystemInfo:

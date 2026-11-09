@@ -15,7 +15,7 @@ Grouping and resource-device options are presentation choices within the configu
 server connections; disabling an option can remove entities specific to that option.
 
 Manual resource-device removal and stale-entity cleanup share inventory presence rules.
-An unavailable inventory cannot establish that a resource is absent.
+An inventory the integration can identify as unavailable cannot establish that a resource is absent. Manual removal also requires a successful coordinator update.
 
 ## Evidence
 

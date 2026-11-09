@@ -24,8 +24,8 @@ from custom_components.unraid_management_agent.collection import (
     subscription_topics,
 )
 
-from .event_application import EventOutcome, apply_event
-from .ports import TelemetrySource, TopicSubscription
+from .event_application import STATEFUL_EVENTS, EventOutcome, apply_event
+from .ports import TopicSubscription, UnraidTelemetrySource
 from .refresh import Fetch, assemble, build_plan
 from .state import UnraidData
 
@@ -52,11 +52,13 @@ class RefreshResult:
         return not self.skipped
 
 
-class TelemetryReconciler:
+class UnraidTelemetryReconciler:
     """Own the poll cadence, push application and in-flight event ordering."""
 
     def __init__(
-        self, source: TelemetrySource, clock: Callable[[], datetime] = dt_util.utcnow
+        self,
+        source: UnraidTelemetrySource,
+        clock: Callable[[], datetime] = dt_util.utcnow,
     ) -> None:
         """Bind the configured server's telemetry source."""
         self._source = source
@@ -65,7 +67,7 @@ class TelemetryReconciler:
         self._generation = 0
         self._parity_history: ParityHistory | None = None
         self._parity_history_fetched_at: datetime | None = None
-        self._journal: list[WebSocketEvent] | None = None
+        self._journal: list[tuple[WebSocketEvent, UnraidData | None]] | None = None
 
     def invalidate_full_poll(self) -> None:
         """Require a full poll after reconnect, including during a current poll."""
@@ -76,9 +78,16 @@ class TelemetryReconciler:
         self, snapshot: UnraidData | None, event: WebSocketEvent
     ) -> EventOutcome:
         """Apply a live event and retain it for a concurrent poll result."""
+        previous = (
+            replace(snapshot)
+            if self._journal is not None
+            and snapshot is not None
+            and isinstance(event, STATEFUL_EVENTS)
+            else None
+        )
         outcome = apply_event(snapshot, event)
         if outcome is EventOutcome.APPLIED and self._journal is not None:
-            self._journal.append(event)
+            self._journal.append((event, previous))
         return outcome
 
     async def _fetch_parity_history(self) -> ParityHistory | None:
@@ -112,7 +121,7 @@ class TelemetryReconciler:
         generation = self._generation
         retained = replace(current) if current is not None else None
         plan = build_plan(self._source, retained, options, self._fetch_parity_history)
-        journal: list[WebSocketEvent] = []
+        journal: list[tuple[WebSocketEvent, UnraidData | None]] = []
         self._journal = journal
         try:
             await asyncio.gather(*(slot.run(skipped) for slot in plan.initial_reads()))
@@ -133,8 +142,8 @@ class TelemetryReconciler:
                 except Exception as err:
                     _LOGGER.debug("Error sending WebSocket topic filter: %s", err)
 
-            for event in journal:
-                apply_event(snapshot, event)
+            for event, previous in journal:
+                apply_event(snapshot, event, previous=previous)
             if not skipped and self._generation == generation:
                 self._last_full_poll = self._clock()
             return RefreshResult(snapshot, skipped)

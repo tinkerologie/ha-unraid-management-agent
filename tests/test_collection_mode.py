@@ -573,9 +573,9 @@ async def test_reconnect_during_full_poll_invalidates_that_poll(
 
     coordinator._ws_client.set_topics.side_effect = set_topics
     freezer.tick(DYNAMIC_FULL_POLL_INTERVAL)
-    with patch.object(coordinator, "async_request_refresh", AsyncMock()):
-        await _poll(coordinator)
-        await coordinator.hass.async_block_till_done()
+    coordinator.async_request_refresh = AsyncMock()
+    await _poll(coordinator)
+    await coordinator.hass.async_block_till_done()
     coordinator._ws_client.set_topics.side_effect = None
     await _poll(coordinator)
     assert coordinator.client.get_system_info.await_count == 3

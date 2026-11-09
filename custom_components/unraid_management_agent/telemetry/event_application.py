@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum, auto
+from typing import Final
 
 from custom_components.unraid_management_agent.api.events import (
     ArrayStatusUpdateEvent,
@@ -45,7 +46,20 @@ class EventOutcome(Enum):
     IGNORED = auto()
 
 
-def apply_event(data: UnraidData | None, event: WebSocketEvent) -> EventOutcome:
+STATEFUL_EVENTS: Final = (
+    CollectorStateChangeEvent,
+    NotificationUpdateEvent,
+    NUTStatusUpdateEvent,
+    VMListUpdateEvent,
+)
+
+
+def apply_event(
+    data: UnraidData | None,
+    event: WebSocketEvent,
+    *,
+    previous: UnraidData | None = None,
+) -> EventOutcome:
     """Apply an event without notifying listeners or scheduling reads."""
     if data is None:
         return EventOutcome.IGNORED
@@ -82,13 +96,31 @@ def apply_event(data: UnraidData | None, event: WebSocketEvent) -> EventOutcome:
             data.fan_control = event.data
         case VMListUpdateEvent():
             data.vm_guest = drop_replaced_vm_guests(data.vm_guest, data.vms, event.data)
+            if previous is not None:
+                # A full poll may already have the new VM list but still hold
+                # guest data read from the replaced VM before this event.
+                data.vm_guest = drop_replaced_vm_guests(
+                    data.vm_guest, previous.vms, event.data
+                )
             data.vms = event.data
         case NUTStatusUpdateEvent():
-            data.nut = merge_nut(data.nut, event.data)
+            current = data.nut
+            if previous is not None:
+                current = merge_nut(previous.nut, current) if current else previous.nut
+            data.nut = merge_nut(current, event.data)
         case NotificationUpdateEvent():
-            data.notifications = merge_notifications(data.notifications, event.data)
+            data.notifications = merge_notifications(
+                data.notifications,
+                event.data,
+                previous.notifications if previous else None,
+            )
         case CollectorStateChangeEvent():
-            data.collectors = merge_collector_state(data.collectors, event.data)
+            current = (
+                data.collectors
+                if data.collectors is not None or previous is None
+                else previous.collectors
+            )
+            data.collectors = merge_collector_state(current, event.data)
         case SourceStatusChangedEvent():
             return EventOutcome.REFRESH_REQUESTED
         case _:

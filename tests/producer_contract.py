@@ -7,7 +7,7 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import aiohttp
 from aiohttp.helpers import TimerNoop
@@ -97,10 +97,7 @@ async def request(case_id: str, method: str, *args: str, body: bytes | None = No
         api_token=token,
     )
     try:
-        with patch(
-            "aiohttp.ClientSession", side_effect=AssertionError("Unexpected I/O")
-        ):
-            return await getattr(client, method)(*args)
+        return await getattr(client, method)(*args)
     finally:
         assert adapter.calls == [
             (

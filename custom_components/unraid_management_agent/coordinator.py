@@ -40,7 +40,7 @@ from .const import (
     DOMAIN,
     UPDATE_INTERVAL,
 )
-from .telemetry import EventOutcome, TelemetryReconciler
+from .telemetry import EventOutcome, UnraidTelemetryReconciler
 from .telemetry import UnraidData as UnraidData  # noqa: PLC0414 - compatibility export
 from .telemetry.reconciler import AgentUnavailableError
 
@@ -129,7 +129,7 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         self._pending_system_action_disconnected = False
         self._previous_uptime_seconds: int | None = None
         self._last_reboot_detected_at: datetime | None = None
-        self._telemetry = TelemetryReconciler(client)
+        self._telemetry = UnraidTelemetryReconciler(client)
 
         super().__init__(
             hass,

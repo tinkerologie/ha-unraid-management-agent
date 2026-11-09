@@ -86,6 +86,19 @@ async def test_registry_removal_requires_a_confirmed_absence(
     fetch.return_value = []
     await coordinator.async_refresh()
     await hass.async_block_till_done()
+    # A total outage keeps the last snapshot, including its empty inventory.
+    # That snapshot cannot authorize removal until a refresh succeeds again.
+    system = mock_async_unraid_client.get_system_info
+    array = mock_async_unraid_client.get_array_status
+    system.side_effect = array.side_effect = RuntimeError("Agent unavailable")
+    await coordinator.async_refresh()
+    assert not coordinator.last_update_success
+    assert not await remove(target.id)
+    assert devices.async_get(target.id) is not None
+
+    system.side_effect = array.side_effect = None
+    await coordinator.async_refresh()
+    assert coordinator.last_update_success
     assert await remove(target.id)
     assert devices.async_get(target.id) is None
 
