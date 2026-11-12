@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -316,3 +316,36 @@ class TestCoordinatorFailureSemantics:
         await hass.async_block_till_done()
 
         assert len(refresh_calls) == 1
+
+
+@pytest.mark.usefixtures(
+    "mock_async_unraid_client", "mock_unraid_websocket_client_class"
+)
+async def test_cleanup_runs_once_per_poll_not_per_websocket_event(
+    hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Cleanup runs per poll, and per WebSocket event only while removals are pending."""
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = mock_config_entry.runtime_data.coordinator
+
+    with patch(
+        "custom_components.unraid_management_agent.async_cleanup_stale_entities"
+    ) as cleanup:
+        # The setup snapshot is cleaned once, then not again for later events.
+        coordinator.async_update_listeners()
+        coordinator.async_update_listeners()
+        assert cleanup.call_count == 1
+
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert cleanup.call_count == 2
+
+        coordinator.async_update_listeners()
+        assert cleanup.call_count == 2
+
+        # While an entity awaits removal, events run cleanup so a reappearance
+        # resets its grace period.
+        coordinator.stale_entity_candidates["test_entry_id_vm_gone"] = dt_util.utcnow()
+        coordinator.async_update_listeners()
+        assert cleanup.call_count == 3
