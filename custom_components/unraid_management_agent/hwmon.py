@@ -20,7 +20,12 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import slugify
 
-from .api.models import FanInfo, TemperatureInfo, hwmon_temperature_keys
+from .api.models import (
+    FanInfo,
+    TemperatureInfo,
+    hwmon_temperature_keys,
+    memo_by_identity,
+)
 from .const import DOMAIN
 from .entity import hwmon_controller_identifier
 
@@ -33,10 +38,14 @@ def hwmon_readings_by_key(system: Any) -> dict[str, TemperatureInfo]:
 
     A None system or temperature list gives an empty mapping.
     """
+    return _readings_by_key(getattr(system, "temperatures", None))
+
+
+@memo_by_identity
+def _readings_by_key(temperatures: Any) -> dict[str, TemperatureInfo]:
+    """Build the mapping once per temperature list (one per message)."""
     keyed: dict[str, TemperatureInfo] = {}
-    for key, reading in hwmon_temperature_keys(
-        getattr(system, "temperatures", None)
-    ).items():
+    for key, reading in hwmon_temperature_keys(temperatures).items():
         keyed.setdefault(slugify(key), reading)
     return keyed
 

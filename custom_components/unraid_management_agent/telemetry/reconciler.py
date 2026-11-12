@@ -20,6 +20,8 @@ from homeassistant.util import dt as dt_util
 from custom_components.unraid_management_agent.api.events import WebSocketEvent
 from custom_components.unraid_management_agent.api.models import ParityHistory
 from custom_components.unraid_management_agent.collection import (
+    COLLECTION_MODE_DYNAMIC,
+    collection_mode,
     pushed_fields,
     subscription_topics,
 )
@@ -114,6 +116,7 @@ class UnraidTelemetryReconciler:
         if (
             current is not None
             and topics
+            and collection_mode(current.collectors) == COLLECTION_MODE_DYNAMIC
             and self._last_full_poll is not None
             and self._clock() - self._last_full_poll < DYNAMIC_FULL_POLL_INTERVAL
         ):

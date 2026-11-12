@@ -11,6 +11,11 @@ from typing import Any
 
 import websockets
 
+# The agent sends whole collections in one message; zfs_snapshots_update alone
+# is over 1 MiB (websockets' default) with a few thousand snapshots, and the
+# 1009 close that limit causes made the integration reconnect every minute.
+WS_MAX_MESSAGE_SIZE = 64 * 1024 * 1024
+
 
 class UnraidWebSocketClient:
     """
@@ -238,7 +243,9 @@ class UnraidWebSocketClient:
         self._running = True
         try:
             async with websockets.connect(
-                self.ws_url, additional_headers=self._headers
+                self.ws_url,
+                max_size=WS_MAX_MESSAGE_SIZE,
+                additional_headers=self._headers,
             ) as websocket:
                 self._websocket = websocket
                 self._reset_retry_count()
@@ -309,6 +316,7 @@ class UnraidWebSocketClient:
                 async with websockets.connect(
                     self.ws_url,
                     ping_interval=None,
+                    max_size=WS_MAX_MESSAGE_SIZE,
                     additional_headers=self._headers,
                 ) as websocket:
                     self._websocket = websocket
@@ -336,7 +344,11 @@ class UnraidWebSocketClient:
                             error = ValueError(f"Failed to parse message: {message!r}")
                             await self._call_callback(self.on_error, error)
                         except websockets.exceptions.ConnectionClosed as err:
-                            close_frame = getattr(err, "rcvd", None)
+                            # The agent may drop the socket without echoing a close,
+                            # so fall back to the frame this client sent (e.g. 1009)
+                            close_frame = getattr(err, "rcvd", None) or getattr(
+                                err, "sent", None
+                            )
                             disconnect_code = getattr(close_frame, "code", None)
                             disconnect_reason = getattr(close_frame, "reason", None)
                             break

@@ -175,11 +175,16 @@ def test_collection_mode(status: CollectorStatus | None, expected: str | None) -
     assert collection_mode(status) == expected
 
 
-def test_subscription_topics_none_outside_dynamic_mode() -> None:
-    """Manual mode, older agents and missing data keep every topic."""
+def test_subscription_topics_filter_in_every_mode() -> None:
+    """Every mode gets the filter, which leaves out the unused ZFS lists."""
     assert subscription_topics(None, {}) is None
-    assert subscription_topics(_data("manual"), {}) is None
     assert subscription_topics(UnraidData(), {}) is None
+    dynamic = subscription_topics(_data("dynamic"), {})
+    assert dynamic
+    assert subscription_topics(_data("manual"), {}) == dynamic
+    assert subscription_topics(_data(None), {}) == dynamic
+    assert "zfs_snapshots_update" not in dynamic
+    assert "zfs_datasets_update" not in dynamic
 
 
 def test_subscription_topics_dynamic_mode() -> None:
@@ -664,14 +669,21 @@ async def test_unfiltered_websocket_keeps_full_poll(
     assert coordinator.client.get_system_info.await_count == 2
 
 
-async def test_manual_mode_resets_filter(
-    coordinator: UnraidDataUpdateCoordinator,
+async def test_manual_mode_filters_topics_but_polls_everything(
+    coordinator: UnraidDataUpdateCoordinator, freezer: FrozenDateTimeFactory
 ) -> None:
-    """Switching the agent to Manual mode sends no filter (every topic)."""
-    coordinator.client.get_collectors_status.return_value = _status("manual")
-    coordinator._ws_client = _ws(None)
+    """Manual mode sends the filter but never skips REST reads."""
+    client = coordinator.client
+    client.get_collectors_status.return_value = _status("manual")
+    first = await _poll(coordinator)
+    topics = subscription_topics(first, {})
+    assert topics
+    coordinator._ws_client = _ws(topics)
+
+    freezer.tick(timedelta(seconds=30))
     await _poll(coordinator)
-    coordinator._ws_client.set_topics.assert_awaited_once_with(None)
+    coordinator._ws_client.set_topics.assert_awaited_once_with(topics)
+    assert client.get_system_info.await_count == 2
     assert coordinator.collection_mode == "manual"
 
 
@@ -772,3 +784,29 @@ def test_system_status_collection_mode_attribute(
         SimpleNamespace(coordinator=coordinator)
     )
     assert attrs.get("collection_mode") == expected
+
+
+async def test_ws_reports_own_close_code_and_raises_max_size() -> None:
+    """A close the agent never echoed reports the code this client sent."""
+    from websockets.frames import Close
+
+    from custom_components.unraid_management_agent.api.websocket import (
+        WS_MAX_MESSAGE_SIZE,
+    )
+
+    class _TooBig(_FakeSocket):
+        async def recv(self) -> str:
+            raise ConnectionClosed(None, Close(1009, "frame too big"))
+
+    seen: list[tuple[Any, Any]] = []
+    client = UnraidWebSocketClient(
+        "192.0.2.10",
+        auto_reconnect=False,
+        on_disconnect=lambda code, reason: seen.append((code, reason)),
+    )
+    with patch(WS_CONNECT, return_value=_Connect(_TooBig())) as connect:
+        await client.start()
+
+    assert seen == [(1009, "frame too big")]
+    assert connect.call_args.kwargs["max_size"] == WS_MAX_MESSAGE_SIZE
+    assert WS_MAX_MESSAGE_SIZE > 1024 * 1024

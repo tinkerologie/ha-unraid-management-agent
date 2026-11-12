@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import functools
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
@@ -302,6 +304,31 @@ class TemperatureInfo(BaseModel):
         return self.name.removesuffix("_input")
 
 
+def memo_by_identity[T](fn: Callable[[Any], T]) -> Callable[[Any], T]:
+    """
+    Cache fn's result for the last few argument objects, by identity.
+
+    Payload models are frozen and rebuilt for each message, so the same object
+    gives the same result; every entity reading one message shares one result
+    instead of rebuilding it. Callers must not mutate the result.
+    """
+    cache: dict[int, tuple[Any, T]] = {}
+
+    @functools.wraps(fn)
+    def wrapper(arg: Any) -> T:
+        hit = cache.get(id(arg))
+        if hit is not None and hit[0] is arg:
+            return hit[1]
+        result = fn(arg)
+        if len(cache) >= 8:
+            cache.pop(next(iter(cache)))
+        cache[id(arg)] = (arg, result)  # holding arg keeps its id from being reused
+        return result
+
+    return wrapper
+
+
+@memo_by_identity
 def hwmon_temperature_keys(readings: Any) -> dict[str, TemperatureInfo]:
     """
     Map each hwmon temperature channel's key to its reading.
@@ -4024,6 +4051,7 @@ class VMGuestInfo(BaseModel):
     model_config = ConfigDict(frozen=True, extra="allow")
 
 
+@memo_by_identity
 def fan_sensor_keys(fans: Any) -> list[tuple[str, str, str, Any]]:
     """
     Return (key, name, display name, fan) for each fan.

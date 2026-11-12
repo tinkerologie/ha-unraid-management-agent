@@ -6,8 +6,8 @@ something consumes its data: a WebSocket client subscribed to one of its
 topics, or a REST read in the last five minutes. A client without a topic
 filter consumes every topic. The integration therefore subscribes to the
 topics its entities use, and skips the REST reads of data those topics push
-while the WebSocket is connected. Manual mode and older agents keep the
-unfiltered WebSocket and the full poll.
+while the WebSocket is connected. Manual mode and older agents get the
+same topic filter but keep the full poll.
 """
 
 from __future__ import annotations
@@ -82,15 +82,13 @@ def subscription_topics(
     """
     Return the topic filter to send, or None to receive every topic.
 
-    A filter is only used in Dynamic mode. It holds the topics of enabled
-    collectors whose data the entities use; guest agent data only while VMs
-    are shown as devices.
+    The filter holds the topics of enabled collectors whose data the entities
+    use; guest agent data only while VMs are shown as devices. It is sent in
+    every mode, so unused topics such as zfs_snapshots_update (over 1 MiB with
+    a few thousand snapshots) are not pushed; agents without filter support
+    ignore it. None until the collector status is known.
     """
-    if (
-        data is None
-        or data.collectors is None
-        or collection_mode(data.collectors) != COLLECTION_MODE_DYNAMIC
-    ):
+    if data is None or data.collectors is None:
         return None
     status = data.collectors
     vm_devices = bool(options.get(CONF_ENABLE_VM_DEVICES, DEFAULT_ENABLE_VM_DEVICES))

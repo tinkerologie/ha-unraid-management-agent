@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Stop the WebSocket reconnecting every minute on servers with a few thousand ZFS snapshots: the snapshot list (over 1 MiB) hit the client's default message size limit and the client closed with code 1009. The limit is now 64 MiB, and the disconnect warning names the code the integration sent when the agent sent none.
+
+- Subscribe to the topics the entities use in every collection mode, not only Dynamic, so the agent no longer pushes the unused ZFS snapshot and dataset lists. REST reads are still skipped only in Dynamic mode.
+
+- Build the hwmon temperature and fan key maps once per message instead of once per sensor read, which blocked the event loop for 100–200 ms per WebSocket message on servers with many hwmon channels.
+
 ## [2026.11.1] — 2026-11-09
 
 ### Fixed
