@@ -733,13 +733,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnraidConfigEntry) -> bo
     array_was_started = _array_started(coordinator.data)
     array_recheck_pending = array_disks_absent(coordinator.data) is None
     parity_reload_scheduled = False
+    cleaned_data: UnraidData | None = None
 
-    # Register stale entity cleanup: runs on every successful coordinator update
-    # and removes entity registry entries for items no longer returned by the API.
+    # Register stale entity cleanup: removes entity registry entries for items
+    # no longer returned by the API. A poll publishes a new snapshot while
+    # WebSocket events update the current one in place, so it runs once per poll,
+    # and on every event while an entity awaits removal so a reappearance resets
+    # its grace period.
     @callback
     def _on_coordinator_update() -> None:
         nonlocal array_was_started, array_recheck_pending, parity_reload_scheduled
-        async_cleanup_stale_entities(hass, entry, coordinator)
+        nonlocal cleaned_data
+        if coordinator.data is not cleaned_data or coordinator.stale_entity_candidates:
+            cleaned_data = coordinator.data
+            async_cleanup_stale_entities(hass, entry, coordinator)
         if not coordinator.last_update_success:
             array_recheck_pending = True
             return
