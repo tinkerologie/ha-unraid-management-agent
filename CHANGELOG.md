@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.11.2] — 2026-11-12
+
 ### Fixed
 
 - Stop the WebSocket reconnecting every minute on servers with a few thousand ZFS snapshots: the snapshot list (over 1 MiB) hit the client's default message size limit and the client closed with code 1009. The limit is now 64 MiB, and the disconnect warning names the code the integration sent when the agent sent none.
