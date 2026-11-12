@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -51,6 +52,10 @@ from custom_components.unraid_management_agent.coordinator import (
 )
 from custom_components.unraid_management_agent.telemetry.reconciler import (
     PARITY_HISTORY_INTERVAL,
+)
+from custom_components.unraid_management_agent.telemetry.state import (
+    call_recording_reads,
+    call_recording_writes,
 )
 
 from .const import (
@@ -3326,3 +3331,121 @@ class TestCoordinatorPollCadence:
         assert data.zfs_snapshots == snapshots
         coordinator.client.list_zfs_datasets.assert_not_called()
         coordinator.client.list_zfs_snapshots.assert_not_called()
+
+
+class TestCoordinatorListenerFields:
+    """WebSocket events wake only the listeners that read a changed field."""
+
+    @pytest.fixture
+    def coordinator(self, hass: HomeAssistant) -> UnraidDataUpdateCoordinator:
+        """Create a coordinator with empty data."""
+        coordinator = UnraidDataUpdateCoordinator(
+            hass,
+            entry=_create_mock_entry(hass),
+            client=MagicMock(host="192.168.1.100", port=8043),
+            enable_websocket=True,
+        )
+        coordinator.data = UnraidData()
+        return coordinator
+
+    @staticmethod
+    def _reader(
+        coordinator: UnraidDataUpdateCoordinator, name: str, calls: list[str]
+    ) -> Callable[[], None]:
+        def listener() -> None:
+            calls.append(name)
+            getattr(coordinator.data, name)
+
+        return listener
+
+    async def test_fields_skip_listeners_that_never_read_them(
+        self, coordinator
+    ) -> None:
+        """Fields call new listeners and readers of those fields only."""
+        calls: list[str] = []
+        coordinator.async_add_listener(self._reader(coordinator, "system", calls))
+        coordinator.async_add_listener(self._reader(coordinator, "disks", calls))
+
+        coordinator.async_update_listeners({"disks"})  # unseen listeners all run
+        assert calls == ["system", "disks"]
+
+        calls.clear()
+        coordinator.async_update_listeners({"disks", "array"})
+        assert calls == ["disks"]
+
+        calls.clear()
+        coordinator.async_update_listeners()
+        assert calls == ["system", "disks"]
+
+    async def test_listener_error_is_logged_and_others_still_run(
+        self, coordinator, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A failing listener does not stop the others."""
+        calls: list[str] = []
+
+        def broken() -> None:
+            raise RuntimeError
+
+        coordinator.async_add_listener(broken)
+        coordinator.async_add_listener(lambda: calls.append("ok"))
+        coordinator.async_update_listeners()
+        assert calls == ["ok"]
+        assert "Unexpected error updating listener" in caplog.text
+
+    async def test_removed_listener_fields_are_dropped(self, coordinator) -> None:
+        """A full update forgets the fields of removed listeners."""
+        remove = coordinator.async_add_listener(lambda: coordinator.data.system)
+        coordinator.async_update_listeners()
+        assert len(coordinator._listener_fields) == 1
+        remove()
+        coordinator.async_update_listeners()
+        assert coordinator._listener_fields == {}
+
+    async def test_websocket_event_wakes_readers_of_every_field_it_writes(
+        self, coordinator
+    ) -> None:
+        """A VM list event writes vms and vm_guest, so it wakes guest readers."""
+        calls: list[str] = []
+        for name in ("system", "vm_guest"):
+            coordinator.async_add_listener(self._reader(coordinator, name, calls))
+        coordinator.async_update_listeners()
+        calls.clear()
+
+        coordinator._handle_websocket_event(VMListUpdateEvent(data=[]))
+        assert calls == ["vm_guest"]
+
+        calls.clear()
+        coordinator._handle_websocket_event(SystemUpdateEvent(data=SystemInfo()))
+        assert calls == ["system"]
+
+    async def test_event_during_poll_wakes_only_readers(self, coordinator) -> None:
+        """The reconciler's copy of the snapshot during a poll is not a write."""
+        calls: list[str] = []
+        for name in ("system", "vm_guest"):
+            coordinator.async_add_listener(self._reader(coordinator, name, calls))
+        coordinator.async_update_listeners()
+        calls.clear()
+
+        coordinator._telemetry._journal = []  # a poll is in flight
+        coordinator._handle_websocket_event(VMListUpdateEvent(data=[]))
+        assert calls == ["vm_guest"]
+        assert len(coordinator._telemetry._journal) == 1
+
+
+def test_recording_reads_nests_and_writes_return_the_result() -> None:
+    """Reads inside a nested recording also count for the outer one."""
+    data = UnraidData()
+
+    def outer() -> None:
+        assert call_recording_reads(lambda: data.disks) == {"disks"}
+        _ = data.system
+
+    assert call_recording_reads(outer) == {"disks", "system"}
+
+    def write() -> str:
+        data.array = None
+        return "done"
+
+    assert call_recording_writes(data, write) == ("done", {"array"})
+    # Writes to other instances, such as copies, are not recorded
+    assert call_recording_writes(UnraidData(), write) == ("done", set())

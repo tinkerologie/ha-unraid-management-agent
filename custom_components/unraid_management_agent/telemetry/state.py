@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from custom_components.unraid_management_agent.api.models import (
     AlertRule,
@@ -49,10 +51,28 @@ from custom_components.unraid_management_agent.api.models import (
     ZFSSnapshot,
 )
 
+# UnraidData fields read or written while recording (see call_recording_reads)
+_reads: set[str] | None = None
+# Instance whose writes are recorded, so copies made meanwhile don't count
+_write_target: UnraidData | None = None
+_writes: set[str] = set()
+
 
 @dataclass
 class UnraidData:
     """Container for Unraid coordinator data."""
+
+    def __getattribute__(self, name: str) -> Any:
+        """Record the field read, so an event wakes only the field's readers."""
+        if _reads is not None and not name.startswith("_"):
+            _reads.add(name)
+        return object.__getattribute__(self, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Record the field written, so an event wakes only the field's readers."""
+        if self is _write_target:
+            _writes.add(name)
+        object.__setattr__(self, name, value)
 
     system: SystemInfo | None = None
     array: ArrayStatus | None = None
@@ -201,3 +221,31 @@ def merge_notifications(
     return NotificationsResponse(
         notifications=notifications, overview=None, timestamp=None
     )
+
+
+def call_recording_reads(func: Callable[[], object]) -> set[str]:
+    """Call func and return the UnraidData fields it read, on any instance."""
+    global _reads
+    outer, _reads = _reads, set()
+    try:
+        func()
+    finally:
+        read, _reads = _reads, outer
+        if outer is not None:
+            outer.update(read)
+    return read
+
+
+def call_recording_writes[T](
+    target: UnraidData | None, func: Callable[[], T]
+) -> tuple[T, set[str]]:
+    """Call func and return its result and the fields it wrote on target."""
+    global _write_target, _writes
+    outer = _write_target, _writes
+    _write_target, _writes = target, set()
+    try:
+        result = func()
+    finally:
+        written = _writes
+        _write_target, _writes = outer
+    return result, written
