@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -40,9 +42,11 @@ from .const import (
     DOMAIN,
     UPDATE_INTERVAL,
 )
+from .entity import UnraidBaseEntity
 from .telemetry import EventOutcome, UnraidTelemetryReconciler
 from .telemetry import UnraidData as UnraidData  # noqa: PLC0414 - compatibility export
 from .telemetry.reconciler import AgentUnavailableError
+from .telemetry.state import call_recording_reads, call_recording_writes
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -130,6 +134,7 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         self._previous_uptime_seconds: int | None = None
         self._last_reboot_detected_at: datetime | None = None
         self._telemetry = UnraidTelemetryReconciler(client)
+        self._websocket_update_fields: set[str] | None = None
 
         super().__init__(
             hass,
@@ -473,11 +478,47 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
 
     def _handle_websocket_event(self, event: WebSocketEvent) -> None:
         """Apply the parsed event without resetting the polling timer."""
-        match self._telemetry.apply_event(self.data, event):
+        outcome, written = call_recording_writes(
+            self.data, lambda: self._telemetry.apply_event(self.data, event)
+        )
+        match outcome:
             case EventOutcome.APPLIED:
-                self.async_update_listeners()
+                self.async_update_listeners(written)
             case EventOutcome.REFRESH_REQUESTED:
                 self.hass.async_create_task(self.async_request_refresh())
+
+    @callback
+    def async_add_listener(
+        self, update_callback: Callable[[], None], context: Any = None
+    ) -> Callable[[], None]:
+        """Track telemetry dependencies for listeners that opt into filtering."""
+        entity = getattr(update_callback, "__self__", None)
+        if (
+            not isinstance(entity, UnraidBaseEntity)
+            or not entity.filter_websocket_updates
+        ):
+            return super().async_add_listener(update_callback, context)
+
+        reads: set[str] = set()
+
+        @callback
+        def _update_if_relevant() -> None:
+            fields = self._websocket_update_fields
+            if fields is not None and reads and reads.isdisjoint(fields):
+                return
+            reads.update(call_recording_reads(update_callback))
+
+        return super().async_add_listener(_update_if_relevant, context)
+
+    @callback
+    def async_update_listeners(self, fields: set[str] | None = None) -> None:
+        """Notify listeners, limiting opt-in listeners for WebSocket updates."""
+        previous = self._websocket_update_fields
+        self._websocket_update_fields = fields
+        try:
+            super().async_update_listeners()
+        finally:
+            self._websocket_update_fields = previous
 
     def _handle_raw_message(self, data: dict) -> None:
         """Handle raw WebSocket message and parse to typed event."""

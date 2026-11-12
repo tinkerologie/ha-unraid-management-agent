@@ -61,6 +61,10 @@ class UnraidBaseEntity(CoordinatorEntity["UnraidDataUpdateCoordinator"]):
 
     _attr_has_entity_name = True
 
+    # Opt in only when state comes from the telemetry snapshot and the
+    # callback does not depend on time or run work on unrelated messages.
+    filter_websocket_updates = False
+
     def __init__(
         self,
         coordinator: UnraidDataUpdateCoordinator,
