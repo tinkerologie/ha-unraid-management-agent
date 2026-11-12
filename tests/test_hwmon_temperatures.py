@@ -422,3 +422,26 @@ async def test_legacy_unique_id_migrated_after_reconnect(
     state = hass.states.get("sensor.unraid_coolant_temp")
     assert state is not None
     assert float(state.state) == 28.4
+
+
+def test_memo_by_identity_reuses_result_per_object() -> None:
+    """The same argument object reuses the result; a new object recomputes."""
+    from custom_components.unraid_management_agent.api.models import (
+        memo_by_identity,
+    )
+
+    calls: list[object] = []
+
+    @memo_by_identity
+    def build(arg: object) -> list[object]:
+        calls.append(arg)
+        return [arg]
+
+    first, second = ["a"], ["a"]
+    assert build(first) is build(first)
+    assert build(second) == [second]
+    assert calls == [first, second]
+    for _ in range(10):  # evicts the oldest entries
+        build([])
+    build(first)
+    assert sum(call is first for call in calls) == 2
