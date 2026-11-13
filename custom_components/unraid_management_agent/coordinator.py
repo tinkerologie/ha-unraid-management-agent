@@ -43,6 +43,7 @@ from .const import (
 from .telemetry import EventOutcome, UnraidTelemetryReconciler
 from .telemetry import UnraidData as UnraidData  # noqa: PLC0414 - compatibility export
 from .telemetry.reconciler import AgentUnavailableError
+from .telemetry.state import call_recording_reads, call_recording_writes
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -130,6 +131,8 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
         self._previous_uptime_seconds: int | None = None
         self._last_reboot_detected_at: datetime | None = None
         self._telemetry = UnraidTelemetryReconciler(client)
+        # Listener ID -> UnraidData fields it has read (async_update_listeners)
+        self._listener_fields: dict[int, set[str]] = {}
 
         super().__init__(
             hass,
@@ -473,11 +476,46 @@ class UnraidDataUpdateCoordinator(DataUpdateCoordinator[UnraidData]):
 
     def _handle_websocket_event(self, event: WebSocketEvent) -> None:
         """Apply the parsed event without resetting the polling timer."""
-        match self._telemetry.apply_event(self.data, event):
+        outcome, written = call_recording_writes(
+            self.data, lambda: self._telemetry.apply_event(self.data, event)
+        )
+        match outcome:
             case EventOutcome.APPLIED:
-                self.async_update_listeners()
+                self.async_update_listeners(written)
             case EventOutcome.REFRESH_REQUESTED:
                 self.hass.async_create_task(self.async_request_refresh())
+
+    @callback
+    def async_update_listeners(self, fields: set[str] | None = None) -> None:
+        """
+        Update listeners; with fields, only those that read one of them.
+
+        Each run records which UnraidData fields the listener read, and the
+        set only grows. A WebSocket event changes one or two fields, so the
+        hundreds of entities that never read them are skipped. Everything else
+        (a poll, a reconnect) passes no fields and updates every listener, so
+        a read missed here is at most one poll interval stale.
+        """
+        if fields is None:
+            self._listener_fields = {
+                listener_id: read
+                for listener_id, read in self._listener_fields.items()
+                if listener_id in self._listeners
+            }
+        for listener_id, (update_callback, _) in list(self._listeners.items()):
+            read = self._listener_fields.get(listener_id)
+            if fields is not None and read is not None and read.isdisjoint(fields):
+                continue
+            try:
+                read = call_recording_reads(update_callback)
+            except Exception:
+                self.logger.exception(
+                    "Unexpected error updating listener %s for %s",
+                    id(update_callback),
+                    self.name,
+                )
+                continue
+            self._listener_fields.setdefault(listener_id, set()).update(read)
 
     def _handle_raw_message(self, data: dict) -> None:
         """Handle raw WebSocket message and parse to typed event."""
