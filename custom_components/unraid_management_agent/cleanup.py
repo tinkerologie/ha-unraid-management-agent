@@ -378,7 +378,7 @@ def _build_valid_dynamic_entity_keys(
 
 def _is_dynamic_key(key: str) -> bool:
     """Return True if *key* belongs to a dynamic entity type that can become stale."""
-    return any(key.startswith(prefix) for prefix in _DYNAMIC_KEY_PREFIXES)
+    return key.startswith(_DYNAMIC_KEY_PREFIXES)
 
 
 @callback
