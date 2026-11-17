@@ -26,7 +26,7 @@ Use your server address and the agent port.
 
 ## Installation
 
-### Marketplace
+### Marketplace (Recommended)
 
 [![Open this integration in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tinkerologie&repository=ha-unraid-management-agent&category=integration)
 
