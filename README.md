@@ -26,24 +26,11 @@ Use your server address and the agent port.
 
 ## Installation
 
-### Install with HACS
+### Marketplace
 
 [![Open this integration in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=tinkerologie&repository=ha-unraid-management-agent&category=integration)
 
-Use the button to open the repository in the Home Assistant Community Store (HACS). Use HACS 2.0.1 or a subsequent version.
-Select **Download**. Then restart Home Assistant.
-
-If you cannot find the integration, add it as a custom repository. [HACS custom repository instructions](https://www.hacs.xyz/docs/faq/custom_repositories/)
-
-1. Open **HACS** in Home Assistant.
-2. Open the three-dot menu.
-3. Select **Custom repositories**.
-4. Put `https://github.com/tinkerologie/ha-unraid-management-agent` in the repository field.
-5. Select **Integration** as the category.
-6. Select **Add**.
-7. Find **Unraid Management Agent** in HACS.
-8. Select **Download**.
-9. Restart Home Assistant.
+Use the button to open the repository in the Home Assistant Marketplace.
 
 ### Install manually
 
