@@ -2084,6 +2084,8 @@ def _hwmon_controller_device(
 class UnraidHwmonTemperatureSensor(UnraidBaseEntity, SensorEntity):
     """Temperature of one hwmon channel (lm-sensors) on the server."""
 
+    filter_websocket_updates = True
+
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -2133,6 +2135,8 @@ class UnraidHwmonTemperatureSensor(UnraidBaseEntity, SensorEntity):
 
 class UnraidFanSensor(UnraidBaseEntity, SensorEntity):
     """Fan speed sensor."""
+
+    filter_websocket_updates = True
 
     _attr_native_unit_of_measurement = "RPM"
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -2503,6 +2507,8 @@ class UnraidNetworkTXSensor(UnraidNetworkSensorBase):
 
 class UnraidDiskSensorBase(UnraidBaseEntity, SensorEntity):
     """Base class for disk sensors."""
+
+    filter_websocket_updates = True
 
     def __init__(
         self,
@@ -2984,6 +2990,8 @@ class UnraidShareUsageSensor(UnraidBaseEntity, SensorEntity):
 
 class UnraidZFSPoolSensorBase(UnraidZFSPoolEntity, SensorEntity):
     """Base class for ZFS pool sensors."""
+
+    filter_websocket_updates = True
 
     def __init__(
         self,
@@ -3489,6 +3497,8 @@ class UnraidGPUEntity(UnraidBaseEntity):
 class UnraidGPUSensorBase(UnraidGPUEntity, SensorEntity):
     """Base class for per-GPU sensors."""
 
+    filter_websocket_updates = True
+
     def __init__(
         self,
         coordinator: UnraidDataUpdateCoordinator,
@@ -3583,6 +3593,9 @@ class UnraidGPUPowerSensor(UnraidGPUSensorBase):
     """Per-GPU power draw sensor."""
 
     _attr_native_unit_of_measurement = UnitOfPower.WATT
+    # Home Assistant's Integral helper uses repeated power reports as samples.
+    filter_websocket_updates = False
+
     _attr_device_class = SensorDeviceClass.POWER
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 1

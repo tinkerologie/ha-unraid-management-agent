@@ -9,6 +9,11 @@ and refreshes after reconnects; Manual mode and older agents retain unfiltered u
 WebSocket events notify entity listeners without resetting the coordinator's polling timer, so frequent
 events cannot indefinitely postpone reconciliation.
 
+Sensors whose state comes only from the telemetry snapshot can opt into WebSocket
+notifications for the fields they read. All listeners still receive REST reconciliation
+updates. Cleanup, connection status and time-dependent counters retain the normal
+notification cadence.
+
 ## Consequences
 
 Push updates provide responsiveness while polling repairs missed state. Topic filtering is part of the

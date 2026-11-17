@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant.common import MockConfigEntry
@@ -49,8 +49,13 @@ from custom_components.unraid_management_agent.const import DOMAIN
 from custom_components.unraid_management_agent.coordinator import (
     UnraidData,
 )
+from custom_components.unraid_management_agent.entity import UnraidBaseEntity
 from custom_components.unraid_management_agent.telemetry.reconciler import (
     PARITY_HISTORY_INTERVAL,
+)
+from custom_components.unraid_management_agent.telemetry.state import (
+    call_recording_reads,
+    call_recording_writes,
 )
 
 from .const import (
@@ -3326,3 +3331,136 @@ class TestCoordinatorPollCadence:
         assert data.zfs_snapshots == snapshots
         coordinator.client.list_zfs_datasets.assert_not_called()
         coordinator.client.list_zfs_snapshots.assert_not_called()
+
+
+class _SnapshotReader(UnraidBaseEntity):
+    """Exercise the same callback registration as opt-in sensors."""
+
+    filter_websocket_updates = True
+
+    def __init__(
+        self,
+        coordinator: UnraidDataUpdateCoordinator,
+        field: str,
+        calls: list[str],
+    ) -> None:
+        super().__init__(coordinator, field)
+        self._field = field
+        self._calls = calls
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        getattr(self.coordinator.data, self._field)
+        self._calls.append(self._field)
+
+
+@pytest.fixture
+def mock_listener_coordinator(hass: HomeAssistant) -> UnraidDataUpdateCoordinator:
+    """Create a coordinator with empty data for listener dispatch tests."""
+    coordinator = UnraidDataUpdateCoordinator(
+        hass,
+        entry=_create_mock_entry(hass),
+        client=MagicMock(host="192.168.1.100", port=8043),
+        enable_websocket=True,
+    )
+    coordinator.data = UnraidData()
+    return coordinator
+
+
+async def test_fields_skip_only_opt_in_listeners(
+    mock_listener_coordinator: UnraidDataUpdateCoordinator,
+) -> None:
+    """Unknown and external-state listeners run; learned opt-ins may skip."""
+    coordinator = mock_listener_coordinator
+    calls: list[str] = []
+    system = _SnapshotReader(coordinator, "system", calls)
+    disks = _SnapshotReader(coordinator, "disks", calls)
+    coordinator.async_add_listener(system._handle_coordinator_update)
+    coordinator.async_add_listener(disks._handle_coordinator_update)
+    coordinator.async_add_listener(lambda: calls.append("external"))
+
+    coordinator.async_update_listeners({"disks"})
+    assert calls == ["system", "disks", "external"]
+
+    calls.clear()
+    coordinator.async_update_listeners({"disks", "array"})
+    assert calls == ["disks", "external"]
+
+    calls.clear()
+    coordinator.async_update_listeners()
+    assert calls == ["system", "disks", "external"]
+
+
+async def test_listener_error_is_logged_and_others_still_run(
+    mock_listener_coordinator: UnraidDataUpdateCoordinator,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A failing listener does not stop the others."""
+    calls: list[str] = []
+
+    def broken() -> None:
+        raise RuntimeError
+
+    mock_listener_coordinator.async_add_listener(broken)
+    mock_listener_coordinator.async_add_listener(lambda: calls.append("ok"))
+    mock_listener_coordinator.async_update_listeners()
+    assert calls == ["ok"]
+    assert "Unexpected error updating listener" in caplog.text
+
+
+async def test_removed_listener_does_not_receive_updates(
+    mock_listener_coordinator: UnraidDataUpdateCoordinator,
+) -> None:
+    """Unsubscribing removes the wrapper along with its recorded fields."""
+    coordinator = mock_listener_coordinator
+    calls: list[str] = []
+    system = _SnapshotReader(coordinator, "system", calls)
+    remove = coordinator.async_add_listener(system._handle_coordinator_update)
+    coordinator.async_update_listeners()
+    assert calls == ["system"]
+    remove()
+    calls.clear()
+    coordinator.async_update_listeners({"system"})
+    assert not calls
+
+
+@pytest.mark.parametrize("poll_in_flight", [False, True])
+async def test_websocket_dispatch_uses_live_writes(
+    mock_listener_coordinator: UnraidDataUpdateCoordinator, poll_in_flight: bool
+) -> None:
+    """Wake readers of both VM fields even when the poll journals a copy."""
+    coordinator = mock_listener_coordinator
+    calls: list[str] = []
+    for field in ("system", "vms", "vm_guest"):
+        reader = _SnapshotReader(coordinator, field, calls)
+        coordinator.async_add_listener(reader._handle_coordinator_update)
+    coordinator.async_update_listeners()
+    calls.clear()
+
+    if poll_in_flight:
+        coordinator._telemetry._journal = []
+    coordinator._handle_websocket_event(VMListUpdateEvent(data=[]))
+    assert calls == ["vms", "vm_guest"]
+
+    calls.clear()
+    coordinator._handle_websocket_event(SystemUpdateEvent(data=SystemInfo()))
+    assert calls == ["system"]
+
+
+def test_recording_reads_nests_and_writes_return_the_result() -> None:
+    """Reads inside a nested recording also count for the outer one."""
+    data = UnraidData()
+
+    def outer() -> None:
+        assert call_recording_reads(lambda: data.disks) == {"disks"}
+        _ = data.system
+
+    assert call_recording_reads(outer) == {"disks", "system"}
+
+    def write() -> str:
+        data.array = None
+        return "done"
+
+    assert call_recording_writes(data, write) == ("done", {"array"})
+    # Writes to other instances, such as copies, are not recorded
+    assert call_recording_writes(UnraidData(), write) == ("done", set())
