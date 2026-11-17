@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2026.11.3] — 2026-11-17
+
 ### Changed
 
 - Check stale-entity key prefixes in one `str.startswith` call instead of a Python loop. On a large server the loop made about 600,000 prefix checks a minute.
