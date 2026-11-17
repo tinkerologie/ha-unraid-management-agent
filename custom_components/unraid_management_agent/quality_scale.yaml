@@ -194,9 +194,9 @@ rules:
       types (containers, VMs, disks, fans, GPUs, network interfaces, shares,
       ZFS pools, remote shares, unassigned devices, user scripts, hwmon
       temperature channels, system services, plugin and container update
-      entities, agent alert rules) on every successful coordinator update via an
-      async_add_listener callback registered in async_setup_entry. Guards on
-      last_update_success prevent false removal during transient server outages.
+      entities, agent alert rules) after successful polls and on updates while
+      a removal candidate is pending. Guards on last_update_success prevent
+      false removal during transient server outages.
       VM and container devices left without entities are removed, and
       async_remove_config_entry_device lets users delete a device whose VM or
       container is gone. Storage controller and enclosure entities are deliberately

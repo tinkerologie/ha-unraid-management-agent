@@ -11,6 +11,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant.common import MockConfigEntry
 
+from custom_components.unraid_management_agent.api.events import VMListUpdateEvent
+from custom_components.unraid_management_agent.api.models import VMInfo
 from custom_components.unraid_management_agent.cleanup import (
     STALE_REMOVAL_GRACE,
     _unavailable_data_prefixes,
@@ -316,3 +318,31 @@ class TestCoordinatorFailureSemantics:
         await hass.async_block_till_done()
 
         assert len(refresh_calls) == 1
+
+
+@pytest.mark.usefixtures("mock_unraid_websocket_client_class")
+async def test_cleanup_waits_for_poll_and_tracks_reappearance_on_push(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_async_unraid_client: MagicMock,
+) -> None:
+    """Start the removal grace on a poll and clear it on a reappearance push."""
+    vm = VMInfo(id="cleanup-test", name="Cleanup Test", state="running")
+    mock_async_unraid_client.list_vms.return_value = [vm]
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    coordinator = mock_config_entry.runtime_data.coordinator
+    entity = _register_entity(hass, mock_config_entry, "switch", "vm_cleanup_test")
+    await coordinator.async_refresh()  # clean the initial inventory
+    assert entity.unique_id not in coordinator.stale_entity_candidates
+
+    coordinator._handle_websocket_event(VMListUpdateEvent(data=[]))
+    assert entity.unique_id not in coordinator.stale_entity_candidates
+
+    mock_async_unraid_client.list_vms.return_value = []
+    await coordinator.async_refresh()
+    assert entity.unique_id in coordinator.stale_entity_candidates
+
+    coordinator._handle_websocket_event(VMListUpdateEvent(data=[vm]))
+    assert entity.unique_id not in coordinator.stale_entity_candidates
+    assert er.async_get(hass).async_get(entity.entity_id) is not None

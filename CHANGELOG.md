@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Run stale-entity cleanup once per poll instead of after every WebSocket event, which took about 1 s a minute on a large server. While an entity is waiting out its removal grace period, cleanup still runs on every event, so an item that reappears restarts the grace period as before.
+
 ### Fixed
 
 - Bound developer-blog issue excerpts and continue processing later posts when an issue cannot be created.
