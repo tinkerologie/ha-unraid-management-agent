@@ -5,20 +5,24 @@
 from __future__ import annotations
 
 import argparse
-import json
-import re
-import sys
-import urllib.request
-import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
+import json
 from pathlib import Path
+import re
+import sys
 from typing import Any
+import urllib.request
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "custom_components" / "unraid_management_agent"
 FEED = "https://developers.home-assistant.io/blog/rss.xml"
+MAX_ISSUE_BODY = 60000
+MAX_EXCERPT = 1000
+MAX_LOCATIONS = 20
+
 ANNOUNCEMENT = re.compile(
     r"deprecated|removed|will be removed|no longer|breaking|stops? working|must now",
     re.IGNORECASE,
@@ -167,11 +171,23 @@ def scan(days: int, existing: list[dict[str, Any]], out: Path) -> None:
             for token, locations in used.items():
                 body.extend(
                     [
-                        f"- `{token}`: {parser.announced[token]}",
-                        *[f"  - `{location}`" for location in locations],
+                        f"- `{token[:300]}`: {parser.announced[token][:MAX_EXCERPT]}",
+                        *[
+                            f"  - `{location}`"
+                            for location in locations[:MAX_LOCATIONS]
+                        ],
+                        *(
+                            [f"  - … {len(locations) - MAX_LOCATIONS} more matches"]
+                            if len(locations) > MAX_LOCATIONS
+                            else []
+                        ),
                     ]
                 )
-            issues.append({"title": f"HA dev blog: {title}", "body": "\n".join(body)})
+            text = "\n".join(body)
+            if len(text) > MAX_ISSUE_BODY:
+                text = text[:MAX_ISSUE_BODY].rsplit("\n", 1)[0]
+                text += "\n\n… excerpt truncated. Read the source post linked above."
+            issues.append({"title": f"HA dev blog: {title}"[:240], "body": text})
             status = "new issue"
         elif matches:
             status = "code not used by the integration; checked: " + ", ".join(
@@ -204,7 +220,7 @@ def main() -> int:
         ]
         scan(args.days, existing, args.out)
     except (OSError, ValueError, ET.ParseError) as err:
-        print(f"Cannot scan Home Assistant developer blog: {err}", file=sys.stderr)
+        print(f"Cannot scan Home Assistant developer blog: {err}", file=sys.stderr)  # noqa: T201 - CLI error reporting
         return 1
     return 0
 

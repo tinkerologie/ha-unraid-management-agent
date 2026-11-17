@@ -136,3 +136,29 @@ jobs:
           uv run --no-project --python 3.14.2 script/build-release.py --output-dir build/b
           cmp build/a/unraid_management_agent.zip build/b/unraid_management_agent.zip
           cmp build/a/SHA256SUMS build/b/SHA256SUMS
+
+  ci-gate:
+    name: CI Gate
+    if: ${{ always() }}
+    needs: ["test", "frontend", "release-zip"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require successful validation
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          ALLOWED_SKIPS: ${{ '[]' }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, sys
+          results = json.loads(os.environ['RESULTS'])
+          allowed_skips = set(json.loads(os.environ['ALLOWED_SKIPS']))
+          failures = {name: job['result'] for name, job in results.items()
+                      if job['result'] != 'success'
+                      and not (job['result'] == 'skipped' and name in allowed_skips)}
+          if not results or failures:
+              print(f'::error::Required CI did not pass: {failures or "no results"}')
+              sys.exit(1)
+          print('All required CI jobs passed (only documented event skips allowed).')
+          PYTHON

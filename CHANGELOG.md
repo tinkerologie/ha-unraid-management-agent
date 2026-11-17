@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bound developer-blog issue excerpts and continue processing later posts when an issue cannot be created.
+- Require aggregate CI results and preserve accepted backlog items in stale automation.
+
 ## [2026.11.2] — 2026-11-12
 
 ### Fixed

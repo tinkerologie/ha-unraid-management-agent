@@ -10,6 +10,10 @@ on:
         description: Look-back window in days
         type: number
         default: 8
+      dry-run:
+        description: Scan and report without creating issues
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -48,21 +52,28 @@ jobs:
       - name: Find posts that name integration code
         run: |
           uv python install 3.14.2
+          uv run --no-project --python 3.14.2 script/ha_dev_blog/test_watch.py
           uv run --no-project --python 3.14.2 script/ha_dev_blog/watch.py \
             --days "$DAYS" --existing "$RUNNER_TEMP/existing.jsonl" --out "$RUNNER_TEMP/blog"
 
       - name: Open an issue per new matching post
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && !inputs.dry-run
         run: |
           if [ ! -s "$RUNNER_TEMP/blog/new_issues.jsonl" ]; then exit 0; fi
           gh label create ha-dev-blog --color fbca04 --description 'Home Assistant developer blog change' || gh api "repos/$GH_REPO/labels/ha-dev-blog" >/dev/null
           gh label create enhancement --color a2eeef --description 'New feature or improvement' || gh api "repos/$GH_REPO/labels/enhancement" >/dev/null
+          failed=0
           while IFS= read -r issue; do
             TITLE=$(jq -r .title <<< "$issue")
             jq -r .body <<< "$issue" > "$RUNNER_TEMP/blog/body.md"
-            URL=$(gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/blog/body.md" --label ha-dev-blog --label enhancement)
-            echo "- Created: $URL" >> "$RUNNER_TEMP/blog/summary.md"
+            if URL=$(gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/blog/body.md" --label ha-dev-blog --label enhancement); then
+              echo "- Created: $URL" >> "$RUNNER_TEMP/blog/summary.md"
+            else
+              echo "- Failed to create an issue; see the job log." >> "$RUNNER_TEMP/blog/summary.md"
+              failed=1
+            fi
           done < "$RUNNER_TEMP/blog/new_issues.jsonl"
+          exit "$failed"
 
       - name: Job summary
         if: always()
