@@ -15,6 +15,7 @@ from custom_components.unraid_management_agent.api.events import VMListUpdateEve
 from custom_components.unraid_management_agent.api.models import VMInfo
 from custom_components.unraid_management_agent.cleanup import (
     STALE_REMOVAL_GRACE,
+    _is_dynamic_key,
     _unavailable_data_prefixes,
     async_cleanup_stale_entities,
     async_prune_seen_names,
@@ -52,6 +53,23 @@ def _register_entity(
 
 
 # ── _unavailable_data_prefixes ────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("key", "expected"),
+    [
+        ("vm_ubuntu_server", True),
+        ("vmguest_windows_memory", True),
+        ("container_app", True),
+        ("network_service_smb", True),
+        ("fan", False),
+        ("array_usage", False),
+        ("not_disk_1", False),
+    ],
+)
+def test_dynamic_key_matches_only_at_start(key: str, expected: bool) -> None:
+    """Classify dynamic registry keys using their whole leading prefix."""
+    assert _is_dynamic_key(key) is expected
 
 
 def test_unavailable_prefixes_all_none() -> None:
