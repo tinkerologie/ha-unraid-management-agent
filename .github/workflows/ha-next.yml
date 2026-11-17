@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   test:
+    timeout-minutes: 10
     name: Check (${{ matrix.channel }})
     runs-on: ubuntu-latest
     permissions:
@@ -163,6 +164,7 @@ jobs:
         run: test "$(jq -r .result "$RUNNER_TEMP/result.json")" = pass
 
   report:
+    timeout-minutes: 10
     name: Report (${{ matrix.channel }})
     needs: test
     # Branch dispatches check compatibility without changing repository issues.

@@ -19,6 +19,7 @@ env:
 
 jobs:
   test:
+    timeout-minutes: 30
     name: Test
     runs-on: ubuntu-latest
     permissions:
@@ -56,10 +57,11 @@ jobs:
           files: ./coverage.xml
           flags: unittests
           name: ha-unraid-management-agent
-          use_oidc: ${{ env.CODECOV_OIDC == 'true' }}
-          fail_ci_if_error: ${{ env.CODECOV_OIDC == 'true' }}
+          use_oidc: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          fail_ci_if_error: false
 
   frontend:
+    timeout-minutes: 30
     name: Frontend
     runs-on: ubuntu-latest
     defaults:
@@ -115,6 +117,7 @@ jobs:
           retention-days: 7
 
   release-zip:
+    timeout-minutes: 30
     name: Reproducible release ZIP
     runs-on: ubuntu-latest
     steps:

@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   build:
+    timeout-minutes: 60
     name: Build and attest
     runs-on: ubuntu-latest
     permissions:
@@ -112,6 +113,7 @@ jobs:
   # Checking that setting via REST requires Administration read permission,
   # which GITHUB_TOKEN cannot request. Published releases are never replaced.
   publish:
+    timeout-minutes: 60
     name: Publish
     needs: build
     if: needs.build.outputs.publish == 'true'

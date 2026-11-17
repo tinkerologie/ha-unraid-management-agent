@@ -2,10 +2,12 @@
 # Documentation: https://docs.codecov.com/docs/codecov-yaml
 
 codecov:
-  require_ci_to_pass: yes
+  require_ci_to_pass: false
   notify:
     after_n_builds: 1
 
+    wait_for_ci: false
+  strict_yaml_branch: main
 coverage:
   precision: 2
   round: down
@@ -26,6 +28,7 @@ coverage:
         informational: false
         if_ci_failed: error
 
+        if_not_found: failure
 comment:
   layout: "reach,diff,flags,files,footer"
   behavior: default
@@ -47,5 +50,4 @@ flags:
       - custom_components/unraid_management_agent/
     carryforward: true
 
-github_checks:
-  annotations: true
+github_checks: false

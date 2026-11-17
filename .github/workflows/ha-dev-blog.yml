@@ -23,6 +23,7 @@ concurrency:
 
 jobs:
   watch:
+    timeout-minutes: 10
     name: Watch developer blog
     # Branch dispatches can scan but must not create repository issues.
     runs-on: ubuntu-latest
